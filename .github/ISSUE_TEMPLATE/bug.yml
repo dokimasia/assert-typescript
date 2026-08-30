@@ -1,0 +1,116 @@
+name: Bug report
+description: An assertion does not do what it says.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, three things that are usually not bugs:
+
+        - **A forgotten `await`.** Seven assertions answer a promise,
+          and dropping one asserts nothing. If the seat reported
+          "never awaited", that is this library telling you where.
+        - **`throws` refusing an async callable.** An unawaited
+          rejection is not a throw. Use `rejectsWith`.
+        - **An empty collection not equalling an absent one.** Pass
+          `equateEmpty()` where that difference does not matter.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `npm ls @dokimi/assert`.
+      placeholder: "@dokimi/assert@0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      description: Output of `node -v`. Supported is 24 and up.
+      placeholder: v24.5.0
+    validations:
+      required: true
+
+  - type: input
+    id: runner
+    attributes:
+      label: Test runner
+      description: >
+        And its version. Say "none" if you construct a seat yourself.
+      placeholder: vitest 4.1.11
+    validations:
+      required: true
+
+  - type: dropdown
+    id: seat
+    attributes:
+      label: Which seat
+      description: >
+        Which seat you hold decides what each surface does, so it is
+        usually the answer when a failure appears in the wrong place.
+      options:
+        - The seat fixture (Collector)
+        - Collector, constructed myself
+        - Standard
+        - Recorder
+        - One of my own
+        - not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface
+      options:
+        - check (throws)
+        - soft (collects and continues)
+        - both
+        - not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: awaited
+    attributes:
+      label: If the assertion answers a promise
+      options:
+        - label: I awaited it, or it does not answer one.
+          required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: A test that shows it
+      description: >
+        A whole test, please. Use a `Recorder` where you want to read a
+        failure back rather than suffer it.
+      render: typescript
+      value: |
+        import { check, Recorder } from "@dokimi/assert";
+        import { it } from "vitest";
+
+        it("reproduces", () => {
+          const seat = new Recorder();
+
+          check.equal(seat, got, want, "the contract under test");
+
+          console.log(seat.message);
+        });
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened
+      description: >
+        Both, please. "It fails" does not say whether the assertion
+        reported the wrong thing or reported nothing at all.
+      placeholder: |
+        Expected: a failure naming both values.
+        Got: it passed.
+    validations:
+      required: true
