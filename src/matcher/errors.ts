@@ -1,0 +1,110 @@
+/**
+ * The assertions about an error value.
+ *
+ * For code that hands an error back rather than throwing it: a
+ * settled promise's rejection reason, a Node callback's first
+ * argument, a result object's error field. Where the code throws, use
+ * the assertions in `raises.ts`.
+ *
+ * Matching follows the chain of causes, which is what `cause` on an
+ * Error is for and what lets a wrapped failure still be recognised.
+ */
+
+import { show } from "./inspect.js";
+import { type Mode, report, type Seat } from "./seat.js";
+
+/** How far down a cause chain to look before calling it cyclic. */
+const MAX_CAUSES = 100;
+
+/** Answer every error in the chain, starting with the error itself. */
+function chain(error: unknown): unknown[] {
+  const found: unknown[] = [];
+  let current = error;
+  for (let depth = 0; depth < MAX_CAUSES; depth += 1) {
+    if (current === null || current === undefined) break;
+    if (found.includes(current)) break;
+    found.push(current);
+    current = current instanceof Error ? current.cause : undefined;
+  }
+  return found;
+}
+
+/** Whether target matches error, or anything it wraps. */
+function matchesTarget(error: unknown, target: unknown): boolean {
+  return chain(error).some((link) => {
+    if (link === target) return true;
+    if (typeof target === "function" && link instanceof (target as never)) return true;
+    if (target instanceof Error && link instanceof Error) {
+      return link.name === target.name && link.message === target.message;
+    }
+    return false;
+  });
+}
+
+/** Fail when an error is present. */
+export function noError(seat: Seat, mode: Mode, err: unknown, msg: string): void {
+  seat.helper();
+  if (err !== null && err !== undefined) {
+    report(seat, mode, `${msg}: unexpected error ${show(err)}`);
+  }
+}
+
+/** Fail when no error is present. */
+export function hasError(seat: Seat, mode: Mode, err: unknown, msg: string): void {
+  seat.helper();
+  if (err === null || err === undefined) {
+    report(seat, mode, `${msg}: expected an error, got none`);
+  }
+}
+
+/** Fail when err does not match target, through the chain of causes. */
+export function errorIs(
+  seat: Seat,
+  mode: Mode,
+  err: unknown,
+  target: unknown,
+  msg: string,
+): void {
+  seat.helper();
+  if (!matchesTarget(err, target)) {
+    report(seat, mode, `${msg}: ${show(err)} does not match ${show(target)}`);
+  }
+}
+
+/** Fail when err matches target. */
+export function errorIsNot(
+  seat: Seat,
+  mode: Mode,
+  err: unknown,
+  target: unknown,
+  msg: string,
+): void {
+  seat.helper();
+  if (matchesTarget(err, target)) {
+    report(seat, mode, `${msg}: ${show(err)} matches ${show(target)}`);
+  }
+}
+
+/** A class of error, as `errorAs` looks for one. */
+export type ErrorClass<E> = abstract new (...args: never[]) => E;
+
+/**
+ * Fail when no error of the given class is in the chain.
+ *
+ * @returns The matching error, so its fields can be read, or undefined.
+ */
+export function errorAs<E>(
+  seat: Seat,
+  mode: Mode,
+  err: unknown,
+  want: ErrorClass<E>,
+  msg: string,
+): E | undefined {
+  seat.helper();
+  const found = chain(err).find((link) => link instanceof want);
+  if (found === undefined) {
+    report(seat, mode, `${msg}: no ${want.name} in ${show(err)}`);
+    return undefined;
+  }
+  return found as E;
+}

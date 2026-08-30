@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "exactOptionalPropertyTypes": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+
+    // Node runs this source by stripping types, and an enum or a
+    // parameter property has no JavaScript spelling to strip to.
+    // Rejecting them here is why `node src/thing.ts` works at all.
+    "erasableSyntaxOnly": true,
+
+    // Imports name the .js the build emits, not the .ts on disk.
+    // rewriteRelativeImportExtensions would let the source name
+    // .ts and run under bare node, but it rewrites only the .js
+    // emit: the .d.ts files keep the .ts specifier, which no
+    // consumer can resolve against a package that ships none.
+
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["src", "tests", "tools", "*.config.ts"]
+}

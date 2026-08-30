@@ -1,0 +1,68 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor package.json declares, and every version since. A
+        # library runs on whatever its consumers run.
+        node-version: ["24.x", "26.x"]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint and format
+        run: npm run lint
+
+      - name: Types
+        run: npm run types
+
+      - name: Tests and coverage
+        run: npm run coverage
+
+      # The package is what consumers get, so build it and check the
+      # emit rather than trusting that the sources typecheck.
+      - name: Build
+        run: npm run build
+
+      - name: Check the build ships no .ts specifiers
+        run: |
+          if grep -rn '\.ts"' --include='*.js' --include='*.d.ts' dist/; then
+            echo "dist names .ts files, which the package does not ship"
+            exit 1
+          fi
+          echo "dist names only .js"
+
+      - name: Check the package installs and imports
+        run: |
+          npm pack --silent
+          mkdir -p /tmp/consumer && cd /tmp/consumer
+          npm init -y --silent >/dev/null
+          npm install --silent "$GITHUB_WORKSPACE"/dokimi-assert-*.tgz
+          node --input-type=module -e "
+            import { check, soft } from '@dokimi/assert';
+            import { Recorder } from '@dokimi/assert';
+            const seat = new Recorder();
+            check.equal(seat, 1, 2, 'the package works');
+            if (!seat.failed) { throw new Error('the assertion reported nothing'); }
+            console.log('installed and imported:', seat.message);
+          "

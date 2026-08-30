@@ -1,0 +1,35 @@
+{
+  "languages": {
+    "TypeScript": {
+      "language_servers": ["typescript-language-server", "biome"],
+      "format_on_save": "on",
+      "formatter": [
+        { "code_actions": { "source.organizeImports.biome": true } },
+        { "language_server": { "name": "biome" } }
+      ],
+      "preferred_line_length": 88
+    },
+    "JSON": {
+      "formatter": { "language_server": { "name": "biome" } }
+    }
+  },
+  "lsp": {
+    "typescript-language-server": {
+      "initialization_options": {
+        "preferences": {
+          "includeInlayParameterNameHints": "literals",
+          "includeInlayFunctionLikeReturnTypeHints": true,
+          "importModuleSpecifierEnding": "js"
+        }
+      }
+    },
+    "biome": {
+      "settings": {
+        "require_config_file": true
+      }
+    }
+  },
+  "file_types": {
+    "JSON": ["src/conformance/spec/**/*.json"]
+  }
+}

@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+*.tgz
+
+# Tests and coverage
+coverage/
+.vitest/
+*.lcov
+
+# Caches
+.cache/
+.eslintcache
+.node_repl_history
+.npm/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Zed: settings.json is the shared config that points the editor at the
+# workspace TypeScript and picks the formatter. Nothing else in .zed is.
+.zed/*
+!.zed/settings.json
+
+# Agentic / LLM
+.claude/
+.codex/
+.gemini/
+.topoi/
+superpowers/
+AGENT.md
+CLAUDE.md
+GEMINI.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.local
+secrets.json

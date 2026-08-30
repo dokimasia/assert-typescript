@@ -1,0 +1,66 @@
+{
+  "name": "@dokimi/assert",
+  "version": "0.1.0",
+  "description": "Test assertions defined by a language-neutral standard and held to it",
+  "license": "MIT",
+  "author": "ThesmOS B.V.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "keywords": [
+    "testing",
+    "assertions",
+    "test-framework",
+    "conformance",
+    "vitest",
+    "typescript"
+  ],
+  "homepage": "https://github.com/dokimasia/assert-typescript",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dokimasia/assert-typescript.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dokimasia/assert-typescript/issues"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./vitest": {
+      "types": "./dist/vitest.d.ts",
+      "import": "./dist/vitest.js"
+    },
+    "./conformance": {
+      "types": "./dist/conformance/index.d.ts",
+      "import": "./dist/conformance/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "npm run lint && npm run lint-md && npm run types && npm run coverage && npm run build",
+    "coverage": "vitest run --coverage",
+    "fmt": "biome check --write src tests tools",
+    "lint": "biome check src tests tools",
+    "spec-sync": "node tools/spec-sync.ts",
+    "test": "vitest run",
+    "types": "tsc --noEmit",
+    "lint-md": "npx --yes markdownlint-cli '**/*.md' --ignore node_modules --ignore dist",
+    "api-docs": "npm run build && node tools/api-reference.ts --write"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.11",
+    "@types/node": "^26.4.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}
