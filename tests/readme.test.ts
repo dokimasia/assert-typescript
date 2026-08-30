@@ -6,7 +6,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
@@ -16,6 +16,13 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const README = readFileSync(join(ROOT, "README.md"), "utf8");
 
 it("the api reference matches the code", () => {
+  // The generator reads dist, so a clean checkout has to build first.
+  // Saying that beats an ENOENT stack from three frames down.
+  expect(
+    existsSync(join(ROOT, "dist", "check.d.ts")),
+    "run npm run build first: the reference is generated from the emit",
+  ).toBe(true);
+
   const generated = execFileSync(
     process.execPath,
     [join(ROOT, "tools", "api-reference.ts")],

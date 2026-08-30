@@ -36,13 +36,14 @@ jobs:
       - name: Types
         run: npm run types
 
-      - name: Tests and coverage
-        run: npm run coverage
-
-      # The package is what consumers get, so build it and check the
-      # emit rather than trusting that the sources typecheck.
+      # Before the tests, not after: the README's API reference is
+      # generated from the emitted declarations, and the test that
+      # holds the README to the code reads them.
       - name: Build
         run: npm run build
+
+      - name: Tests and coverage
+        run: npm run coverage
 
       - name: Check the build ships no .ts specifiers
         run: |

@@ -46,7 +46,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "check": "npm run lint && npm run lint-md && npm run types && npm run coverage && npm run build",
+    "check": "npm run lint && npm run lint-md && npm run types && npm run build && npm run coverage",
     "coverage": "vitest run --coverage",
     "fmt": "biome check --write src tests tools",
     "lint": "biome check src tests tools",
