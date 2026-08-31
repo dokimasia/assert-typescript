@@ -105,6 +105,39 @@ export function overlay(): Overlay {
 }
 
 /**
+ * Each relaxation the definition states, with this language's name.
+ *
+ * A relaxation the naming table gives TypeScript no name for maps to
+ * the empty string, which is what an overlay declining it looks like.
+ *
+ * @returns Relaxation id to the name a caller types.
+ */
+export function relaxationNames(): Record<string, string> {
+  const stated = (read("assertions.json") as { relaxations?: Record<string, unknown> })
+    .relaxations;
+  const named = (
+    read("naming.json") as { relaxations?: Record<string, Record<string, string>> }
+  ).relaxations;
+
+  const mapped: Record<string, string> = {};
+  for (const id of Object.keys(stated ?? {})) {
+    mapped[id] = named?.[id]?.[LANGUAGE] ?? "";
+  }
+  return mapped;
+}
+
+/**
+ * Whether the overlay declines a relaxation.
+ *
+ * @param relaxation - The canonical relaxation id.
+ * @returns True when the overlay declares it not offered.
+ */
+export function declinesRelaxation(relaxation: string): boolean {
+  const entries = (overlay() as { relaxations?: { id: string }[] }).relaxations ?? [];
+  return entries.some((entry) => entry.id === relaxation);
+}
+
+/**
  * Whether the overlay excuses an assertion from being implemented.
  *
  * @param assertion The assertion's canonical id.

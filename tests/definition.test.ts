@@ -11,13 +11,16 @@ import * as bench from "../src/bench.js";
 import * as check from "../src/check.js";
 import {
   assertions,
+  declinesRelaxation,
   diverges,
   LANGUAGE,
   names,
   overlay,
+  relaxationNames,
   version,
 } from "../src/conformance/index.js";
 import * as golden from "../src/golden.js";
+import * as option from "../src/option.js";
 import * as soft from "../src/soft.js";
 
 const ASSERTIONS = assertions();
@@ -145,5 +148,29 @@ it("every divergence states a stance and a reason", () => {
 it("the overlay diverges only on assertions the standard states", () => {
   for (const d of overlay().diverge) {
     expect(d.id in ASSERTIONS, `${d.id} is not a defined assertion`).toBe(true);
+  }
+});
+
+describe("every relaxation is offered or declined", () => {
+  const relaxations = relaxationNames();
+
+  it("the definition states relaxations", () => {
+    expect(Object.keys(relaxations).length).toBeGreaterThan(0);
+  });
+
+  for (const [id, name] of Object.entries(relaxations)) {
+    it(`${id} is answered one way`, () => {
+      const declined = declinesRelaxation(id);
+
+      // Named and declined is a contradiction; neither is a silent gap.
+      expect(name !== "" && declined, `${id}: named and declined`).toBe(false);
+      expect(name !== "" || declined, `${id}: neither named nor declined`).toBe(true);
+      if (name !== "") {
+        expect(
+          typeof (option as Record<string, unknown>)[name],
+          `${id}: ${name} is named and not exported`,
+        ).toBe("function");
+      }
+    });
   }
 });
