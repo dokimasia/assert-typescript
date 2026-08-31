@@ -146,9 +146,12 @@ mixing int and float is a numeric assertion where both pass.
 
 ### What the corpus reaches
 
-Seventy cases across seventeen assertions, run against both surfaces.
-The other twenty-four take a callable, a signal or a timeout, and no
-corpus file can hold one, so they are covered by tests here and by the
+Eighty-seven cases across twenty-five assertions, run against both
+surfaces. Seventeen of those cases name a behaviour rather than stating
+a value, which is how a case reaches an assertion that takes a callable.
+
+The other sixteen want a real timeout, a real file or a real runtime, and
+no corpus file can hold one, so they are covered by tests here and by the
 completeness gate.
 
 ### Two assertions are declared, not implemented
