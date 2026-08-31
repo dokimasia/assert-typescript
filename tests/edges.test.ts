@@ -41,7 +41,7 @@ it("a subject that rejects with an unrelated error under a deadline", async () =
   );
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("TypeError");
+  expect(seat.failures[0]?.assertion).toBe("honours-deadline");
 });
 
 it("a subject that throws something other than a TypeError on no handle", async () => {
@@ -100,7 +100,7 @@ it("the corpus checker names what went wrong", () => {
     assertion: "equal",
     args: [],
     expect: "pass",
-    messageContains: [],
+    detail: {},
     skip: {},
   };
   const failed = new Recorder();
@@ -110,8 +110,22 @@ it("the corpus checker names what went wrong", () => {
   expect(mismatch({ ...passing, expect: "fail" }, new Recorder())).toContain(
     "expected a failure",
   );
+  // A failure that reported no record is one that bypassed the seam,
+  // which no assertion may do.
+  expect(mismatch({ ...passing, expect: "fail" }, failed)).toContain(
+    "reported no record",
+  );
+
+  const recorded = new Recorder();
+  recorded.report(
+    { assertion: "equal", contract: "x", detail: { want: 1, got: 2 } },
+    true,
+  );
   expect(
-    mismatch({ ...passing, expect: "fail", messageContains: ["absent"] }, failed),
-  ).toContain("does not mention");
+    mismatch({ ...passing, expect: "fail", detail: { want: 9 } }, recorded),
+  ).toContain('detail "want" is 1, want 9');
+  expect(
+    mismatch({ ...passing, expect: "fail", detail: { want: 1, got: 2 } }, recorded),
+  ).toBeUndefined();
   expect(mismatch(passing, new Recorder())).toBeUndefined();
 });

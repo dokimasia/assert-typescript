@@ -10,6 +10,8 @@
  * | `Recorder`  | collects  | collects                       |
  */
 
+import { type Clock, System } from "./clock.js";
+import { type Failure, render } from "./failure.js";
 import { clear, dropped } from "./matcher/pending.js";
 import type { Seat } from "./matcher/seat.js";
 
@@ -66,6 +68,60 @@ export class Standard implements Seat {
  * test.
  */
 export class Recorder implements Seat {
+  /** Every record that arrived, in call order. */
+  #records: Failure[] = [];
+  /** What assertions read time from, or undefined for the platform. */
+  #clock: Clock | undefined;
+
+  /**
+   * Record one failure as the record it is.
+   *
+   * This is what lets a test read the assertion's own fields rather
+   * than search its sentence for words. The rendered sentence is kept
+   * too, so message answers what it always did.
+   *
+   * @param failure The record the assertion reported.
+   * @param aborting Whether it came from the aborting surface.
+   */
+  report(failure: Failure, aborting: boolean): void {
+    this.#records.push(failure);
+    if (aborting) {
+      this.fail(render(failure));
+      return;
+    }
+    this.record(render(failure));
+  }
+
+  /**
+   * Every record that arrived, in call order.
+   *
+   * A message passed straight to fail or record leaves none, so an
+   * assertion that did not report a record is visible here.
+   */
+  get failures(): readonly Failure[] {
+    return [...this.#records];
+  }
+
+  /**
+   * The clock this seat hands assertions.
+   *
+   * @returns What withClock set, or the platform clock.
+   */
+  clock(): Clock {
+    return this.#clock ?? new System();
+  }
+
+  /**
+   * Make assertions reported here read clock rather than the platform.
+   *
+   * @param clock Where those assertions read time.
+   * @returns The receiver, so the call chains onto the constructor.
+   */
+  withClock(clock: Clock): this {
+    this.#clock = clock;
+    return this;
+  }
+
   #fatal: string | undefined;
   #recorded: string[] = [];
   #helpers = 0;

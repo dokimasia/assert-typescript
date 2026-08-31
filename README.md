@@ -349,7 +349,7 @@ The assertions are defined in
 and implemented in several languages. This library vendors the
 definition and holds itself to it:
 
-- 70 corpus cases state what each assertion must report, run against
+- 87 corpus cases state what each assertion must report, run against
   both surfaces. They are the same cases every other implementation
   runs.
 - A completeness gate checks every assertion is present under the name

@@ -65,7 +65,7 @@ it("eventuallyTrue reports the wait running out", async () => {
   await check.eventuallyTrue(seat, 20, () => false, "it settles");
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("still false");
+  expect(seat.failures[0]?.assertion).toBe("eventually-true");
 });
 
 it("eventuallyTrue passes a predicate that holds", async () => {
@@ -90,7 +90,7 @@ it("noTaskLeaks reports a timer left running", () => {
   clearTimeout(timer);
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("still running");
+  expect(seat.failures[0]?.assertion).toBe("no-task-leaks");
 });
 
 it("noTaskLeaks passes when the scope leaves nothing behind", () => {

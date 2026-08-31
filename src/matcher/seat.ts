@@ -7,6 +7,9 @@
  * assertion itself.
  */
 
+import { type Clock, System } from "../clock.js";
+import { callSite, type Failure, render } from "../failure.js";
+
 /** Where an assertion reports, and what it may do about it. */
 export interface Seat {
   /**
@@ -61,4 +64,71 @@ export function report(seat: Seat, mode: Mode, message: string): void {
     return;
   }
   seat.fail(message);
+}
+
+/** A seat that takes the record rather than the sentence. */
+interface Reporter {
+  report(failure: Failure, aborting: boolean): void;
+}
+
+/** Whether a seat can take a record. */
+function takesRecords(seat: Seat): seat is Seat & Reporter {
+  return typeof (seat as Partial<Reporter>).report === "function";
+}
+
+/**
+ * Send one record to seat.
+ *
+ * A seat that takes records receives it; any other receives the
+ * sentence rendered from it. The call site is read here, so a matcher
+ * does not have to walk the stack.
+ *
+ * This does not decide whether anything failed. A matcher calls it
+ * only once its own comparison has failed.
+ *
+ * @param seat - Where the failure is reported.
+ * @param mode - Whether a failure throws or is recorded.
+ * @param assertion - The canonical id the definition names.
+ * @param contract - The caller's message, unchanged.
+ * @param detail - The values this assertion declares.
+ */
+export function reportFailure(
+  seat: Seat,
+  mode: Mode,
+  assertion: string,
+  contract: string,
+  detail: Record<string, unknown> = {},
+): void {
+  seat.helper();
+  const where = callSite();
+  const failure: Failure = where
+    ? { assertion, contract, detail, where }
+    : { assertion, contract, detail };
+
+  if (takesRecords(seat)) {
+    seat.report(failure, mode !== Mode.Soft);
+    return;
+  }
+  report(seat, mode, render(failure));
+}
+
+/** A seat that carries a clock. */
+interface Clocked {
+  clock(): Clock;
+}
+
+/**
+ * Answer the clock seat carries, or the platform clock.
+ *
+ * @param seat - Where the failure is reported, which is also where a
+ *   test supplies time.
+ * @returns What the seat carries, or System when it carries nothing.
+ */
+export function clockOf(seat: Seat): Clock {
+  const held = (seat as Partial<Clocked>).clock;
+  if (typeof held === "function") {
+    const supplied = held.call(seat);
+    if (supplied) return supplied;
+  }
+  return new System();
 }

@@ -7,8 +7,7 @@
  * synchronous and asynchronous code.
  */
 
-import { show } from "./inspect.js";
-import { type Mode, report, type Seat } from "./seat.js";
+import { type Mode, reportFailure, type Seat } from "./seat.js";
 
 /** Whether a value is a promise this can await. */
 function isPromise(value: unknown): value is Promise<unknown> {
@@ -34,13 +33,13 @@ export function throws(
   try {
     const answered = fn();
     if (isPromise(answered)) {
-      report(seat, mode, `${msg}: answered a promise; await it and pass the result`);
+      reportFailure(seat, mode, "throws", msg);
       return undefined;
     }
   } catch (thrown) {
     return thrown;
   }
-  report(seat, mode, `${msg}: returned without throwing`);
+  reportFailure(seat, mode, "throws", msg);
   return undefined;
 }
 
@@ -55,7 +54,7 @@ export function doesNotThrow(
   try {
     fn();
   } catch (thrown) {
-    report(seat, mode, `${msg}: threw ${show(thrown)}`);
+    reportFailure(seat, mode, "not-throws", msg, { got: thrown });
   }
 }
 
@@ -76,6 +75,6 @@ export async function rejectsWith(
   } catch (thrown) {
     return thrown;
   }
-  report(seat, mode, `${msg}: settled without rejecting`);
+  reportFailure(seat, mode, "throws", msg);
   return undefined;
 }

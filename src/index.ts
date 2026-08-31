@@ -22,6 +22,8 @@
 
 export * as bench from "./bench.js";
 export * as check from "./check.js";
+export { type Clock, Controlled, System } from "./clock.js";
+export type { Failure, Where } from "./failure.js";
 export * as golden from "./golden.js";
 export { equateEmpty, equateNans, type Option } from "./option.js";
 export { rejects } from "./rejects.js";

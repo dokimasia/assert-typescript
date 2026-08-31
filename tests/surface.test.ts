@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import * as check from "../src/check.js";
+import { Controlled } from "../src/clock.js";
 import { Recorder } from "../src/seat.js";
 import * as soft from "../src/soft.js";
 
@@ -45,7 +46,9 @@ function boom(): never {
 const ERROR = new Error("boom");
 
 /** Each entry answers fresh arguments, so a stateful case starts clean. */
-const FAILING: Record<string, () => unknown[]> = {
+//: Each case is built against the clock its seat reads, so a subject
+//: that has to take time moves that clock rather than the wall.
+const FAILING: Record<string, (clock: Controlled) => unknown[]> = {
   noError: () => [ERROR],
   hasError: () => [null],
   errorIs: () => [ERROR, TypeError],
@@ -56,7 +59,13 @@ const FAILING: Record<string, () => unknown[]> = {
   pairwise: () => [[2, 1], (a: number, b: number) => a < b],
   honoursCancellation: () => [ignores],
   honoursDeadline: () => [ignores],
-  completesWithin: () => [0, () => new Promise((r) => setTimeout(r, 5))],
+  completesWithin: (clock) => [
+    0,
+    () => {
+      clock.advance(5);
+      return Promise.resolve();
+    },
+  ],
   nullHandleSafe: () => [(s: AbortSignal) => s.aborted],
   isPure: () => {
     const state = [1];
@@ -75,14 +84,20 @@ describe("both surfaces report the same failure", () => {
   for (const name of Object.keys(FAILING).sort()) {
     it(name, async () => {
       const msg = "the stated contract";
-      const aborting = new Recorder();
-      const recording = new Recorder();
+      // Both seats read a clock the test controls, so an assertion
+      // that measures or retries reports the same values on each
+      // surface rather than two readings of a busy machine.
+      const abortingClock = new Controlled(0);
+      const recordingClock = new Controlled(0);
+      const aborting = new Recorder().withClock(abortingClock);
+      const recording = new Recorder().withClock(recordingClock);
 
       const asCheck = check as unknown as Record<string, (...a: unknown[]) => unknown>;
       const asSoft = soft as unknown as Record<string, (...a: unknown[]) => unknown>;
 
-      await asCheck[name]?.(aborting, ...(FAILING[name] as () => unknown[])(), msg);
-      await asSoft[name]?.(recording, ...(FAILING[name] as () => unknown[])(), msg);
+      const build = FAILING[name] as (clock: Controlled) => unknown[];
+      await asCheck[name]?.(aborting, ...build(abortingClock), msg);
+      await asSoft[name]?.(recording, ...build(recordingClock), msg);
 
       expect(aborting.failed, `check.${name} reports`).toBe(true);
       expect(recording.failed, `soft.${name} reports`).toBe(true);
@@ -94,11 +109,13 @@ describe("both surfaces report the same failure", () => {
 describe("the recording surface records rather than stopping", () => {
   for (const name of Object.keys(FAILING).sort()) {
     it(name, async () => {
-      const seat = new Recorder();
+      const clock = new Controlled(0);
+      const seat = new Recorder().withClock(clock);
       const asSoft = soft as unknown as Record<string, (...a: unknown[]) => unknown>;
 
-      await asSoft[name]?.(seat, ...(FAILING[name] as () => unknown[])(), "first");
-      await asSoft[name]?.(seat, ...(FAILING[name] as () => unknown[])(), "second");
+      const build = FAILING[name] as (clock: Controlled) => unknown[];
+      await asSoft[name]?.(seat, ...build(clock), "first");
+      await asSoft[name]?.(seat, ...build(clock), "second");
 
       expect(seat.messages).toHaveLength(2);
     });

@@ -10,8 +10,7 @@
  * Error is for and what lets a wrapped failure still be recognised.
  */
 
-import { show } from "./inspect.js";
-import { type Mode, report, type Seat } from "./seat.js";
+import { type Mode, reportFailure, type Seat } from "./seat.js";
 
 /** How far down a cause chain to look before calling it cyclic. */
 const MAX_CAUSES = 100;
@@ -45,7 +44,7 @@ function matchesTarget(error: unknown, target: unknown): boolean {
 export function noError(seat: Seat, mode: Mode, err: unknown, msg: string): void {
   seat.helper();
   if (err !== null && err !== undefined) {
-    report(seat, mode, `${msg}: unexpected error ${show(err)}`);
+    reportFailure(seat, mode, "err-absent", msg, { got: err });
   }
 }
 
@@ -53,7 +52,7 @@ export function noError(seat: Seat, mode: Mode, err: unknown, msg: string): void
 export function hasError(seat: Seat, mode: Mode, err: unknown, msg: string): void {
   seat.helper();
   if (err === null || err === undefined) {
-    report(seat, mode, `${msg}: expected an error, got none`);
+    reportFailure(seat, mode, "err-present", msg);
   }
 }
 
@@ -67,7 +66,7 @@ export function errorIs(
 ): void {
   seat.helper();
   if (!matchesTarget(err, target)) {
-    report(seat, mode, `${msg}: ${show(err)} does not match ${show(target)}`);
+    reportFailure(seat, mode, "err-is", msg, { want: target, got: err });
   }
 }
 
@@ -81,7 +80,7 @@ export function errorIsNot(
 ): void {
   seat.helper();
   if (matchesTarget(err, target)) {
-    report(seat, mode, `${msg}: ${show(err)} matches ${show(target)}`);
+    reportFailure(seat, mode, "err-is-not", msg, { got: err });
   }
 }
 
@@ -103,7 +102,7 @@ export function errorAs<E>(
   seat.helper();
   const found = chain(err).find((link) => link instanceof want);
   if (found === undefined) {
-    report(seat, mode, `${msg}: no ${want.name} in ${show(err)}`);
+    reportFailure(seat, mode, "err-as", msg, { want, got: err });
     return undefined;
   }
   return found as E;

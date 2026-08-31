@@ -31,8 +31,17 @@ export interface Case {
   readonly args: readonly unknown[];
   /** Whether the assertion must pass or fail. */
   readonly expect: "pass" | "fail";
-  /** Text the failure must carry. */
-  readonly messageContains: readonly string[];
+  /**
+   * What the failure's record must hold, keyed by the names the
+   * assertion declares. Every field stated must match; a field the
+   * case leaves out is not checked.
+   */
+  readonly detail: Readonly<Record<string, unknown>>;
+  /**
+   * The behaviour this case hands the assertion in place of arguments,
+   * or undefined for a case that states values.
+   */
+  readonly subject?: string;
   /** Why a language skips this case, by language. */
   readonly skip: Readonly<Record<string, string>>;
 }
@@ -57,9 +66,10 @@ export function cases(): Case[] {
       assertion: string;
       cases: {
         id: string;
-        args: Literal[];
+        args?: Literal[];
         expect: "pass" | "fail";
-        message_contains?: string[];
+        detail?: Record<string, Literal>;
+        subject?: { kind: string };
         skip?: Record<string, string>;
       }[];
     };
@@ -68,9 +78,15 @@ export function cases(): Case[] {
       found.push({
         id: one.id,
         assertion: document.assertion,
-        args: one.args.map(decode),
+        args: (one.args ?? []).map(decode),
         expect: one.expect,
-        messageContains: one.message_contains ?? [],
+        ...(one.subject ? { subject: one.subject.kind } : {}),
+        detail: Object.fromEntries(
+          Object.entries(one.detail ?? {}).map(([name, value]) => [
+            name,
+            decode(value),
+          ]),
+        ),
         skip: one.skip ?? {},
       });
     }
@@ -111,10 +127,47 @@ export function mismatch(one: Case, recorder: Recorder): string | undefined {
   }
   if (!recorder.failed) return "expected a failure, got a pass";
 
-  for (const wanted of one.messageContains) {
-    if (!recorder.message.includes(wanted)) {
-      return `the failure does not mention "${wanted}": ${recorder.message}`;
+  const [record] = recorder.failures;
+  if (record === undefined) {
+    return "reported no record; the assertion did not report one";
+  }
+
+  for (const [name, want] of Object.entries(one.detail)) {
+    if (!(name in record.detail)) {
+      return `the record holds no detail "${name}", want ${show(want)}`;
+    }
+    const held = record.detail[name];
+    if (!same(held, want)) {
+      return `detail "${name}" is ${show(held)}, want ${show(want)}`;
     }
   }
   return undefined;
+}
+
+/** Say one value for a mismatch message. */
+function show(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/**
+ * Whether a reported value matches what a case states.
+ *
+ * A NaN is unequal to itself under the standard's own rules, which
+ * would make a case stating one impossible to satisfy. Here the
+ * question is whether the assertion reported the value the case named,
+ * so two NaNs count as the same value.
+ *
+ * @param held What the assertion reported.
+ * @param want What the case states.
+ * @returns Whether they are the same value.
+ */
+function same(held: unknown, want: unknown): boolean {
+  if (typeof held === "number" && typeof want === "number") {
+    if (Number.isNaN(held) && Number.isNaN(want)) return true;
+  }
+  return JSON.stringify(held) === JSON.stringify(want);
 }

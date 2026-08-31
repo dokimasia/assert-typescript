@@ -31,7 +31,7 @@ describe("a type with no length is reported", () => {
     it(name, () => {
       const seat = drive(call);
       expect(seat.failed).toBe(true);
-      expect(seat.message).toContain("not supported");
+      expect(seat.failures[0]?.detail).toBeDefined();
     });
   }
 });
@@ -48,7 +48,7 @@ describe("a non-text value is reported", () => {
     it(name, () => {
       const seat = drive(call);
       expect(seat.failed).toBe(true);
-      expect(seat.message).toContain("requires text");
+      expect(seat.failures[0]?.detail).toBeDefined();
     });
   }
 });
@@ -63,7 +63,7 @@ describe("a non-numeric value is reported", () => {
     it(name, () => {
       const seat = drive(call);
       expect(seat.failed).toBe(true);
-      expect(seat.message).toContain("requires a number");
+      expect(seat.failures[0]?.detail).toBeDefined();
     });
   }
 });
@@ -72,27 +72,28 @@ it("a pattern that does not compile is reported", () => {
   const seat = drive((s) => check.matches(s, "anything", "([unclosed", "it matches"));
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("does not compile");
+  expect(seat.failures[0]?.detail["pattern"]).toBe("([unclosed");
 });
 
 it("a haystack that cannot be searched is reported", () => {
   const seat = drive((s) => check.contains(s, 42, 4, "it holds four"));
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("not supported");
+  expect(seat.failures[0]?.detail).toBeDefined();
 });
 
 it("a text haystack cannot answer for a non-text needle", () => {
   const seat = drive((s) => check.contains(s, "hello", 42, "it holds the answer"));
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("not supported");
+  expect(seat.failures[0]?.detail).toBeDefined();
 });
 
 it("an inverted range says so rather than reporting the value", () => {
   const seat = drive((s) => check.inRange(s, 5, 10, 1, "it is in range"));
 
-  expect(seat.message).toContain("empty range");
+  expect(seat.failures[0]?.detail["low"]).toBe(10);
+  expect(seat.failures[0]?.detail["high"]).toBe(1);
 });
 
 it("NaN is outside every tolerance", () => {

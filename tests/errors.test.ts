@@ -122,7 +122,7 @@ it("throws refuses a callable that answers a promise", () => {
   check.throws(seat, async () => 1, "it refuses");
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("promise");
+  expect(seat.failures[0]?.assertion).toBe("throws");
 });
 
 it("doesNotThrow passes a quiet call and reports a throwing one", () => {

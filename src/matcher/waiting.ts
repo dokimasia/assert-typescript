@@ -10,7 +10,8 @@
  * the answer instead.
  */
 
-import { type Mode, report, type Seat } from "./seat.js";
+import { wait } from "../clock.js";
+import { clockOf, type Mode, reportFailure, type Seat } from "./seat.js";
 
 /**
  * A seat that keeps one trial's failure instead of reporting it.
@@ -62,7 +63,8 @@ export async function eventually(
   msg: string,
 ): Promise<void> {
   seat.helper();
-  const deadline = performance.now() + timeout;
+  const clock = clockOf(seat);
+  const deadline = clock.now() + timeout;
 
   for (let attempt = 1; ; attempt += 1) {
     const trial = new Trial();
@@ -71,15 +73,14 @@ export async function eventually(
     const failure = trial.failure;
     if (failure === undefined) return;
 
-    if (performance.now() > deadline) {
-      report(
-        seat,
-        mode,
-        `${msg}: still failing after ${timeout}ms and ${attempt} attempts: ${failure}`,
-      );
+    if (clock.now() > deadline) {
+      reportFailure(seat, mode, "eventually", msg, {
+        attempts: attempt,
+        last: failure,
+      });
       return;
     }
-    await sleep(interval);
+    await wait(clock, interval);
   }
 }
 
@@ -100,22 +101,19 @@ export async function eventuallyTrue(
   msg: string,
 ): Promise<void> {
   seat.helper();
-  const deadline = performance.now() + timeout;
+  const clock = clockOf(seat);
+  const deadline = clock.now() + timeout;
   const cap = timeout / 4;
   let backoff = 1;
 
   for (let attempt = 1; ; attempt += 1) {
     if (await predicate()) return;
 
-    if (performance.now() > deadline) {
-      report(
-        seat,
-        mode,
-        `${msg}: still false after ${timeout}ms and ${attempt} attempts`,
-      );
+    if (clock.now() > deadline) {
+      reportFailure(seat, mode, "eventually-true", msg, { attempts: attempt });
       return;
     }
-    await sleep(backoff);
+    await wait(clock, backoff);
     backoff = Math.min(backoff * 2, cap > 0 ? cap : backoff * 2);
   }
 }
@@ -146,7 +144,7 @@ export function noTaskLeaks(seat: Seat, mode: Mode, msg: string): () => void {
       if (started > 0) leaked.push(`${started} ${kind}`);
     }
     if (leaked.length > 0) {
-      report(seat, mode, `${msg}: still running: ${leaked.sort().join(", ")}`);
+      reportFailure(seat, mode, "no-task-leaks", msg, { leaked: leaked.sort() });
     }
   };
 }

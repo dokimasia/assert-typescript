@@ -24,7 +24,7 @@
  * ceiling set from one run would fail the next for no reason.
  */
 
-import { Mode, report, type Seat } from "./matcher/seat.js";
+import { Mode, report, reportFailure, type Seat } from "./matcher/seat.js";
 
 /** How many samples a p99 needs before it means anything. */
 const P99_MINIMUM = 100;
@@ -124,20 +124,16 @@ export class Contract {
     const p99 = percentile(run.latencies, 99);
 
     if (this.#maxLatency !== undefined && p99 > this.#maxLatency) {
-      report(
-        this.#seat,
-        Mode.Fatal,
-        `${this.#msg}: p99 was ${p99.toFixed(3)}ms, want at most ` +
-          `${this.#maxLatency}ms over ${run.iterations} iterations`,
-      );
+      reportFailure(this.#seat, Mode.Fatal, "bench-max-latency", this.#msg, {
+        want: this.#maxLatency,
+        got: Number(p99.toFixed(3)),
+      });
     }
     if (this.#maxMean !== undefined && mean > this.#maxMean) {
-      report(
-        this.#seat,
-        Mode.Fatal,
-        `${this.#msg}: mean was ${mean.toFixed(3)}ms, want at most ` +
-          `${this.#maxMean}ms over ${run.iterations} iterations`,
-      );
+      reportFailure(this.#seat, Mode.Fatal, "bench-max-mean", this.#msg, {
+        want: this.#maxMean,
+        got: Number(mean.toFixed(3)),
+      });
     }
   }
 }

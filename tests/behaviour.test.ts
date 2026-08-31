@@ -42,7 +42,7 @@ it("honoursCancellation reports a subject that ignores it", async () => {
   await check.honoursCancellation(seat, ignores, "it stops when told");
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("no rejection");
+  expect(seat.failures[0]?.assertion).toBe("honours-cancellation");
 });
 
 it("honoursDeadline passes a subject that checks the signal", async () => {
@@ -76,7 +76,7 @@ it("completesWithin reports a slow subject and names the ceiling", async () => {
   );
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("want at most");
+  expect(seat.failures[0]?.assertion).toBe("completes-within");
 });
 
 it("isPure passes when the projection holds", async () => {
@@ -103,7 +103,7 @@ it("isPure reports when the projection changes", async () => {
   );
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("observable state changed");
+  expect(seat.failures[0]?.assertion).toBe("pure");
 });
 
 it("isPure ignores what the projection leaves out", async () => {
@@ -144,5 +144,5 @@ it("nullHandleSafe reports a subject that dereferences", async () => {
   );
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("a missing handle caused");
+  expect(seat.failures[0]?.assertion).toBe("nil-context-safe");
 });

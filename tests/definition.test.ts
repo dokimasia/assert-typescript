@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as bench from "../src/bench.js";
 import * as check from "../src/check.js";
+import * as clock from "../src/clock.js";
 import {
   assertions,
   declinesRelaxation,
@@ -195,11 +196,31 @@ describe("every surface id is offered or declined", () => {
   };
 
   /**
+   * Where a clock row resolves. The interface is erased at run time,
+   * so its rows are answered by the class that implements them.
+   */
+  const InClock: Record<string, { prototype: object } | null> = {
+    "controlled-clock": clock.Controlled,
+    "system-clock": clock.System,
+    "clock.now": clock.Controlled,
+    "clock.sleep": clock.Controlled,
+    "controlled-clock.advance": clock.Controlled,
+    "seat.clock": seat.Recorder,
+  };
+
+  /**
    * A type is erased at run time, so its row is checked against the
    * declaration file a consumer's editor reads.
    */
   const Declared: Record<string, { file: string; holds: string }> = {
     seat: { file: "seat.d.ts", holds: "export type { Seat }" },
+    clock: { file: "clock.d.ts", holds: "interface Clock" },
+    failure: { file: "failure.d.ts", holds: "interface Failure" },
+    where: { file: "failure.d.ts", holds: "interface Where" },
+    "failure.assertion": { file: "failure.d.ts", holds: "assertion: string" },
+    "failure.contract": { file: "failure.d.ts", holds: "contract: string" },
+    "failure.detail": { file: "failure.d.ts", holds: "detail: Readonly" },
+    "seat.report": { file: "seat.d.ts", holds: "report(" },
     scrubber: { file: "golden.d.ts", holds: "export type Scrubber" },
   };
 
@@ -216,6 +237,21 @@ describe("every surface id is offered or declined", () => {
       if (name === "") return;
 
       const leaf = name.split(".").pop() as string;
+
+      if (sid in InClock) {
+        const owner = InClock[sid] as { prototype: object };
+        if (!sid.includes(".")) {
+          expect(owner, `${sid}: ${name} is named and not exported`).toBeTypeOf(
+            "function",
+          );
+          return;
+        }
+        expect(
+          carries(owner, leaf),
+          `${sid}: ${name} is named and not implemented`,
+        ).toBe(true);
+        return;
+      }
 
       if (sid in Declared) {
         const where = Declared[sid] as { file: string; holds: string };

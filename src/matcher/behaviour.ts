@@ -8,9 +8,8 @@
  */
 
 import { equal as compare } from "./compare.js";
-import { show } from "./inspect.js";
 import { type Option, settings } from "./option.js";
-import { type Mode, report, type Seat } from "./seat.js";
+import { clockOf, type Mode, reportFailure, type Seat } from "./seat.js";
 
 /** A subject that takes a cancellation handle and answers a promise. */
 export type Cancellable = (signal: AbortSignal) => Promise<unknown>;
@@ -58,14 +57,10 @@ export async function honoursCancellation(
     await fn(signal);
   } catch (thrown) {
     if (isAbort(thrown, signal)) return;
-    report(
-      seat,
-      mode,
-      `${msg}: an aborted signal produced ${show(thrown)}, want a cancellation`,
-    );
+    reportFailure(seat, mode, "honours-cancellation", msg, { got: thrown });
     return;
   }
-  report(seat, mode, `${msg}: an aborted signal produced no rejection`);
+  reportFailure(seat, mode, "honours-cancellation", msg, { got: undefined });
 }
 
 /**
@@ -91,14 +86,10 @@ export async function honoursDeadline(
     await fn(signal);
   } catch (thrown) {
     if (isAbort(thrown, signal)) return;
-    report(
-      seat,
-      mode,
-      `${msg}: an expired deadline produced ${show(thrown)}, want a timeout`,
-    );
+    reportFailure(seat, mode, "honours-deadline", msg, { got: thrown });
     return;
   }
-  report(seat, mode, `${msg}: an expired deadline produced no rejection`);
+  reportFailure(seat, mode, "honours-deadline", msg, { got: undefined });
 }
 
 /**
@@ -116,16 +107,18 @@ export async function completesWithin(
   msg: string,
 ): Promise<void> {
   seat.helper();
-  const started = performance.now();
+  const clock = clockOf(seat);
+  const started = clock.now();
   await fn();
-  const elapsed = performance.now() - started;
+  const elapsed = clock.now() - started;
 
   if (elapsed > within) {
-    report(
-      seat,
-      mode,
-      `${msg}: took ${elapsed.toFixed(1)}ms, want at most ${within}ms`,
-    );
+    // Tenths of a millisecond is the granularity this is about, and a
+    // raw reading carries far more digits than that.
+    reportFailure(seat, mode, "completes-within", msg, {
+      want: within,
+      got: Number(elapsed.toFixed(1)),
+    });
   }
 }
 
@@ -151,11 +144,7 @@ export async function isPure(
   const after = await observe();
 
   if (!compare(after, before, settings(options))) {
-    report(
-      seat,
-      mode,
-      `${msg}: observable state changed: was ${show(before)}, now ${show(after)}`,
-    );
+    reportFailure(seat, mode, "pure", msg, { want: before, got: after });
   }
 }
 
@@ -177,7 +166,7 @@ export async function nullHandleSafe(
     await fn(undefined);
   } catch (thrown) {
     if (thrown instanceof TypeError) {
-      report(seat, mode, `${msg}: a missing handle caused ${show(thrown)}`);
+      reportFailure(seat, mode, "nil-context-safe", msg, { got: thrown });
     }
   }
 }

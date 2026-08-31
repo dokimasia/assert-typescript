@@ -32,8 +32,7 @@ it("a run over the latency ceiling is reported", async () => {
   contract.check();
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("p99");
-  expect(seat.message).toContain("want at most");
+  expect(seat.failures[0]?.assertion).toBe("bench-max-latency");
 });
 
 it("a run over the mean ceiling is reported", async () => {
@@ -44,7 +43,7 @@ it("a run over the mean ceiling is reported", async () => {
   contract.check();
 
   expect(seat.failed).toBe(true);
-  expect(seat.message).toContain("mean");
+  expect(seat.failures[0]?.assertion).toBe("bench-max-mean");
 });
 
 it("checking without measuring is itself the failure", () => {

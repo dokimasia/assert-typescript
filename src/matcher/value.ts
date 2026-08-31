@@ -8,9 +8,8 @@
  */
 
 import { equal as compare } from "./compare.js";
-import { show } from "./inspect.js";
 import { type Option, settings } from "./option.js";
-import { type Mode, report, type Seat } from "./seat.js";
+import { type Mode, reportFailure, type Seat } from "./seat.js";
 
 /** Whether a value can answer for its own length. */
 function sized(value: unknown): number | undefined {
@@ -37,10 +36,10 @@ function unsupported(
   seat: Seat,
   mode: Mode,
   msg: string,
-  what: string,
-  value: unknown,
+  assertion: string,
+  detail: Record<string, unknown>,
 ): void {
-  report(seat, mode, `${msg}: ${what} is not supported for ${typeName(value)}`);
+  reportFailure(seat, mode, assertion, msg, detail);
 }
 
 /** Fail when got and want differ. */
@@ -54,7 +53,7 @@ export function equal(
 ): void {
   seat.helper();
   if (!compare(got, want, settings(options))) {
-    report(seat, mode, `${msg}: want ${show(want)}, got ${show(got)}`);
+    reportFailure(seat, mode, "equal", msg, { want, got });
   }
 }
 
@@ -69,27 +68,27 @@ export function notEqual(
 ): void {
   seat.helper();
   if (compare(got, want, settings(options))) {
-    report(seat, mode, `${msg}: values are equal, want different: got ${show(got)}`);
+    reportFailure(seat, mode, "not-equal", msg, { got });
   }
 }
 
 /** Fail when the condition does not hold. */
 export function isTrue(seat: Seat, mode: Mode, condition: boolean, msg: string): void {
   seat.helper();
-  if (!condition) report(seat, mode, msg);
+  if (!condition) reportFailure(seat, mode, "true", msg);
 }
 
 /** Fail when the condition holds. */
 export function isFalse(seat: Seat, mode: Mode, condition: boolean, msg: string): void {
   seat.helper();
-  if (condition) report(seat, mode, msg);
+  if (condition) reportFailure(seat, mode, "false", msg);
 }
 
 /** Fail when got is neither null nor undefined. */
 export function isNil(seat: Seat, mode: Mode, got: unknown, msg: string): void {
   seat.helper();
   if (got !== null && got !== undefined) {
-    report(seat, mode, `${msg}: expected nothing, got ${show(got)}`);
+    reportFailure(seat, mode, "nil", msg, { got });
   }
 }
 
@@ -97,7 +96,7 @@ export function isNil(seat: Seat, mode: Mode, got: unknown, msg: string): void {
 export function isNotNil(seat: Seat, mode: Mode, got: unknown, msg: string): void {
   seat.helper();
   if (got === null || got === undefined) {
-    report(seat, mode, `${msg}: expected something, got ${show(got)}`);
+    reportFailure(seat, mode, "not-nil", msg);
   }
 }
 
@@ -112,11 +111,11 @@ export function length(
   seat.helper();
   const size = sized(got);
   if (size === undefined) {
-    unsupported(seat, mode, msg, "length", got);
+    unsupported(seat, mode, msg, "length", { want, got });
     return;
   }
   if (size !== want) {
-    report(seat, mode, `${msg}: expected length ${want}, got ${size}`);
+    reportFailure(seat, mode, "length", msg, { want, got: size });
   }
 }
 
@@ -125,10 +124,10 @@ export function isEmpty(seat: Seat, mode: Mode, got: unknown, msg: string): void
   seat.helper();
   const size = sized(got);
   if (size === undefined) {
-    unsupported(seat, mode, msg, "emptiness", got);
+    unsupported(seat, mode, msg, "empty", { length: got });
     return;
   }
-  if (size !== 0) report(seat, mode, `${msg}: expected empty, got length ${size}`);
+  if (size !== 0) reportFailure(seat, mode, "empty", msg, { length: size });
 }
 
 /** Fail when got holds nothing. */
@@ -136,10 +135,10 @@ export function isNotEmpty(seat: Seat, mode: Mode, got: unknown, msg: string): v
   seat.helper();
   const size = sized(got);
   if (size === undefined) {
-    unsupported(seat, mode, msg, "emptiness", got);
+    unsupported(seat, mode, msg, "not-empty", {});
     return;
   }
-  if (size === 0) report(seat, mode, `${msg}: expected non-empty, got length 0`);
+  if (size === 0) reportFailure(seat, mode, "not-empty", msg);
 }
 
 /**
@@ -195,11 +194,11 @@ export function contains(
   seat.helper();
   const { held, answered } = holds(haystack, needle, options);
   if (!answered) {
-    unsupported(seat, mode, msg, "containment", haystack);
+    unsupported(seat, mode, msg, "contains", { haystack, needle });
     return;
   }
   if (!held) {
-    report(seat, mode, `${msg}: ${show(haystack)} does not contain ${show(needle)}`);
+    reportFailure(seat, mode, "contains", msg, { haystack, needle });
   }
 }
 
@@ -215,11 +214,11 @@ export function notContains(
   seat.helper();
   const { held, answered } = holds(haystack, needle, options);
   if (!answered) {
-    unsupported(seat, mode, msg, "containment", haystack);
+    unsupported(seat, mode, msg, "not-contains", { haystack, needle });
     return;
   }
   if (held) {
-    report(seat, mode, `${msg}: ${show(haystack)} contains ${show(needle)}`);
+    reportFailure(seat, mode, "not-contains", msg, { haystack, needle });
   }
 }
 
@@ -229,8 +228,14 @@ function asText(value: unknown): string | undefined {
 }
 
 /** Report that an assertion needed text and was handed something else. */
-function requiresText(seat: Seat, mode: Mode, msg: string, got: unknown): void {
-  report(seat, mode, `${msg}: requires text, got ${typeName(got)}`);
+function requiresText(
+  seat: Seat,
+  mode: Mode,
+  msg: string,
+  assertion: string,
+  detail: Record<string, unknown>,
+): void {
+  reportFailure(seat, mode, assertion, msg, detail);
 }
 
 /** Fail when got does not start with prefix. */
@@ -244,11 +249,11 @@ export function hasPrefix(
   seat.helper();
   const text = asText(got);
   if (text === undefined) {
-    requiresText(seat, mode, msg, got);
+    requiresText(seat, mode, msg, "has-prefix", { got, prefix });
     return;
   }
   if (!text.startsWith(prefix)) {
-    report(seat, mode, `${msg}: ${show(text)} does not start with ${show(prefix)}`);
+    reportFailure(seat, mode, "has-prefix", msg, { got: text, prefix });
   }
 }
 
@@ -263,11 +268,11 @@ export function hasSuffix(
   seat.helper();
   const text = asText(got);
   if (text === undefined) {
-    requiresText(seat, mode, msg, got);
+    requiresText(seat, mode, msg, "has-suffix", { got, suffix });
     return;
   }
   if (!text.endsWith(suffix)) {
-    report(seat, mode, `${msg}: ${show(text)} does not end with ${show(suffix)}`);
+    reportFailure(seat, mode, "has-suffix", msg, { got: text, suffix });
   }
 }
 
@@ -282,7 +287,7 @@ export function matches(
   seat.helper();
   const text = asText(got);
   if (text === undefined) {
-    requiresText(seat, mode, msg, got);
+    requiresText(seat, mode, msg, "matches", { got, pattern });
     return;
   }
 
@@ -290,11 +295,11 @@ export function matches(
   try {
     expression = new RegExp(pattern);
   } catch (err) {
-    report(seat, mode, `${msg}: pattern ${show(pattern)} does not compile: ${err}`);
+    reportFailure(seat, mode, "matches", msg, { got, pattern });
     return;
   }
   if (!expression.test(text)) {
-    report(seat, mode, `${msg}: ${show(text)} does not match ${show(pattern)}`);
+    reportFailure(seat, mode, "matches", msg, { got: text, pattern });
   }
 }
 
@@ -309,15 +314,25 @@ export function containsInOrder(
   seat.helper();
   const text = asText(got);
   if (text === undefined) {
-    requiresText(seat, mode, msg, got);
+    requiresText(seat, mode, msg, "contains-in-order", {
+      haystack: got,
+      needle: "",
+      index: 0,
+    });
     return;
   }
 
   let from = 0;
-  for (const needle of needles) {
+  // The index is the loop's own, not a lookup: a needle listed twice
+  // would find its first position rather than the one that failed.
+  for (const [index, needle] of needles.entries()) {
     const at = text.indexOf(needle, from);
     if (at < 0) {
-      report(seat, mode, `${msg}: ${show(needle)} does not follow what came before`);
+      reportFailure(seat, mode, "contains-in-order", msg, {
+        haystack: text,
+        needle,
+        index,
+      });
       return;
     }
     from = at + needle.length;
@@ -330,8 +345,14 @@ function asNumber(value: unknown): number | undefined {
 }
 
 /** Report that an assertion needed a number and was handed something else. */
-function requiresNumber(seat: Seat, mode: Mode, msg: string, got: unknown): void {
-  report(seat, mode, `${msg}: requires a number, got ${typeName(got)}`);
+function requiresNumber(
+  seat: Seat,
+  mode: Mode,
+  msg: string,
+  assertion: string,
+  detail: Record<string, unknown>,
+): void {
+  reportFailure(seat, mode, assertion, msg, detail);
 }
 
 /** Fail when got is further than tolerance from want. */
@@ -346,7 +367,7 @@ export function closeTo(
   seat.helper();
   const value = asNumber(got);
   if (value === undefined) {
-    requiresNumber(seat, mode, msg, got);
+    requiresNumber(seat, mode, msg, "close-to", { got, want, tolerance });
     return;
   }
 
@@ -354,16 +375,11 @@ export function closeTo(
   // would pass a NaN rather than reject it. Name the case instead.
   const diff = Math.abs(value - want);
   if (Number.isNaN(diff) || Number.isNaN(tolerance)) {
-    report(
-      seat,
-      mode,
-      `${msg}: ${show(got)} is not within ${tolerance} of ${want}: ` +
-        "NaN is outside every tolerance",
-    );
+    reportFailure(seat, mode, "close-to", msg, { got, want, tolerance });
     return;
   }
   if (diff > tolerance) {
-    report(seat, mode, `${msg}: ${show(got)} is not within ${tolerance} of ${want}`);
+    reportFailure(seat, mode, "close-to", msg, { got, want, tolerance });
   }
 }
 
@@ -379,14 +395,14 @@ export function inRange(
   seat.helper();
   const value = asNumber(got);
   if (value === undefined) {
-    requiresNumber(seat, mode, msg, got);
+    requiresNumber(seat, mode, msg, "in-range", { got, low, high });
     return;
   }
   if (low > high) {
-    report(seat, mode, `${msg}: [${low}, ${high}] is an empty range`);
+    reportFailure(seat, mode, "in-range", msg, { got, low, high });
     return;
   }
   if (Number.isNaN(value) || !(value >= low && value <= high)) {
-    report(seat, mode, `${msg}: ${show(got)} is not in [${low}, ${high}]`);
+    reportFailure(seat, mode, "in-range", msg, { got, low, high });
   }
 }
