@@ -54,7 +54,9 @@
     "test": "vitest run",
     "types": "tsc --noEmit",
     "lint-md": "npx --yes markdownlint-cli '**/*.md' --ignore node_modules --ignore dist",
-    "api-docs": "npm run build && node tools/api-reference.ts --write"
+    "api-docs": "npm run build && node tools/api-reference.ts --write",
+    "spec:sync": "./tools/spec-sync.sh src/conformance/spec typescript",
+    "spec:check": "./tools/spec-check.sh src/conformance/spec"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
