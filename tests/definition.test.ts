@@ -6,21 +6,26 @@
  * declares this language cannot supply it.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as bench from "../src/bench.js";
 import * as check from "../src/check.js";
 import {
   assertions,
   declinesRelaxation,
+  declinesSurface,
   diverges,
   LANGUAGE,
   names,
   overlay,
   relaxationNames,
+  surfaceNames,
   version,
 } from "../src/conformance/index.js";
 import * as golden from "../src/golden.js";
 import * as option from "../src/option.js";
+import * as seat from "../src/seat.js";
 import * as soft from "../src/soft.js";
 
 const ASSERTIONS = assertions();
@@ -170,6 +175,95 @@ describe("every relaxation is offered or declined", () => {
           typeof (option as Record<string, unknown>)[name],
           `${id}: ${name} is named and not exported`,
         ).toBe("function");
+      }
+    });
+  }
+});
+
+describe("every surface id is offered or declined", () => {
+  const surface = surfaceNames();
+
+  it("the surface table states something", () => {
+    expect(Object.keys(surface).length).toBeGreaterThan(0);
+  });
+
+  /** The classes a seat row resolves to, by id. */
+  const Seats: Record<string, { prototype: object }> = {
+    "standard-seat": seat.Standard,
+    "recorder-seat": seat.Recorder,
+    "collector-seat": seat.Collector,
+  };
+
+  /**
+   * A type is erased at run time, so its row is checked against the
+   * declaration file a consumer's editor reads.
+   */
+  const Declared: Record<string, { file: string; holds: string }> = {
+    seat: { file: "seat.d.ts", holds: "export type { Seat }" },
+    scrubber: { file: "golden.d.ts", holds: "export type Scrubber" },
+  };
+
+  /** A member is looked up, never invoked: a getter would run. */
+  function carries(owner: { prototype: object }, member: string): boolean {
+    return Object.getOwnPropertyDescriptor(owner.prototype, member) !== undefined;
+  }
+
+  for (const [sid, name] of Object.entries(surface)) {
+    it(`${sid} is answered one way`, () => {
+      const declined = declinesSurface(sid);
+      expect(name !== "" && declined, `${sid}: named and declined`).toBe(false);
+      expect(name !== "" || declined, `${sid}: neither named nor declined`).toBe(true);
+      if (name === "") return;
+
+      const leaf = name.split(".").pop() as string;
+
+      if (sid in Declared) {
+        const where = Declared[sid] as { file: string; holds: string };
+        const declarations = readFileSync(
+          join(import.meta.dirname, "../dist", where.file),
+          "utf8",
+        );
+        expect(declarations, `${sid}: ${name} is named and not declared`).toContain(
+          where.holds,
+        );
+        return;
+      }
+      if (sid in Seats) {
+        expect(Seats[sid], `${sid}: ${name} is named and not exported`).toBeTypeOf(
+          "function",
+        );
+        return;
+      }
+      if (sid === "contract") {
+        expect(bench.Contract, `${sid}: ${name} is named and not exported`).toBeTypeOf(
+          "function",
+        );
+        return;
+      }
+      if (sid.startsWith("contract.")) {
+        expect(
+          carries(bench.Contract, leaf),
+          `${sid}: ${name} is named and not implemented`,
+        ).toBe(true);
+        return;
+      }
+      if (name.startsWith("golden.")) {
+        expect(
+          (golden as Record<string, unknown>)[leaf],
+          `${sid}: ${name} is named and not exported`,
+        ).toBeDefined();
+        return;
+      }
+      // A member of a seat. The seat's own three are checked on every
+      // class; a reader member on the class its id names.
+      const owners = sid.startsWith("seat.")
+        ? Object.values(Seats)
+        : [Seats[sid.split(".")[0] as string] as { prototype: object }];
+      for (const owner of owners) {
+        expect(
+          carries(owner, leaf),
+          `${sid}: ${name} is named and not implemented`,
+        ).toBe(true);
       }
     });
   }

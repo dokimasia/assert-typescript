@@ -127,6 +127,42 @@ export function relaxationNames(): Record<string, string> {
 }
 
 /**
+ * Every surface id, with this language's name for it.
+ *
+ * An id the table gives TypeScript no name for maps to the empty
+ * string, which is what an overlay declining it looks like.
+ *
+ * @returns Surface id to the name a caller types, across the types,
+ *   members and helpers sections.
+ */
+export function surfaceNames(): Record<string, string> {
+  const table = (
+    read("naming.json") as {
+      surface?: Record<string, Record<string, Record<string, string>>>;
+    }
+  ).surface;
+
+  const mapped: Record<string, string> = {};
+  for (const section of ["types", "members", "helpers"]) {
+    for (const [sid, perLanguage] of Object.entries(table?.[section] ?? {})) {
+      mapped[sid] = perLanguage[LANGUAGE] ?? "";
+    }
+  }
+  return mapped;
+}
+
+/**
+ * Whether the overlay declines a surface id.
+ *
+ * @param surfaceId - The id, as the surface table states it.
+ * @returns True when the overlay declares it not offered.
+ */
+export function declinesSurface(surfaceId: string): boolean {
+  const entries = (overlay() as { surface?: { id: string }[] }).surface ?? [];
+  return entries.some((entry) => entry.id === surfaceId);
+}
+
+/**
  * Whether the overlay declines a relaxation.
  *
  * @param relaxation - The canonical relaxation id.

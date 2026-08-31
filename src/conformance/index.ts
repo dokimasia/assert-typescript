@@ -20,12 +20,14 @@ export {
   assertions,
   type Divergence,
   declinesRelaxation,
+  declinesSurface,
   diverges,
   LANGUAGE,
   names,
   type Overlay,
   overlay,
   relaxationNames,
+  surfaceNames,
   version,
 } from "./definition.js";
 export { decode, type Literal } from "./literal.js";
