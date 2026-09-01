@@ -7,7 +7,7 @@
  * that fails in CI for no reason.
  */
 
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Contract } from "../src/bench.js";
 import { Recorder } from "../src/seat.js";
 
@@ -106,4 +106,45 @@ it("awaits a body that answers a promise", async () => {
   // Were the body not awaited, the measurement would be near zero and
   // a ceiling of zero would pass.
   expect(seat.failed).toBe(true);
+});
+
+describe("measuring", () => {
+  /** A fixture whose build takes long enough to notice. */
+  const slowSetup = async (): Promise<number> => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return 1;
+  };
+
+  it("takes the setup's time out of the ceiling", async () => {
+    const seat = new Recorder();
+    const contract = new Contract(seat, "settling stays quick").maxLatency(5);
+    await contract.measuring(3, slowSetup, (held) => held + 1);
+    contract.check();
+
+    expect(seat.failed, "an excluded setup is not timed").toBe(false);
+  });
+
+  it("the same setup unexcluded crosses the ceiling", async () => {
+    // Without this the case above passes against a measuring that timed
+    // the setup anyway.
+    const seat = new Recorder();
+    const c = await new Contract(seat, "settling stays quick")
+      .maxLatency(5)
+      .loop(3, slowSetup);
+    c.check();
+
+    expect(seat.failed, "a setup nobody excluded is timed").toBe(true);
+  });
+
+  it("hands the measured body what the setup built", async () => {
+    const seat = new Recorder();
+    const seen: number[] = [];
+    await new Contract(seat, "the fixture arrives").measuring(
+      3,
+      () => 7,
+      (held) => seen.push(held),
+    );
+
+    expect(seen).toEqual([7, 7, 7]);
+  });
 });

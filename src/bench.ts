@@ -92,6 +92,46 @@ export class Contract {
   }
 
   /**
+   * Measure a body whose input is built fresh each iteration.
+   *
+   * A benchmark whose operation consumes its input builds a new one
+   * every time, and {@link Contract.loop} would state what the build
+   * and the operation cost together. This builds every input first,
+   * outside the measurement, and measures only the bodies.
+   *
+   * Every input exists at once, so a large fixture and a long run cost
+   * that much memory. A body needing no input wants
+   * {@link Contract.loop}, which holds nothing.
+   *
+   * @param iterations How many times to run the body.
+   * @param setup Builds one input, outside the measurement.
+   * @param body The measured work, given what setup built.
+   * @returns The contract, so the call chains into check.
+   */
+  async measuring<T>(
+    iterations: number,
+    setup: () => T | Promise<T>,
+    body: (input: T) => unknown,
+  ): Promise<this> {
+    // Built first and all at once, so no clock is read between one
+    // iteration's setup and the next iteration's work.
+    const inputs: T[] = [];
+    for (let i = 0; i < iterations; i += 1) {
+      inputs.push(await setup());
+    }
+
+    const latencies: number[] = [];
+    for (const input of inputs) {
+      const started = performance.now();
+      await body(input);
+      latencies.push(performance.now() - started);
+    }
+    latencies.sort((a, b) => a - b);
+    this.#measurement = { iterations, latencies };
+    return this;
+  }
+
+  /**
    * Run the body the given number of times, timing each.
    *
    * @param iterations How many times to run the body.
