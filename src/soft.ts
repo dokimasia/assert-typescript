@@ -41,11 +41,15 @@ const MODE = Mode.Soft;
  * The test carries on either way, and everything recorded is
  * reported when the test body ends. The signature and the
  * comparison rules are those of {@link check.equal}.
+ *
+ * `want` is held to the type of `got`. Comparing across types is
+ * almost always a mistake, and the few deliberate cases say so with
+ * a cast: `check.equal(seat, got as unknown, want as unknown, msg)`.
  */
-export function equal(
+export function equal<T>(
   seat: Seat,
-  got: unknown,
-  want: unknown,
+  got: T,
+  want: NoInfer<T>,
   msg: string,
   ...options: Option[]
 ): void {
@@ -59,11 +63,15 @@ export function equal(
  * The test carries on either way, and everything recorded is
  * reported when the test body ends. The signature and the
  * comparison rules are those of {@link check.notEqual}.
+ *
+ * `want` is held to the type of `got`. Comparing across types is
+ * almost always a mistake, and the few deliberate cases say so with
+ * a cast: `check.equal(seat, got as unknown, want as unknown, msg)`.
  */
-export function notEqual(
+export function notEqual<T>(
   seat: Seat,
-  got: unknown,
-  want: unknown,
+  got: T,
+  want: NoInfer<T>,
   msg: string,
   ...options: Option[]
 ): void {

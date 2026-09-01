@@ -132,10 +132,14 @@ it("a plain object answers for its keys", () => {
 });
 
 it("equateEmpty makes an absent collection equal an empty one", () => {
-  expect(drive((s) => check.equal(s, null, [], "no items")).failed).toBe(true);
-  expect(drive((s) => check.equal(s, null, [], "no items", equateEmpty())).failed).toBe(
-    false,
-  );
+  expect(
+    drive((s) => check.equal(s, null as unknown, [] as unknown, "no items")).failed,
+  ).toBe(true);
+  expect(
+    drive((s) =>
+      check.equal(s, null as unknown, [] as unknown, "no items", equateEmpty()),
+    ).failed,
+  ).toBe(false);
 });
 
 it("equateNans makes NaN equal itself", () => {

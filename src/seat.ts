@@ -31,6 +31,28 @@ export class AssertionFailed extends Error {
 }
 
 /**
+ * Throw when this seat has assertions nobody awaited.
+ *
+ * Several assertions answer a promise, and a caller who drops one gets
+ * a green test that asserted nothing. No type checker catches it: the
+ * promise was used, it was simply used as a promise.
+ *
+ * @param seat The seat whose started work is being closed off.
+ * @throws AssertionFailed naming every assertion that was dropped.
+ */
+function reportDropped(seat: Seat): void {
+  const forgotten = dropped(seat);
+  clear(seat);
+  if (forgotten.length === 0) return;
+
+  const listed = forgotten.map((m) => `  - ${m}`).join("\n");
+  throw new AssertionFailed(
+    `${forgotten.length} assertion(s) were never awaited, so they ` +
+      `asserted nothing:\n${listed}\nAdd \`await\` to the call.`,
+  );
+}
+
+/**
  * A seat that throws on any failure.
  *
  * The seat to construct outside a test runner. Its `record` throws
@@ -57,6 +79,19 @@ export class Standard implements Seat {
    */
   record(message: string): never {
     throw new AssertionFailed(message);
+  }
+
+  /**
+   * Throw for any asynchronous assertion nobody awaited.
+   *
+   * This seat throws a failure the moment it arrives, so there is
+   * nothing collected to report. What it cannot see on its own is an
+   * assertion whose promise was dropped: that failure was thrown
+   * inside a promise nobody holds, and the evidence is gone by the
+   * time the test ends. Call this where the test ends.
+   */
+  flush(): void {
+    reportDropped(this);
   }
 }
 
@@ -225,16 +260,7 @@ export class Collector implements Seat {
    * was used, it was simply used as a promise.
    */
   flush(): void {
-    const forgotten = dropped(this);
-    if (forgotten.length > 0) {
-      clear(this);
-      const listed = forgotten.map((m) => `  - ${m}`).join("\n");
-      throw new AssertionFailed(
-        `${forgotten.length} assertion(s) were never awaited, so they ` +
-          `asserted nothing:\n${listed}\nAdd \`await\` to the call.`,
-      );
-    }
-    clear(this);
+    reportDropped(this);
     if (this.#collected.length === 0) return;
 
     const collected = this.#collected;

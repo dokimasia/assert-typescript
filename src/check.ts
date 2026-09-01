@@ -51,11 +51,15 @@ const MODE = Mode.Fatal;
  * @param options Relaxations for this call alone.
  * @example
  * check.equal(seat, store.get(id), item, "get answers the stored item");
+ *
+ * `want` is held to the type of `got`. Comparing across types is
+ * almost always a mistake, and the few deliberate cases say so with
+ * a cast: `check.equal(seat, got as unknown, want as unknown, msg)`.
  */
-export function equal(
+export function equal<T>(
   seat: Seat,
-  got: unknown,
-  want: unknown,
+  got: T,
+  want: NoInfer<T>,
   msg: string,
   ...options: Option[]
 ): void {
@@ -76,11 +80,15 @@ export function equal(
  * @param options Relaxations for this call alone.
  * @example
  * check.notEqual(seat, token, previous, "refresh issues a new token");
+ *
+ * `want` is held to the type of `got`. Comparing across types is
+ * almost always a mistake, and the few deliberate cases say so with
+ * a cast: `check.equal(seat, got as unknown, want as unknown, msg)`.
  */
-export function notEqual(
+export function notEqual<T>(
   seat: Seat,
-  got: unknown,
-  want: unknown,
+  got: T,
+  want: NoInfer<T>,
   msg: string,
   ...options: Option[]
 ): void {

@@ -58,11 +58,17 @@ it("the seat table says what the seats do", () => {
 
 it("equateEmpty does what the README says", () => {
   const strict = new Recorder();
-  check.equal(strict, null, [], "no items came back");
+  check.equal(strict, null as unknown, [] as unknown, "no items came back");
   expect(strict.failed).toBe(true);
 
   const relaxed = new Recorder();
-  check.equal(relaxed, null, [], "no items came back", equateEmpty());
+  check.equal(
+    relaxed,
+    null as unknown,
+    [] as unknown,
+    "no items came back",
+    equateEmpty(),
+  );
   expect(relaxed.failed).toBe(false);
 });
 

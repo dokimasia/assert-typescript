@@ -113,8 +113,8 @@ only what happens on a failure differs.
 **Equality** — Structural, and strict about types.
 
 ```ts
-check.equal(seat: Seat, got: unknown, want: unknown, msg: string, ...options: Option[])
-check.notEqual(seat: Seat, got: unknown, want: unknown, msg: string, ...options: Option[])
+check.equal<T>(seat: Seat, got: T, want: NoInfer<T>, msg: string, ...options: Option[])
+check.notEqual<T>(seat: Seat, got: T, want: NoInfer<T>, msg: string, ...options: Option[])
 ```
 
 **Truth and absence** — `isNil` accepts null and undefined both, which is what nullish means.
