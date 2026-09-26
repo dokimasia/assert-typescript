@@ -358,13 +358,14 @@ definition and holds itself to it:
 
 ### Where TypeScript differs
 
-Two assertions are declared divergent rather than implemented.
-`bench.Contract.maxAllocs` and `maxBytes` state ceilings on allocation,
-and V8 exposes no per-iteration allocation count. Bytes can only be read
-as a heap-usage delta, which moves with whether the collector ran:
-measuring one unchanged body six times gave 43, -3, 43, -10, -10 and -8
-bytes per iteration. A ceiling set from one run would fail the next for
-no reason, so the overlay records the gap instead of pretending.
+Three assertions are declared divergent rather than implemented.
+`maxAllocs` on a call, and `bench.Contract.maxAllocs` and `maxBytes` on
+a benchmark iteration, state ceilings on allocation, and V8 exposes no
+allocation count. Bytes can only be read as a heap-usage delta, which
+moves with whether the collector ran: measuring one unchanged body six
+times gave 43, -3, 43, -10, -10 and -8 bytes per iteration. A ceiling
+set from one run would fail the next for no reason, so the overlay
+records the gap instead of pretending.
 
 `throws` refuses a callable that answers a promise. An unawaited
 rejection is not a throw, and passing there would make the assertion lie

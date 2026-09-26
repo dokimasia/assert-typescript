@@ -100,16 +100,13 @@ it("the corpus count the README states is the real one", async () => {
 });
 
 it("the divergences the README names are the ones declared", async () => {
-  const { overlay } = await import("../src/conformance/definition.js");
+  const { names, overlay } = await import("../src/conformance/definition.js");
+  const named = names();
 
   for (const d of overlay().diverge) {
-    // bench-max-allocs is written maxAllocs in prose, as the naming
-    // table has it.
-    const member = d.id
-      .split("-")
-      .slice(1)
-      .map((part, at) => (at === 0 ? part : part[0]?.toUpperCase() + part.slice(1)))
-      .join("");
+    // Prose names a member by the last segment of the name the naming
+    // table gives it: bench-max-allocs is written maxAllocs.
+    const member = (named[d.id] ?? d.id).split(".").pop() as string;
 
     expect(README, `${d.id} is declared but not explained`).toContain(member);
   }

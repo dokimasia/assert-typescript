@@ -63,7 +63,7 @@ function present(owner: unknown, path: string): boolean {
 }
 
 it("the vendored definition states assertions", () => {
-  expect(Object.keys(ASSERTIONS).length).toBe(41);
+  expect(Object.keys(ASSERTIONS).length).toBe(42);
 });
 
 it("every assertion has a TypeScript name", () => {
@@ -121,6 +121,13 @@ describe("an unqualified assertion is on both surfaces", () => {
   for (const id of rootIds) {
     it(id, () => {
       const name = NAMES[id] as string;
+      // One the overlay declines is on neither surface, for the reason
+      // a declared divergence is checked absent above.
+      if (diverges(id)) {
+        expect(name in check, `${name} is declined but on check`).toBe(false);
+        expect(name in soft, `${name} is declined but on soft`).toBe(false);
+        return;
+      }
       if (name in CHECK_ONLY) {
         expect(name in soft, `${name}: ${CHECK_ONLY[name]}`).toBe(false);
         return;
