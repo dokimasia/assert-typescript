@@ -1,19 +1,19 @@
 /**
- * Render the README's API reference from the source itself.
+ * Renders the README's API reference from the declarations that the build
+ * emits.
  *
- * A signature list written by hand goes stale the first time a
- * parameter moves. This reads the real declarations through the
- * compiler's own parser, so the README either matches the code or the
- * documentation test fails.
+ * A list of signatures written by hand is wrong after the first change of
+ * a parameter. This reads the emitted declarations, so the README matches
+ * the code, or the spec of the README fails.
  *
- * Reads the build, so run `npm run build` first.
+ * It reads the build, so run `npm run build` first.
  *
  *     node tools/api-reference.ts --write
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -71,7 +71,30 @@ const FAMILIES: [string, string, string[]][] = [
     "Reads Node's active resources, so a timer or handle left open is a leak.",
     ["noTaskLeaks"],
   ],
-  ["Purity", "What observe answers defines what nothing means.", ["isPure"]],
+  [
+    "Purity",
+    "What observe answers defines what nothing means.",
+    ["isPure", "isNotPure"],
+  ],
+  [
+    "Relations",
+    "Properties of a subject across its calls. A callable may return a promise. Every relation but isPermutation returns one, so await it.",
+    [
+      "isIdempotent",
+      "accumulates",
+      "isDeterministic",
+      "isCommutative",
+      "isAssociative",
+      "roundTrip",
+      "hasStableOrder",
+      "noDuplicates",
+      "isMonotonic",
+      "isTotal",
+      "failsAfterClose",
+      "isPoisoned",
+      "isPermutation",
+    ],
+  ],
   [
     "Testing an assertion",
     "On `check` only: `soft` cannot drive a check to failure, because it does not stop.",
@@ -79,52 +102,253 @@ const FAMILIES: [string, string, string[]][] = [
   ],
 ];
 
+/** The functions of the module files, in the order a reader meets them. */
+const FILES = [
+  "workspace",
+  "write",
+  "read",
+  "text",
+  "bytes",
+  "executable",
+  "directory",
+  "link",
+  "equal",
+  "contains",
+  "unchanged",
+  "absent",
+  "isFile",
+  "isDir",
+  "linksTo",
+  "hasContent",
+  "hasMode",
+];
+
+/** The groups of the functions of the module prop, in the order a reader meets them. */
+const PROP: [string, string, string[]][] = [
+  [
+    "Properties",
+    "The body of a property draws its inputs from its case. A run shrinks a failing case to a minimal counterexample, and states the token that replays it. Each returns a promise, so await it.",
+    ["forAll", "fuzz"],
+  ],
+  [
+    "Property forms",
+    "Each form states an assertion of a function of a generated input, and generates the input from the generator of `prop.using`.",
+    [
+      "equal",
+      "notEqual",
+      "isTrue",
+      "isFalse",
+      "isNil",
+      "isNotNil",
+      "length",
+      "isEmpty",
+      "isNotEmpty",
+      "contains",
+      "notContains",
+      "containsInOrder",
+      "isPermutation",
+      "hasPrefix",
+      "hasSuffix",
+      "matches",
+      "closeTo",
+      "inRange",
+      "pairwise",
+      "noError",
+      "hasError",
+      "errorIs",
+      "errorIsNot",
+      "errorAs",
+      "throws",
+      "doesNotThrow",
+      "isPure",
+      "isNotPure",
+      "nullHandleSafe",
+      "honoursCancellation",
+      "honoursDeadline",
+      "isIdempotent",
+      "accumulates",
+      "isDeterministic",
+      "isCommutative",
+      "isAssociative",
+      "roundTrip",
+    ],
+  ],
+  [
+    "Generators",
+    "Each value is decoded from the choices of the case, so a value shrinks as its choices do.",
+    [
+      "integer",
+      "float",
+      "boolean",
+      "just",
+      "sampledFrom",
+      "oneOf",
+      "optional",
+      "list",
+      "dict",
+      "string",
+      "bytes",
+      "duration",
+      "permutation",
+      "stringMatching",
+      "recursive",
+      "composite",
+    ],
+  ],
+  [
+    "Shapes and registrations",
+    "A shape file states the type of an input, from which a generator is derived.",
+    ["of", "ofShape", "shapeOf", "register", "registerValues", "registerVariants"],
+  ],
+  [
+    "Property options",
+    "The settings of a run. A later option overrides an earlier one of the same setting.",
+    [
+      "cases",
+      "seed",
+      "replay",
+      "require",
+      "shrink",
+      "shrinkTime",
+      "maxChoices",
+      "store",
+      "explain",
+      "workers",
+      "hermetic",
+      "draws",
+      "using",
+      "example",
+      "examples",
+    ],
+  ],
+];
+
+/** The functions of the module history, in the order a reader meets them. */
+const HISTORY = [
+  "fromIntervals",
+  "concurrently",
+  "specFrom",
+  "isLinearizable",
+  "isSerializable",
+  "hasSnapshotIsolation",
+  "budget",
+  "memoLimit",
+  "timeLimit",
+  "workers",
+];
+
+/** The functions of the module stateful, in the order a reader meets them. */
+const STATEFUL = [
+  "steps",
+  "mean",
+  "max",
+  "swarm",
+  "clients",
+  "concurrent",
+  "tasks",
+  "uniform",
+  "pct",
+];
+
 /**
- * Read one emitted declaration file and answer its exported functions.
+ * Reads one emitted declaration file and returns its exported functions,
+ * with the signature of each overload in order.
  *
- * The build's .d.ts is what a consumer's editor reads, and TypeScript
- * emits one declaration per line, so this needs no parser. The
- * compiler's own API would be the obvious alternative; TypeScript 7
- * moved it under `unstable`, and a documentation tool is not worth
- * pinning to that.
+ * A consumer's editor reads the build's .d.ts, and TypeScript emits one
+ * declaration per line, so this needs no parser. TypeScript 7 moved the
+ * compiler's API under `unstable`, so a documentation tool does not
+ * depend on it.
  */
-function declarations(file: string): Map<string, string> {
+function declarations(file: string): Map<string, string[]> {
   const path = join(ROOT, "dist", file);
-  const found = new Map<string, string>();
+  const found = new Map<string, string[]>();
 
   for (const line of readFileSync(path, "utf8").split("\n")) {
     const match = /^export declare function (\w+)(.*);$/.exec(line.trim());
     if (match?.[1] !== undefined && match[2] !== undefined) {
-      // Almost everything answers void, so saying so on every line
-      // hides the few that answer something worth knowing about.
-      found.set(match[1], match[2].replace(/: void$/, ""));
+      // Almost every function returns void, so a reference that states it
+      // on every line hides the few that return a value worth reading.
+      const signature = match[2].replace(/: void$/, "");
+      found.set(match[1], [...(found.get(match[1]) ?? []), signature]);
     }
   }
   return found;
 }
 
-/** Read a class's public methods from its emitted declaration. */
-function methods(file: string, className: string): string[] {
+/**
+ * Returns the line of each overload of the functions of names, which the
+ * module of the directory dir exports, under prefix. It reads every
+ * declaration file of the directory, and checks that names lists every
+ * function that the module exports.
+ */
+async function signatures(
+  dir: string,
+  prefix: string,
+  names: readonly string[],
+): Promise<Map<string, string[]>> {
+  const found = new Map<string, string[]>();
+  for (const name of readdirSync(join(ROOT, "dist", dir)).filter((n) =>
+    n.endsWith(".d.ts"),
+  )) {
+    for (const [fn, overloads] of declarations(join(dir, name))) {
+      found.set(fn, [...(found.get(fn) ?? []), ...overloads]);
+    }
+  }
+  const module = (await import(
+    pathToFileURL(join(ROOT, "dist", dir, "index.js")).href
+  )) as Record<string, unknown>;
+  // A class is a function whose name starts with a capital, and its methods
+  // are read from its declaration.
+  const exported = Object.keys(module).filter(
+    (n) => typeof module[n] === "function" && !/^[A-Z]/.test(n),
+  );
+  const unlisted = exported.filter((n) => !names.includes(n));
+  if (unlisted.length > 0) {
+    throw new Error(`api-reference: ${dir} lists no ${unlisted.join(", ")}`);
+  }
+  const lines = new Map<string, string[]>();
+  for (const name of names) {
+    const overloads = found.get(name);
+    if (overloads === undefined)
+      throw new Error(`api-reference: ${dir} has no ${name}`);
+    lines.set(
+      name,
+      overloads.map((signature) => `${prefix}.${name}${signature}`),
+    );
+  }
+  return lines;
+}
+
+/** Reads the public methods of a class from its emitted declaration, those of names alone when it states them. */
+function methods(file: string, className: string, names?: readonly string[]): string[] {
   const path = join(ROOT, "dist", file);
   const lines = readFileSync(path, "utf8").split("\n");
 
-  const at = lines.findIndex((l) => l.includes(`declare class ${className}`));
+  const declared = new RegExp(`declare (abstract )?class ${className}\\b`);
+  const at = lines.findIndex((l) => declared.test(l));
   if (at < 0) return [];
 
   const rendered: string[] = [];
   for (const line of lines.slice(at + 1)) {
     if (line.startsWith("}")) break;
-    const match = /^ {4}(\w+)(\(.*\)): (.+);$/.exec(line);
-    if (match?.[1] !== undefined && !match[1].startsWith("#")) {
-      rendered.push(`${className}.${match[1]}${match[2]}: ${match[3]}`);
-    }
+    const match = /^ {4}(\w+)(<[^(]*>)?(\(.*\)): (.+);$/.exec(line);
+    const name = match?.[1];
+    if (name === undefined || (names !== undefined && !names.includes(name))) continue;
+    rendered.push(
+      `${className}.${name}${match?.[2] ?? ""}${match?.[3]}: ${match?.[4]}`,
+    );
   }
   return rendered;
 }
 
-/** Answer the whole reference section. */
-function reference(): string {
-  // check re-exports rejects, so its declaration lives elsewhere.
+/** Returns a family's block: its title, what it states, and its lines. */
+function block(title: string, blurb: string, lines: readonly string[]): string[] {
+  return [`**${title}** — ${blurb}`, "", "```ts", ...lines, "```", ""];
+}
+
+/** Returns the whole reference section. */
+async function reference(): Promise<string> {
+  // check re-exports rejects, whose declaration is in rejects.d.ts.
   const check = new Map([
     ...declarations("check.d.ts"),
     ...declarations("rejects.d.ts"),
@@ -143,37 +367,107 @@ function reference(): string {
   ];
 
   for (const [title, blurb, names] of FAMILIES) {
-    out.push(`**${title}** — ${blurb}`, "", "```ts");
-    for (const name of names) {
-      const signature = check.get(name);
-      if (signature === undefined) {
+    const lines = names.flatMap((name) => {
+      const overloads = check.get(name);
+      if (overloads === undefined)
         throw new Error(`api-reference: check has no ${name}`);
-      }
-      out.push(`check.${name}${signature}`);
-    }
-    out.push("```", "");
+      return overloads.map((signature) => `check.${name}${signature}`);
+    });
+    out.push(...block(title, blurb, lines));
   }
 
   const golden = declarations("golden.d.ts");
-  out.push("**Golden files** — recorded output, compared and rewritable.", "", "```ts");
-  for (const name of [
-    "match",
-    "matchAt",
-    "matchJsonField",
-    "shouldUpdate",
-    "scrubTimestamps",
-    "scrubHashes",
-    "scrubRunIds",
-    "scrubJsonFields",
-  ]) {
-    const signature = golden.get(name);
-    if (signature !== undefined) out.push(`golden.${name}${signature}`);
-  }
-  out.push("```", "");
+  out.push(
+    ...block(
+      "Golden files",
+      "recorded output, compared and rewritable.",
+      [
+        "match",
+        "matchAt",
+        "matchJsonField",
+        "matchTree",
+        "shouldUpdate",
+        "scrubTimestamps",
+        "scrubHashes",
+        "scrubRunIds",
+        "scrubJsonFields",
+      ].flatMap((name) =>
+        (golden.get(name) ?? []).map((signature) => `golden.${name}${signature}`),
+      ),
+    ),
+  );
 
-  out.push("**Benchmark ceilings** — chained onto one contract.", "", "```ts");
-  out.push(...methods("bench.d.ts", "Contract"));
-  out.push("```", "");
+  const files = await signatures("files", "files", FILES);
+  out.push(
+    ...block(
+      "Trees of files",
+      "a workspace for a test, and the assertions about the files that the code under test leaves. Each stops the test on a failure.",
+      [
+        ...FILES.flatMap((name) => files.get(name) ?? []),
+        ...methods("files/entry.d.ts", "Entry"),
+      ],
+    ),
+  );
+
+  out.push(
+    ...block(
+      "Benchmark ceilings",
+      "chained onto one contract.",
+      methods("bench.d.ts", "Contract"),
+    ),
+  );
+
+  const prop = await signatures(
+    "prop",
+    "prop",
+    PROP.flatMap(([, , names]) => names),
+  );
+  for (const [title, blurb, names] of PROP) {
+    const lines = names.flatMap((name) => prop.get(name) ?? []);
+    if (title === "Properties") {
+      lines.push(
+        ...methods("prop/case.d.ts", "Case", [
+          "draw",
+          "assume",
+          "classify",
+          "note",
+          "rand",
+          "observe",
+          "cleanup",
+          "history",
+          "target",
+        ]),
+      );
+    }
+    if (title === "Generators")
+      lines.push(...methods("prop/engine/generator.d.ts", "Generator"));
+    out.push(...block(title, blurb, lines));
+  }
+
+  const history = await signatures("history", "history", HISTORY);
+  out.push(
+    ...block(
+      "Histories",
+      "the calls that the clients of a subject make, checked against a sequential specification or for an isolation level.",
+      [
+        ...methods("history/history.d.ts", "History"),
+        ...methods("history/history.d.ts", "Call"),
+        ...HISTORY.flatMap((name) => history.get(name) ?? []),
+      ],
+    ),
+  );
+
+  const stateful = await signatures("stateful", "stateful", STATEFUL);
+  out.push(
+    ...block(
+      "Machines",
+      "the steps of a case over a subject, and the task scheduler that releases its tasks in an order that the case decides.",
+      [
+        ...STATEFUL.flatMap((name) => stateful.get(name) ?? []),
+        ...methods("stateful/scheduler.d.ts", "Scheduler"),
+      ],
+    ),
+  );
 
   out.push(
     "Each one carries a full doc comment: what it states, what every",
@@ -182,7 +476,7 @@ function reference(): string {
   return out.join("\n");
 }
 
-const section = reference();
+const section = await reference();
 if (!process.argv.includes("--write")) {
   console.log(section);
 } else {
