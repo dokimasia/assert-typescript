@@ -18,8 +18,9 @@ jobs:
       fail-fast: false
       matrix:
         # The floor package.json declares, and every version since. A
-        # library runs on whatever its consumers run.
-        node-version: ["24.x", "26.x"]
+        # library runs on whatever its consumers run. Node 26 is the
+        # first version with Temporal.
+        node-version: ["26.x"]
     steps:
       - uses: actions/checkout@v7
 
@@ -38,7 +39,7 @@ jobs:
 
       # Before the tests, not after: the README's API reference is
       # generated from the emitted declarations, and the test that
-      # holds the README to the code reads them.
+      # compares the README with the code reads them.
       - name: Build
         run: npm run build
 
@@ -68,16 +69,37 @@ jobs:
             console.log('installed and imported:', seat.message);
           "
 
-  # The vendored definition is what this library is held to, and a copy
-  # nobody checked is a copy that can drift. This fails on a copy that
-  # does not match the manifest beside it, and reports without failing
-  # when the definition has moved on: lagging is allowed, not knowing
-  # is not.
-  # The vendored definition is what this library is held to. A copy that
-  # does not match the manifest beside it fails, always. A copy that
-  # differs from upstream only fails when this change is the one that
-  # touched it: falling behind is allowed and is tracked by an issue,
-  # but committing a copy nobody else has is not.
+  # The file helpers and assertions call the file system of each platform,
+  # and Windows records no permission bits. The tests run there without
+  # coverage, because a case that a platform skips leaves a branch that no
+  # test there takes.
+  platforms:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26.x"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Tests
+        run: npm test
+
+  # The vendored definition is the standard that this library meets. A
+  # copy that does not match the manifest beside it fails, always. A copy
+  # that differs from upstream fails only when this change touched it:
+  # falling behind is allowed and an issue tracks it, but committing a
+  # copy that nobody else has is not.
   spec:
     runs-on: ubuntu-latest
     steps:
