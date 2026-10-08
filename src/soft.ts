@@ -28,6 +28,8 @@ import type { Option } from "./matcher/option.js";
 import * as order from "./matcher/order.js";
 import { track } from "./matcher/pending.js";
 import * as raising from "./matcher/raises.js";
+import type { Count, Sequence } from "./matcher/relation.js";
+import * as relation from "./matcher/relation.js";
 import { Mode, type Seat } from "./matcher/seat.js";
 import * as value from "./matcher/value.js";
 import * as waiting from "./matcher/waiting.js";
@@ -418,7 +420,7 @@ export function rejectsWith(
   msg: string,
 ): Promise<unknown> {
   seat.helper();
-  return raising.rejectsWith(seat, MODE, fn, msg);
+  return track(seat, msg, raising.rejectsWith(seat, MODE, fn, msg));
 }
 
 /**
@@ -463,7 +465,7 @@ export function honoursDeadline(
 export function completesWithin(
   seat: Seat,
   within: number,
-  fn: () => unknown,
+  fn: (signal: AbortSignal) => unknown,
   msg: string,
 ): Promise<void> {
   seat.helper();
@@ -501,7 +503,7 @@ export function isPure(
   ...options: Option[]
 ): Promise<void> {
   seat.helper();
-  return behaviour.isPure(seat, MODE, observe, fn, msg, ...options);
+  return track(seat, msg, behaviour.isPure(seat, MODE, observe, fn, msg, ...options));
 }
 
 /**
@@ -551,4 +553,297 @@ export function eventuallyTrue(
 export function noTaskLeaks(seat: Seat, msg: string): () => void {
   seat.helper();
   return waiting.noTaskLeaks(seat, MODE, msg);
+}
+
+/**
+ * Record a failure when a second call leaves the state other than one
+ * call left it.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.isIdempotent}.
+ */
+export function isIdempotent<I>(
+  seat: Seat,
+  call: (input: I) => unknown,
+  input: I,
+  observe: () => unknown,
+  msg: string,
+  ...options: Option[]
+): Promise<void> {
+  seat.helper();
+  return track(
+    seat,
+    msg,
+    relation.isIdempotent(seat, MODE, call, input, observe, msg, ...options),
+  );
+}
+
+/**
+ * Record a failure when a call leaves a count unchanged, or two calls
+ * change it by different amounts.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.accumulates}.
+ */
+export function accumulates<I>(
+  seat: Seat,
+  call: (input: I) => unknown,
+  input: I,
+  observe: () => Count | Promise<Count>,
+  msg: string,
+): Promise<void> {
+  seat.helper();
+  return track(seat, msg, relation.accumulates(seat, MODE, call, input, observe, msg));
+}
+
+/**
+ * Record a failure when one of 32 calls with one input returns another
+ * result.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.isDeterministic}.
+ */
+export function isDeterministic<I>(
+  seat: Seat,
+  call: (input: I) => unknown,
+  input: I,
+  msg: string,
+  ...options: Option[]
+): Promise<void> {
+  seat.helper();
+  return track(
+    seat,
+    msg,
+    relation.isDeterministic(seat, MODE, call, input, msg, ...options),
+  );
+}
+
+/**
+ * Record a failure when combine(a, b) differs from combine(b, a).
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.isCommutative}.
+ */
+export function isCommutative<T>(
+  seat: Seat,
+  combine: (a: T, b: T) => unknown,
+  a: T,
+  b: T,
+  msg: string,
+  ...options: Option[]
+): Promise<void> {
+  seat.helper();
+  return track(
+    seat,
+    msg,
+    relation.isCommutative(seat, MODE, combine, a, b, msg, ...options),
+  );
+}
+
+/**
+ * Record a failure when the two groupings of three operands differ.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.isAssociative}.
+ */
+export function isAssociative<T>(
+  seat: Seat,
+  combine: (a: T, b: T) => T | Promise<T>,
+  a: T,
+  b: T,
+  c: T,
+  msg: string,
+  ...options: Option[]
+): Promise<void> {
+  seat.helper();
+  return track(
+    seat,
+    msg,
+    relation.isAssociative(seat, MODE, combine, a, b, c, msg, ...options),
+  );
+}
+
+/**
+ * Record a failure when inverse(forward(input)) differs from input.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.roundTrip}.
+ */
+export function roundTrip<I, E>(
+  seat: Seat,
+  forward: (input: I) => E | Promise<E>,
+  inverse: (encoded: E) => I | Promise<I>,
+  input: I,
+  msg: string,
+  ...options: Option[]
+): Promise<void> {
+  seat.helper();
+  return track(
+    seat,
+    msg,
+    relation.roundTrip(seat, MODE, forward, inverse, input, msg, ...options),
+  );
+}
+
+/**
+ * Record a failure when one of 32 iterations yields another sequence.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.hasStableOrder}.
+ */
+export function hasStableOrder<T>(
+  seat: Seat,
+  iterate: () => Sequence<T> | Promise<Sequence<T>>,
+  msg: string,
+  ...options: Option[]
+): Promise<void> {
+  seat.helper();
+  return track(
+    seat,
+    msg,
+    relation.hasStableOrder(seat, MODE, iterate, msg, ...options),
+  );
+}
+
+/**
+ * Record a failure when one iteration yields an element equal to an
+ * earlier one.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.noDuplicates}.
+ */
+export function noDuplicates<T>(
+  seat: Seat,
+  iterate: () => Sequence<T> | Promise<Sequence<T>>,
+  msg: string,
+  ...options: Option[]
+): Promise<void> {
+  seat.helper();
+  return track(seat, msg, relation.noDuplicates(seat, MODE, iterate, msg, ...options));
+}
+
+/**
+ * Record a failure when a reading falls below the reading before it, or
+ * is NaN.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.isMonotonic}.
+ */
+export function isMonotonic(
+  seat: Seat,
+  observe: () => number | Promise<number>,
+  advance: () => unknown,
+  steps: number,
+  msg: string,
+): Promise<void> {
+  seat.helper();
+  return track(
+    seat,
+    msg,
+    relation.isMonotonic(seat, MODE, observe, advance, steps, msg),
+  );
+}
+
+/**
+ * Record a failure at the first element of a domain for which call
+ * throws or rejects.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.isTotal}.
+ */
+export function isTotal<I>(
+  seat: Seat,
+  call: (input: I) => unknown,
+  domain: Iterable<I>,
+  msg: string,
+): Promise<void> {
+  seat.helper();
+  return track(seat, msg, relation.isTotal(seat, MODE, call, domain, msg));
+}
+
+/**
+ * Record a failure when fn leaves what observe reads unchanged.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.isNotPure}.
+ */
+export function isNotPure(
+  seat: Seat,
+  observe: () => unknown,
+  fn: () => unknown,
+  msg: string,
+  ...options: Option[]
+): Promise<void> {
+  seat.helper();
+  return track(seat, msg, relation.isNotPure(seat, MODE, observe, fn, msg, ...options));
+}
+
+/**
+ * Record a failure when a call after close does not fail with a sentinel.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.failsAfterClose}.
+ */
+export function failsAfterClose(
+  seat: Seat,
+  close: () => unknown,
+  call: () => unknown,
+  sentinel: unknown,
+  msg: string,
+): Promise<void> {
+  seat.helper();
+  return track(
+    seat,
+    msg,
+    relation.failsAfterClose(seat, MODE, close, call, sentinel, msg),
+  );
+}
+
+/**
+ * Record a failure when one of 32 readings after an induced failure
+ * succeeds.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.isPoisoned}.
+ */
+export function isPoisoned(
+  seat: Seat,
+  induce: () => unknown,
+  observe: () => unknown,
+  msg: string,
+): Promise<void> {
+  seat.helper();
+  return track(seat, msg, relation.isPoisoned(seat, MODE, induce, observe, msg));
+}
+
+/**
+ * Record a failure when got does not contain the elements of want, each
+ * as often.
+ *
+ * The test carries on either way, and everything recorded is
+ * reported when the test body ends. The signature and the
+ * comparison rules are those of {@link check.isPermutation}.
+ */
+export function isPermutation<T>(
+  seat: Seat,
+  got: readonly T[],
+  want: readonly NoInfer<T>[],
+  msg: string,
+  ...options: Option[]
+): void {
+  seat.helper();
+  relation.isPermutation(seat, MODE, got, want, msg, ...options);
 }

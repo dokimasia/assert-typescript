@@ -11,4 +11,4 @@
  * ```
  */
 
-export { equateEmpty, equateNans, type Option } from "./matcher/option.js";
+export { byIdentity, equateEmpty, equateNans, type Option } from "./matcher/option.js";

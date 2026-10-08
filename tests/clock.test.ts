@@ -1,91 +1,124 @@
-/** The clock a seat carries, and what a test can do with it. */
+/** The spec of the clocks that an assertion reads time from. */
 
-import { describe, expect, it } from "vitest";
-import { Controlled, System } from "../src/clock.js";
+import { describe } from "vitest";
+import { Controlled, System, wait } from "../src/clock.js";
 import { check } from "../src/index.js";
-import { Recorder } from "../src/seat.js";
+import { test as it } from "../src/vitest.js";
 
-describe("Controlled", () => {
-  it("reads the start until something advances it", () => {
-    const clock = new Controlled(100);
+describe("clock", () => {
+  describe("System.now", () => {
+    it("returns the reading of the platform clock in milliseconds", ({ seat }) => {
+      const before = performance.now();
+      const now = new System().now();
 
-    expect(clock.now()).toBe(100);
-    clock.advance(30);
-    expect(clock.now()).toBe(130);
+      check.inRange(
+        seat,
+        now,
+        before,
+        performance.now(),
+        "the reading is the platform's",
+      );
+    });
   });
 
-  it("does not move time backwards", () => {
-    const clock = new Controlled(100);
-    clock.advance(-30);
+  describe("System.sleep", () => {
+    it("resolves once the duration has passed on the platform clock", async ({
+      seat,
+    }) => {
+      const started = performance.now();
+      await new System().sleep(5);
 
-    expect(clock.now()).toBe(100);
+      check.isTrue(
+        seat,
+        performance.now() - started >= 4,
+        "the sleep took its duration",
+      );
+    });
   });
 
-  it("settles a sleep only once the clock passes it", async () => {
-    const clock = new Controlled(0);
-    let settled = false;
-    const sleeping = clock.sleep(60).then(() => {
-      settled = true;
+  describe("new Controlled", () => {
+    it("returns a clock that reads its start", ({ seat }) => {
+      check.equal(seat, new Controlled(100).now(), 100, "a new clock reads its start");
     });
 
-    clock.advance(30);
-    await Promise.resolve();
-    expect(settled, "it does not settle before the clock reaches it").toBe(false);
-
-    clock.advance(30);
-    await sleeping;
-    expect(settled, "it settles once the clock passes the duration").toBe(true);
-  });
-});
-
-describe("a seat's clock", () => {
-  it("is the platform clock by default", () => {
-    expect(new Recorder().clock()).toBeInstanceOf(System);
+    it("returns a clock that reads 0 without a start", ({ seat }) => {
+      check.equal(seat, new Controlled().now(), 0, "a clock without a start reads 0");
+    });
   });
 
-  it("is what withClock supplied", () => {
-    const seat = new Recorder().withClock(new Controlled(100));
+  describe("Controlled.advance", () => {
+    it("moves the clock forward by the duration", ({ seat }) => {
+      const clock = new Controlled(100);
+      clock.advance(30);
 
-    expect(seat.clock().now()).toBe(100);
+      check.equal(
+        seat,
+        clock.now(),
+        130,
+        "the clock reads its start plus the duration",
+      );
+    });
+
+    it("leaves the clock unchanged for a duration that is not positive", ({ seat }) => {
+      const clock = new Controlled(100);
+      clock.advance(-30);
+      clock.advance(0);
+
+      check.equal(seat, clock.now(), 100, "time on the clock does not move backwards");
+    });
+
+    it("resolves each sleep that the new instant passed", async ({ seat }) => {
+      const clock = new Controlled(0);
+      const woke: number[] = [];
+      const sleeping = [10, 20, 30].map((d) => clock.sleep(d).then(() => woke.push(d)));
+      clock.advance(25);
+      await Promise.all(sleeping.slice(0, 2));
+
+      check.equal(seat, woke, [10, 20], "the sleeps of 10 and 20 ms resolved at 25 ms");
+    });
   });
-});
 
-describe("eventually against a controlled clock", () => {
-  it("gives up without spending real time", async () => {
-    const seat = new Recorder().withClock(new Controlled(0));
+  describe("Controlled.sleep", () => {
+    it("resolves only once the clock passes the duration", async ({ seat }) => {
+      const clock = new Controlled(0);
+      let settled = false;
+      const sleeping = clock.sleep(60).then(() => {
+        settled = true;
+      });
+      clock.advance(30);
+      await Promise.resolve();
+      check.isFalse(seat, settled, "the sleep waits while the clock is before its end");
 
-    const started = performance.now();
-    await check.eventually(
-      seat,
-      3_600_000,
-      60_000,
-      (inner) => {
-        check.isTrue(inner, false, "never settles");
-      },
-      "the body settles",
-    );
-    const elapsed = performance.now() - started;
+      clock.advance(30);
+      await sleeping;
+      check.isTrue(seat, settled, "the sleep resolves once the clock passes its end");
+    });
 
-    expect(seat.failed, "a body that never settles reports").toBe(true);
-    expect(elapsed, "an hour of controlled time costs no waiting").toBeLessThan(5000);
+    it("resolves at once for a duration that is not positive", async ({ seat }) => {
+      const clock = new Controlled(0);
+      await clock.sleep(0);
+
+      check.equal(seat, clock.now(), 0, "the sleep resolved without an advance");
+    });
   });
 
-  it("stops once the body settles", async () => {
-    const seat = new Recorder().withClock(new Controlled(0));
-    let attempts = 0;
+  describe("wait", () => {
+    it("advances a controlled clock by the duration", async ({ seat }) => {
+      const clock = new Controlled(0);
+      await wait(clock, 40);
 
-    await check.eventually(
-      seat,
-      3_600_000,
-      60_000,
-      (inner) => {
-        attempts += 1;
-        check.isTrue(inner, attempts >= 3, "not yet");
-      },
-      "the body settles",
-    );
+      check.equal(seat, clock.now(), 40, "the wait advanced the clock");
+    });
 
-    expect(seat.failed, "a body that settles is not reported").toBe(false);
-    expect(attempts, "it stops once the body comes right").toBe(3);
+    it("sleeps on a clock other than a controlled one", async ({ seat }) => {
+      const started = performance.now();
+      await wait(new System(), 5);
+
+      check.isTrue(
+        seat,
+        performance.now() - started >= 4,
+        "the wait slept its duration",
+      );
+    });
   });
 });

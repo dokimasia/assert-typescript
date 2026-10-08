@@ -1,7 +1,7 @@
 /**
  * The seats an assertion reports through.
  *
- * Which seat a test holds decides what each surface does:
+ * The seat that a test passes decides what each surface does:
  *
  * | Seat        | `check`   | `soft`                         |
  * | ----------- | --------- | ------------------------------ |
@@ -13,14 +13,17 @@
 import { type Clock, System } from "./clock.js";
 import { type Failure, render } from "./failure.js";
 import { clear, dropped } from "./matcher/pending.js";
-import type { Seat } from "./matcher/seat.js";
+import type { Cleanups, Seat } from "./matcher/seat.js";
+import { faultText } from "./matcher/verdict.js";
+import { keep, lines, own } from "./record/calls.js";
 
-export type { Seat };
+export { signalOf } from "./matcher/seat.js";
+export type { Cleanups, Seat };
 
 /** Raised by every seat that stops a test. */
 export class AssertionFailed extends Error {
   /**
-   * Return a failure carrying message.
+   * Returns a failure with message.
    *
    * @param message What was supposed to be true, and what was not.
    */
@@ -31,11 +34,11 @@ export class AssertionFailed extends Error {
 }
 
 /**
- * Throw when this seat has assertions nobody awaited.
+ * Throws when this seat has assertions that nobody awaited.
  *
- * Several assertions answer a promise, and a caller who drops one gets
- * a green test that asserted nothing. No type checker catches it: the
- * promise was used, it was simply used as a promise.
+ * Several assertions return a promise, and a caller who drops one gets a
+ * green test that asserted nothing. No type checker catches it, because
+ * the caller used the promise as a value.
  *
  * @param seat The seat whose started work is being closed off.
  * @throws AssertionFailed naming every assertion that was dropped.
@@ -55,16 +58,17 @@ function reportDropped(seat: Seat): void {
 /**
  * A seat that throws on any failure.
  *
- * The seat to construct outside a test runner. Its `record` throws
- * too: a recorded failure needs somewhere to report at the end, and a
- * bare seat has no end to report at. Throwing early beats dropping it.
+ * The seat to construct outside a test runner. Its `record` throws too: a
+ * recorded failure needs a place to be reported at the end of the test,
+ * and a bare seat has no end of test, so it throws the failure at once
+ * rather than drop it. It has no signal, and writes no call record.
  */
 export class Standard implements Seat {
-  /** Do nothing; there is no runner here to hide frames from. */
+  /** Does nothing, because no runner hides frames here. */
   helper(): void {}
 
   /**
-   * Throw, stopping the test here.
+   * Throws, which stops the test here.
    *
    * @param message What was supposed to be true.
    */
@@ -73,7 +77,7 @@ export class Standard implements Seat {
   }
 
   /**
-   * Throw; this seat cannot collect a failure and carry on.
+   * Throws, because this seat cannot collect a failure and continue.
    *
    * @param message What was supposed to be true.
    */
@@ -82,13 +86,12 @@ export class Standard implements Seat {
   }
 
   /**
-   * Throw for any asynchronous assertion nobody awaited.
+   * Throws for any asynchronous assertion that nobody awaited.
    *
-   * This seat throws a failure the moment it arrives, so there is
-   * nothing collected to report. What it cannot see on its own is an
-   * assertion whose promise was dropped: that failure was thrown
-   * inside a promise nobody holds, and the evidence is gone by the
-   * time the test ends. Call this where the test ends.
+   * This seat throws each failure the moment it arrives, so it has nothing
+   * collected to report. It cannot see an assertion whose promise was
+   * dropped: that failure was thrown inside a promise that nobody awaited.
+   * Call this where the test ends.
    */
   flush(): void {
     reportDropped(this);
@@ -98,22 +101,33 @@ export class Standard implements Seat {
 /**
  * A seat that collects every failure and throws none.
  *
- * This is what lets an assertion be tested by reading what it reported
- * rather than suffering it. Nothing driven with a recorder can fail a
- * test.
+ * A test of an assertion reads what the assertion reported on it, rather
+ * than being stopped by it. Nothing driven with a recorder can fail a test.
+ * It keeps the call record of every call it receives, whatever
+ * `DOKIMI_ASSERT_RECORD` states.
  */
 export class Recorder implements Seat {
   /** Every record that arrived, in call order. */
   #records: Failure[] = [];
   /** What assertions read time from, or undefined for the platform. */
   #clock: Clock | undefined;
+  /** The signal that this recorder states, or undefined for none. */
+  #signal: AbortSignal | undefined;
+  #fatal: string | undefined;
+  #recorded: string[] = [];
+  #helpers = 0;
+
+  /** Returns a recorder that has received nothing. */
+  constructor() {
+    keep(own(this));
+  }
 
   /**
-   * Record one failure as the record it is.
+   * Records one failure as the record it is.
    *
-   * This is what lets a test read the assertion's own fields rather
-   * than search its sentence for words. The rendered sentence is kept
-   * too, so message answers what it always did.
+   * A test reads the assertion's own fields from the record, rather than
+   * search its sentence for words. The recorder keeps the rendered sentence
+   * too, which `message` returns.
    *
    * @param failure The record the assertion reported.
    * @param aborting Whether it came from the aborting surface.
@@ -137,8 +151,13 @@ export class Recorder implements Seat {
     return [...this.#records];
   }
 
+  /** The call records of this recorder's calls, in the order of their seq, as JSON lines. */
+  get records(): readonly string[] {
+    return lines(own(this));
+  }
+
   /**
-   * The clock this seat hands assertions.
+   * Returns the clock that this seat hands assertions.
    *
    * @returns What withClock set, or the platform clock.
    */
@@ -147,7 +166,7 @@ export class Recorder implements Seat {
   }
 
   /**
-   * Make assertions reported here read clock rather than the platform.
+   * Makes the assertions reported here read clock rather than the platform.
    *
    * @param clock Where those assertions read time.
    * @returns The receiver, so the call chains onto the constructor.
@@ -157,17 +176,29 @@ export class Recorder implements Seat {
     return this;
   }
 
-  #fatal: string | undefined;
-  #recorded: string[] = [];
-  #helpers = 0;
+  /** The signal that withSignal set, or undefined for none. */
+  get signal(): AbortSignal | undefined {
+    return this.#signal;
+  }
 
-  /** Count one helper-frame mark. */
+  /**
+   * Makes signal the signal of this recorder.
+   *
+   * @param signal - What an assertion reported here hands the code under test.
+   * @returns The receiver, so the call chains onto the constructor.
+   */
+  withSignal(signal: AbortSignal): this {
+    this.#signal = signal;
+    return this;
+  }
+
+  /** Counts one helper-frame mark. */
   helper(): void {
     this.#helpers += 1;
   }
 
   /**
-   * Collect a failure. The first fatal message is the one kept.
+   * Collects a failure. The recorder keeps the first fatal message.
    *
    * @param message What was supposed to be true.
    */
@@ -176,7 +207,7 @@ export class Recorder implements Seat {
   }
 
   /**
-   * Collect a failure and return.
+   * Collects a failure and returns.
    *
    * @param message What was supposed to be true.
    */
@@ -190,11 +221,11 @@ export class Recorder implements Seat {
   }
 
   /**
-   * The first failure recorded, preferring the aborting path.
+   * The first failure recorded, the aborting path's first.
    *
-   * Empty when nothing failed. Reading this rather than indexing a
-   * list keeps a test from throwing when the assertion under test
-   * wrongly reported nothing.
+   * Empty when nothing failed. A test that reads this rather than an
+   * index of a list does not throw when the assertion under test wrongly
+   * reported nothing.
    */
   get message(): string {
     return this.#fatal ?? this.#recorded[0] ?? "";
@@ -211,22 +242,27 @@ export class Recorder implements Seat {
   }
 }
 
+/** The functions that each collector runs when its test ends, in the order of their registration. */
+const CLEANUPS = new WeakMap<Collector, (() => void)[]>();
+
 /**
  * A seat that throws on a check and collects what soft records.
  *
- * This is what a real test wants. An aborting assertion throws where
- * it stands; a recording one is kept until {@link Collector.flush},
- * which the runner adapter calls once the test body is done, so
- * several failing properties of one value are all reported at once.
+ * The seat of a real test. An aborting assertion throws at the call; a
+ * recording one is kept until {@link Collector.flush}, which the runner
+ * adapter calls once the test body is done, so several failing properties
+ * of one value are all reported at once.
  */
-export class Collector implements Seat {
+export class Collector implements Seat, Cleanups {
   #collected: string[] = [];
+  /** The signal that this collector states, or undefined for none. */
+  #signal: AbortSignal | undefined;
 
-  /** Do nothing; the adapter hides frames, not the seat. */
+  /** Does nothing, because the adapter hides frames, not the seat. */
   helper(): void {}
 
   /**
-   * Throw, stopping the test here.
+   * Throws, which stops the test here.
    *
    * @param message What was supposed to be true.
    */
@@ -235,7 +271,7 @@ export class Collector implements Seat {
   }
 
   /**
-   * Keep a failure, and let the test carry on.
+   * Keeps a failure, and lets the test continue.
    *
    * @param message What was supposed to be true.
    */
@@ -248,16 +284,48 @@ export class Collector implements Seat {
     return [...this.#collected];
   }
 
+  /** The signal that withSignal set, or undefined for none. */
+  get signal(): AbortSignal | undefined {
+    return this.#signal;
+  }
+
   /**
-   * Throw one failure carrying everything collected.
+   * Makes signal the signal of this collector: the signal of the test that
+   * runs on it.
    *
-   * Returns when nothing was collected. Clears what it threw, so a
-   * seat reused across phases does not report a failure twice.
+   * @param signal - What an assertion reported here hands the code under test.
+   * @returns The receiver, so the call chains onto the constructor.
+   */
+  withSignal(signal: AbortSignal): this {
+    this.#signal = signal;
+    return this;
+  }
+
+  /**
+   * Registers fn to run when the test ends, also when the test fails. The
+   * fixture of `@dokimi/assert/vitest` runs the functions after the test
+   * body, in the reverse order of their registration, and reports each
+   * function that throws as a failure of the test.
    *
-   * An asynchronous assertion still running is reported here too. A
-   * caller who forgot to await one would otherwise get a green test
-   * that asserted nothing, which no type checker catches: the promise
-   * was used, it was simply used as a promise.
+   * @param fn - The function, such as the removal of a directory that the
+   *   test created.
+   */
+  cleanup(fn: () => void): void {
+    const registered = CLEANUPS.get(this) ?? [];
+    registered.push(fn);
+    CLEANUPS.set(this, registered);
+  }
+
+  /**
+   * Throws one failure with everything collected.
+   *
+   * Returns when nothing was collected. Clears what it threw, so a seat
+   * reused across phases does not report a failure twice.
+   *
+   * An asynchronous assertion that nobody awaited is reported here too. A
+   * caller who forgot to await one would otherwise get a green test that
+   * asserted nothing, which no type checker catches, because the caller
+   * used the promise as a value.
    */
   flush(): void {
     reportDropped(this);
@@ -271,5 +339,25 @@ export class Collector implements Seat {
 
     const listed = collected.map((m, i) => `  ${i + 1}. ${m}`).join("\n");
     throw new AssertionFailed(`${collected.length} failures:\n${listed}`);
+  }
+}
+
+/**
+ * Runs the functions that collector registered through `cleanup`, the
+ * last registered first, and forgets them. A function that throws does
+ * not stop the ones after it: the collector records its error as a
+ * failure, which the next flush reports.
+ *
+ * @param collector - The seat of the test that ended.
+ */
+export function cleanUp(collector: Collector): void {
+  const registered = CLEANUPS.get(collector) ?? [];
+  CLEANUPS.delete(collector);
+  for (const fn of registered.reverse()) {
+    try {
+      fn();
+    } catch (err) {
+      collector.record(`a cleanup failed: ${faultText(err)}`);
+    }
   }
 }

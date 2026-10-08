@@ -1,9 +1,9 @@
 /**
  * Test assertions defined by a language-neutral standard.
  *
- * Two surfaces carry the same assertions under the same names.
+ * Two surfaces export the same assertions under the same names.
  * {@link check} stops the test at the first failure; {@link soft}
- * records the failure and lets the test carry on.
+ * records the failure and lets the test continue.
  *
  * ```ts
  * import { check, soft } from "@dokimi/assert";
@@ -23,9 +23,21 @@
 export * as bench from "./bench.js";
 export * as check from "./check.js";
 export { type Clock, Controlled, System } from "./clock.js";
-export type { Failure, Where } from "./failure.js";
+export { Failure, type Where } from "./failure.js";
+export * as files from "./files/index.js";
 export * as golden from "./golden.js";
-export { equateEmpty, equateNans, type Option } from "./option.js";
+export * as history from "./history/index.js";
+export { byIdentity, equateEmpty, equateNans, type Option } from "./option.js";
+export * as prop from "./prop/index.js";
 export { rejects } from "./rejects.js";
-export { AssertionFailed, Collector, Recorder, type Seat, Standard } from "./seat.js";
+export {
+  AssertionFailed,
+  type Cleanups,
+  Collector,
+  Recorder,
+  type Seat,
+  Standard,
+  signalOf,
+} from "./seat.js";
 export * as soft from "./soft.js";
+export * as stateful from "./stateful/index.js";
