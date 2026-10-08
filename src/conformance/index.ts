@@ -12,6 +12,7 @@ export {
   cases,
   memberFor,
   mismatch,
+  optionsOf,
   SURFACES,
   skipReason,
 } from "./corpus.js";
@@ -30,4 +31,5 @@ export {
   surfaceNames,
   version,
 } from "./definition.js";
-export { decode, type Literal } from "./literal.js";
+export { canonical, decode, type Literal, Objects, sameJson } from "./literal.js";
+export { checkVector, type Vector, vectors } from "./vector.js";

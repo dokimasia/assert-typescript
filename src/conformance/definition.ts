@@ -16,16 +16,18 @@ export const LANGUAGE = "typescript";
 /** Where the vendored definition sits, relative to this module. */
 const SPEC = join(dirname(fileURLToPath(import.meta.url)), "spec");
 
-/** What one assertion's entry in the definition holds. */
+/** What one assertion's entry in the definition states. */
 export interface AssertionSpec {
-  /** How many arguments the function form takes, message included. */
+  /** How many arguments the function form takes, message included and the seat left out. */
   readonly arity: number;
-  /** What the assertion states, in one sentence. */
+  /** What the assertion states. */
   readonly summary: string;
-  /** The subpackage it lives in, empty for the root namespace. */
+  /** The subpackage it is in, absent for the root namespace. */
   readonly package?: string;
-  /** What its failure names. */
-  readonly message_fields?: readonly string[];
+  /** The fields that its failure record contains, and no others. */
+  readonly detail_fields: readonly string[];
+  /** The relaxations that it accepts. */
+  readonly relaxations?: readonly string[];
 }
 
 /** One language's declared inability to supply an assertion. */
@@ -74,12 +76,9 @@ export function names(): Record<string, string> {
   const table = (
     read("naming.json") as { names: Record<string, Record<string, string>> }
   ).names;
-  const mapped: Record<string, string> = {};
-  for (const [id, entry] of Object.entries(table)) {
-    const name = entry[LANGUAGE];
-    if (name !== undefined) mapped[id] = name;
-  }
-  return mapped;
+  return Object.fromEntries(
+    Object.entries(table).map(([id, entry]) => [id, entry[LANGUAGE] as string]),
+  );
 }
 
 /**
@@ -107,23 +106,20 @@ export function overlay(): Overlay {
 /**
  * Each relaxation the definition states, with this language's name.
  *
- * A relaxation the naming table gives TypeScript no name for maps to
- * the empty string, which is what an overlay declining it looks like.
- *
  * @returns Relaxation id to the name a caller types.
  */
 export function relaxationNames(): Record<string, string> {
-  const stated = (read("assertions.json") as { relaxations?: Record<string, unknown> })
+  const stated = (read("assertions.json") as { relaxations: Record<string, unknown> })
     .relaxations;
   const named = (
-    read("naming.json") as { relaxations?: Record<string, Record<string, string>> }
+    read("naming.json") as { relaxations: Record<string, Record<string, string>> }
   ).relaxations;
-
-  const mapped: Record<string, string> = {};
-  for (const id of Object.keys(stated ?? {})) {
-    mapped[id] = named?.[id]?.[LANGUAGE] ?? "";
-  }
-  return mapped;
+  return Object.fromEntries(
+    Object.keys(stated).map((id) => [
+      id,
+      (named[id] as Record<string, string>)[LANGUAGE] as string,
+    ]),
+  );
 }
 
 /**
@@ -138,17 +134,29 @@ export function relaxationNames(): Record<string, string> {
 export function surfaceNames(): Record<string, string> {
   const table = (
     read("naming.json") as {
-      surface?: Record<string, Record<string, Record<string, string>>>;
+      surface: Record<string, Record<string, Record<string, string>>>;
     }
   ).surface;
 
   const mapped: Record<string, string> = {};
   for (const section of ["types", "members", "helpers"]) {
-    for (const [sid, perLanguage] of Object.entries(table?.[section] ?? {})) {
+    const rows = table[section] as Record<string, Record<string, string>>;
+    for (const [sid, perLanguage] of Object.entries(rows)) {
       mapped[sid] = perLanguage[LANGUAGE] ?? "";
     }
   }
   return mapped;
+}
+
+/**
+ * Reports whether a list section of the overlay has an entry of id. A
+ * section that the overlay leaves out has none.
+ */
+function lists(section: "diverge" | "surface" | "relaxations", id: string): boolean {
+  const entries = (
+    overlay() as unknown as Record<string, { id: string }[] | undefined>
+  )[section];
+  return (entries ?? []).some((entry) => entry.id === id);
 }
 
 /**
@@ -158,8 +166,7 @@ export function surfaceNames(): Record<string, string> {
  * @returns True when the overlay declares it not offered.
  */
 export function declinesSurface(surfaceId: string): boolean {
-  const entries = (overlay() as { surface?: { id: string }[] }).surface ?? [];
-  return entries.some((entry) => entry.id === surfaceId);
+  return lists("surface", surfaceId);
 }
 
 /**
@@ -169,8 +176,7 @@ export function declinesSurface(surfaceId: string): boolean {
  * @returns True when the overlay declares it not offered.
  */
 export function declinesRelaxation(relaxation: string): boolean {
-  const entries = (overlay() as { relaxations?: { id: string }[] }).relaxations ?? [];
-  return entries.some((entry) => entry.id === relaxation);
+  return lists("relaxations", relaxation);
 }
 
 /**
@@ -180,5 +186,5 @@ export function declinesRelaxation(relaxation: string): boolean {
  * @returns True when the overlay declares a divergence for it.
  */
 export function diverges(assertion: string): boolean {
-  return overlay().diverge.some((d) => d.id === assertion);
+  return lists("diverge", assertion);
 }

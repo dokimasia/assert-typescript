@@ -10,10 +10,19 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as check from "../check.js";
+import type { Option } from "../matcher/option.js";
+import * as option from "../option.js";
+import { DEFINITION } from "../record/call.js";
 import type { Recorder } from "../seat.js";
 import * as soft from "../soft.js";
-import { LANGUAGE, names } from "./definition.js";
-import { decode, type Literal } from "./literal.js";
+import {
+  type AssertionSpec,
+  assertions,
+  LANGUAGE,
+  names,
+  relaxationNames,
+} from "./definition.js";
+import { canonical, decode, type Literal, Objects } from "./literal.js";
 
 /** Where the vendored corpus sits, relative to this module. */
 const CORPUS = join(dirname(fileURLToPath(import.meta.url)), "spec", "corpus");
@@ -29,14 +38,18 @@ export interface Case {
   readonly assertion: string;
   /** Its arguments, already decoded. */
   readonly args: readonly unknown[];
+  /** The ids of the relaxations that the call passes. */
+  readonly options: readonly string[];
   /** Whether the assertion must pass or fail. */
   readonly expect: "pass" | "fail";
   /**
-   * What the failure's record must hold, keyed by the names the
-   * assertion declares. Every field stated must match; a field the
-   * case leaves out is not checked.
+   * What the failure's record must state, keyed by the names the
+   * assertion declares. Every field stated must match; a field the case
+   * leaves out is not checked.
    */
   readonly detail: Readonly<Record<string, unknown>>;
+  /** The detail fields that the assertion declares: a failure's record states exactly these. */
+  readonly fields: readonly string[];
   /**
    * The behaviour this case hands the assertion in place of arguments,
    * or undefined for a case that states values.
@@ -52,33 +65,40 @@ export const SURFACES: Record<string, Record<string, Invoker>> = {
   soft: soft as unknown as Record<string, Invoker>,
 };
 
+/** A corpus file, as the definition states it. */
+interface CorpusFile {
+  readonly assertion: string;
+  readonly cases: readonly {
+    readonly id: string;
+    readonly args?: readonly Literal[];
+    readonly options?: readonly string[];
+    readonly expect: "pass" | "fail";
+    readonly detail?: Readonly<Record<string, Literal>>;
+    readonly subject?: { readonly kind: string };
+    readonly skip?: Readonly<Record<string, string>>;
+  }[];
+}
+
 /**
  * Answer every case the vendored corpus states.
  *
- * @returns The cases, with their arguments decoded.
+ * @returns The cases, with their arguments decoded: the references of one
+ *   case decode to one object per id.
  */
 export function cases(): Case[] {
+  const declared = assertions();
   const found: Case[] = [];
   for (const file of readdirSync(CORPUS).sort()) {
     if (!file.endsWith(".json")) continue;
 
-    const document = JSON.parse(readFileSync(join(CORPUS, file), "utf8")) as {
-      assertion: string;
-      cases: {
-        id: string;
-        args?: Literal[];
-        expect: "pass" | "fail";
-        detail?: Record<string, Literal>;
-        subject?: { kind: string };
-        skip?: Record<string, string>;
-      }[];
-    };
-
+    const document = JSON.parse(readFileSync(join(CORPUS, file), "utf8")) as CorpusFile;
     for (const one of document.cases) {
+      const objects = new Objects();
       found.push({
         id: one.id,
         assertion: document.assertion,
-        args: (one.args ?? []).map(decode),
+        args: (one.args ?? []).map((arg) => objects.decode(arg)),
+        options: one.options ?? [],
         expect: one.expect,
         ...(one.subject ? { subject: one.subject.kind } : {}),
         detail: Object.fromEntries(
@@ -87,6 +107,7 @@ export function cases(): Case[] {
             decode(value),
           ]),
         ),
+        fields: (declared[document.assertion] as AssertionSpec).detail_fields,
         skip: one.skip ?? {},
       });
     }
@@ -115,59 +136,130 @@ export function memberFor(one: Case): string | undefined {
 }
 
 /**
- * Hold a recorder to what a case says must have happened.
+ * Returns the options that a case's call passes, as this language names
+ * each relaxation.
  *
- * @param one The case that was driven.
- * @param recorder The seat the assertion reported to.
- * @returns What went wrong, or undefined when the two agree.
+ * @param one The case to ask about.
+ * @returns One option per relaxation that the case names.
  */
-export function mismatch(one: Case, recorder: Recorder): string | undefined {
-  if (one.expect === "pass") {
-    return recorder.failed ? `expected a pass, got: ${recorder.message}` : undefined;
-  }
+export function optionsOf(one: Case): Option[] {
+  const named = relaxationNames();
+  return one.options.map((id) => {
+    const make = (option as unknown as Record<string, () => Option>)[named[id] ?? ""];
+    if (make === undefined) throw new Error(`${one.id}: no option names ${id}`);
+    return make();
+  });
+}
+
+/** Whether a reported value is the value that a case states. */
+function same(held: unknown, want: unknown): boolean {
+  return canonical(held) === canonical(want);
+}
+
+/** Returns how the names of a detail differ from the fields that a case's assertion declares. */
+function fieldsMismatch(whose: string, detail: object, one: Case): string | undefined {
+  const stated = JSON.stringify(Object.keys(detail).sort());
+  const declared = JSON.stringify([...one.fields].sort());
+  return stated === declared
+    ? undefined
+    : `${whose} states the fields ${stated}, want ${declared}`;
+}
+
+/** Holds the first failure record of a failing case to what the case states. */
+function recordMismatch(one: Case, recorder: Recorder): string | undefined {
   if (!recorder.failed) return "expected a failure, got a pass";
-
   const [record] = recorder.failures;
-  if (record === undefined) {
+  if (record === undefined)
     return "reported no record; the assertion did not report one";
+  if (record.assertion !== one.assertion) {
+    return `the record is of ${record.assertion}, want ${one.assertion}`;
   }
-
+  if (record.contract !== one.id) {
+    return `the record states the contract ${JSON.stringify(record.contract)}, want ${JSON.stringify(one.id)}`;
+  }
+  const fields = fieldsMismatch("the record", record.detail, one);
+  if (fields !== undefined) return fields;
   for (const [name, want] of Object.entries(one.detail)) {
-    if (!(name in record.detail)) {
-      return `the record holds no detail "${name}", want ${show(want)}`;
-    }
-    const held = record.detail[name];
-    if (!same(held, want)) {
-      return `detail "${name}" is ${show(held)}, want ${show(want)}`;
+    if (!same(record.detail[name], want)) {
+      return `detail "${name}" is ${canonical(record.detail[name])}, want ${canonical(want)}`;
     }
   }
   return undefined;
 }
 
-/** Say one value for a mismatch message. */
-function show(value: unknown): string {
-  try {
-    return JSON.stringify(value) ?? String(value);
-  } catch {
-    return String(value);
+/**
+ * Hold a recorder to what a case says must have happened.
+ *
+ * The runner passes the case's id as the assertion's message. The first
+ * record of a failing case names the case's assertion, states the id as
+ * its contract, contains exactly the case's fields, and has the case's
+ * value for every field that the case states. The recorder keeps the
+ * case's one call record: of this library's definition, numbered 1
+ * without a parent, with the case's assertion, the id as its contract, the
+ * verdict that the case expects, the surface of the call, and a failure's
+ * fields as typed literals.
+ *
+ * @param one The case that was driven.
+ * @param recorder The seat the assertion reported to.
+ * @param aborting Whether the case ran on the aborting surface.
+ * @returns What went wrong, or undefined when the two agree.
+ */
+export function mismatch(
+  one: Case,
+  recorder: Recorder,
+  aborting: boolean,
+): string | undefined {
+  if (one.expect === "pass" && recorder.failed) {
+    return `expected a pass, got: ${recorder.message}`;
   }
+  const record = one.expect === "fail" ? recordMismatch(one, recorder) : undefined;
+  return record ?? callMismatch(one, recorder, aborting);
 }
 
-/**
- * Whether a reported value matches what a case states.
- *
- * A NaN is unequal to itself under the standard's own rules, which
- * would make a case stating one impossible to satisfy. Here the
- * question is whether the assertion reported the value the case named,
- * so two NaNs count as the same value.
- *
- * @param held What the assertion reported.
- * @param want What the case states.
- * @returns Whether they are the same value.
- */
-function same(held: unknown, want: unknown): boolean {
-  if (typeof held === "number" && typeof want === "number") {
-    if (Number.isNaN(held) && Number.isNaN(want)) return true;
+/** Holds the one call record that a recorder keeps to what a case states. */
+function callMismatch(
+  one: Case,
+  recorder: Recorder,
+  aborting: boolean,
+): string | undefined {
+  const lines = recorder.records;
+  if (lines.length !== 1)
+    return `the recorder keeps ${lines.length} call records, want 1`;
+  const { where, detail, ...call } = JSON.parse(lines[0] as string) as Record<
+    string,
+    unknown
+  >;
+  void where;
+  const want = {
+    definition: DEFINITION,
+    seq: 1,
+    assertion: one.assertion,
+    contract: one.id,
+    verdict: one.expect,
+    aborting,
+  };
+  if (JSON.stringify(call) !== JSON.stringify(want)) {
+    return `the call record is ${JSON.stringify(call)}, want ${JSON.stringify(want)}`;
   }
-  return JSON.stringify(held) === JSON.stringify(want);
+  if (one.expect === "pass") {
+    return detail === undefined
+      ? undefined
+      : `a passing call record states the detail ${JSON.stringify(detail)}`;
+  }
+  const fields = detail as Record<string, Literal>;
+  const named = fieldsMismatch("the call record", fields, one);
+  if (named !== undefined) return named;
+  for (const [name, want] of Object.entries(one.detail)) {
+    const literal = fields[name] as Literal;
+    let held: unknown;
+    try {
+      held = decode(literal);
+    } catch (err) {
+      return `the call record's ${name} is no typed literal: ${(err as Error).message}`;
+    }
+    if (!same(held, want)) {
+      return `the call record's ${name} is ${JSON.stringify(literal)}, want ${canonical(want)}`;
+    }
+  }
+  return undefined;
 }
