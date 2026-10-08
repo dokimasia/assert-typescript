@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CONTRACT, RUNNERS, type Runner } from "../../src/conformance/files.js";
-import { enter, temporary, UNENFORCED } from "../helpers.js";
+import { enter, LONG_NAMES_ABSENT, temporary, UNENFORCED } from "../helpers.js";
 
 /** The tree of no entry. */
 const NO_FILES = { type: "tree", entries: [] };
@@ -243,17 +243,20 @@ describe("files", () => {
       });
     }
 
-    it("throws the fault of a check that ends with a fault, with the fault's text", async () => {
-      const fault = await faultOf("path-absent", {
-        workspace: A_FILE,
-        args: [string("n".repeat(300))],
-        expect: "pass",
-      });
+    it.skipIf(LONG_NAMES_ABSENT)(
+      "throws the fault of a check that ends with a fault, with the fault's text",
+      async () => {
+        const fault = await faultOf("path-absent", {
+          workspace: A_FILE,
+          args: [string("n".repeat(300))],
+          expect: "pass",
+        });
 
-      expect(fault).toMatch(
-        /^expect: the check ends as error \(files\.absent: the entry cannot be read: ENAMETOOLONG.*\), want pass$/,
-      );
-    });
+        expect(fault).toMatch(
+          /^expect: the check ends as error \(files\.absent: the entry cannot be read: ENAMETOOLONG.*\), want pass$/,
+        );
+      },
+    );
 
     it("throws the fault of a workspace that cannot be written", async () => {
       const dir = temporary();

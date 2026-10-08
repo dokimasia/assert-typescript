@@ -15,7 +15,7 @@ import { workspace } from "../../src/files/workspace.js";
 import { check } from "../../src/index.js";
 import { type Collector, Recorder } from "../../src/seat.js";
 import { test as it } from "../../src/vitest.js";
-import { records, WINDOWS } from "../helpers.js";
+import { LONG_NAMES_ABSENT, records, WINDOWS } from "../helpers.js";
 
 /** The bytes of a PNG file's signature, which are no UTF-8 text. */
 const PNG = Uint8Array.of(0x89, 0x50, 0x4e, 0x47);
@@ -94,20 +94,21 @@ describe("path", () => {
       );
     });
 
-    it("ends the call with a fault for a path that the file system refuses", ({
-      seat,
-    }) => {
-      const dir = fixture(seat);
-      const [verdict, fault] = outcome((r) => absent(r, join(dir, TOO_LONG), "m"));
+    it.skipIf(LONG_NAMES_ABSENT)(
+      "ends the call with a fault for a path that the file system refuses",
+      ({ seat }) => {
+        const dir = fixture(seat);
+        const [verdict, fault] = outcome((r) => absent(r, join(dir, TOO_LONG), "m"));
 
-      check.equal(seat, verdict, "error", "the verdict");
-      check.hasPrefix(
-        seat,
-        fault as string,
-        "files.absent: the entry cannot be read: ENAMETOOLONG",
-        "the fault",
-      );
-    });
+        check.equal(seat, verdict, "error", "the verdict");
+        check.hasPrefix(
+          seat,
+          fault as string,
+          "files.absent: the entry cannot be read: ENAMETOOLONG",
+          "the fault",
+        );
+      },
+    );
   });
 
   describe("isFile", () => {
@@ -180,11 +181,14 @@ describe("path", () => {
       });
     }
 
-    it("ends the call with a fault that names isDir", ({ seat }) => {
-      const [, fault] = outcome((r) => isDir(r, join(fixture(seat), TOO_LONG), "m"));
+    it.skipIf(LONG_NAMES_ABSENT)(
+      "ends the call with a fault that names isDir",
+      ({ seat }) => {
+        const [, fault] = outcome((r) => isDir(r, join(fixture(seat), TOO_LONG), "m"));
 
-      check.hasPrefix(seat, fault as string, "files.isDir: ", "the fault");
-    });
+        check.hasPrefix(seat, fault as string, "files.isDir: ", "the fault");
+      },
+    );
   });
 
   describe("linksTo", () => {
@@ -228,13 +232,16 @@ describe("path", () => {
       });
     }
 
-    it("ends the call with a fault that names linksTo", ({ seat }) => {
-      const [, fault] = outcome((r) =>
-        linksTo(r, join(fixture(seat), TOO_LONG), "a", "m"),
-      );
+    it.skipIf(LONG_NAMES_ABSENT)(
+      "ends the call with a fault that names linksTo",
+      ({ seat }) => {
+        const [, fault] = outcome((r) =>
+          linksTo(r, join(fixture(seat), TOO_LONG), "a", "m"),
+        );
 
-      check.hasPrefix(seat, fault as string, "files.linksTo: ", "the fault");
-    });
+        check.hasPrefix(seat, fault as string, "files.linksTo: ", "the fault");
+      },
+    );
   });
 
   describe("hasContent", () => {

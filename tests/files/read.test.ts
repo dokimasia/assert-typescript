@@ -8,6 +8,7 @@ import { workspace } from "../../src/files/workspace.js";
 import { check } from "../../src/index.js";
 import { Recorder } from "../../src/seat.js";
 import { test as it } from "../../src/vitest.js";
+import { LONG_NAMES_ABSENT } from "../helpers.js";
 
 describe("read", () => {
   describe("read", () => {
@@ -48,19 +49,20 @@ describe("read", () => {
       });
     }
 
-    it("ends the call with a fault for a path that the file system refuses", ({
-      seat,
-    }) => {
-      const dir = workspace(seat, {});
-      const recorder = new Recorder();
-      read(recorder, join(dir, "n".repeat(300)));
+    it.skipIf(LONG_NAMES_ABSENT)(
+      "ends the call with a fault for a path that the file system refuses",
+      ({ seat }) => {
+        const dir = workspace(seat, {});
+        const recorder = new Recorder();
+        read(recorder, join(dir, "n".repeat(300)));
 
-      check.hasPrefix(
-        seat,
-        recorder.message,
-        "files.read: the entry cannot be read: ENAMETOOLONG",
-        "the fault",
-      );
-    });
+        check.hasPrefix(
+          seat,
+          recorder.message,
+          "files.read: the entry cannot be read: ENAMETOOLONG",
+          "the fault",
+        );
+      },
+    );
   });
 });

@@ -26,6 +26,13 @@ export const WINDOWS = process.platform === "win32";
  */
 export const UNENFORCED = WINDOWS || process.getuid?.() === 0;
 
+/**
+ * Whether the file system reports a name past its length limit as absent,
+ * as Windows does. A test of a path that the file system refuses cannot run
+ * then.
+ */
+export const LONG_NAMES_ABSENT = WINDOWS;
+
 /** Returns a new directory, which is removed when the test ends, also below a directory that forbids it. */
 export function temporary(): string {
   const dir = mkdtempSync(join(tmpdir(), "dokimi-test-"));

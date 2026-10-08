@@ -253,9 +253,10 @@ describe("golden", () => {
     });
 
     it("ends the call with a fault for a file that cannot be read", ({ seat }) => {
-      const blocked = written("this is a file, so no file is below it");
+      const path = absent();
+      mkdirSync(path);
       const recorder = new Recorder();
-      golden.matchAt(recorder, join(blocked, "golden.txt"), "content", CHECKING);
+      golden.matchAt(recorder, path, "content", CHECKING);
 
       check.equal(seat, recorder.failures, [], "a fault reports no failure");
       check.contains(
@@ -424,9 +425,10 @@ describe("golden", () => {
     });
 
     it("ends the call with a fault for a file that cannot be read", ({ seat }) => {
-      const blocked = written("this is a file, so no file is below it");
+      const path = absent("g.json");
+      mkdirSync(path);
       const recorder = new Recorder();
-      golden.matchJsonField(recorder, join(blocked, "g.json"), "i", "[1]", CHECKING);
+      golden.matchJsonField(recorder, path, "i", "[1]", CHECKING);
 
       check.contains(
         seat,

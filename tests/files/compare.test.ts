@@ -10,11 +10,16 @@ import { check } from "../../src/index.js";
 import { dropped } from "../../src/matcher/pending.js";
 import { Recorder } from "../../src/seat.js";
 import { test as it } from "../../src/vitest.js";
-import { records, temporary } from "../helpers.js";
+import { records, temporary, WINDOWS } from "../helpers.js";
 
 /** Returns the verdict of each call record of recorder. */
 function verdicts(recorder: Recorder): unknown[] {
   return records(recorder).map((r) => r["verdict"]);
+}
+
+/** Returns entry with the mode 0o644 of a written file, where the file system records modes. */
+function asWritten(entry: Entry): Entry {
+  return WINDOWS ? entry : entry.withMode(0o644);
 }
 
 describe("compare", () => {
@@ -146,8 +151,8 @@ describe("compare", () => {
         [
           "tree-unchanged",
           {
-            want: { "a.txt": text("a").withMode(0o644) },
-            got: { "a.txt": text("b").withMode(0o644) },
+            want: { "a.txt": asWritten(text("a")) },
+            got: { "a.txt": asWritten(text("b")) },
             differences: 1,
           },
         ],

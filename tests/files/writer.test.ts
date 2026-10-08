@@ -28,7 +28,15 @@ import {
 } from "../../src/files/writer.js";
 import { check } from "../../src/index.js";
 import { test as it } from "../../src/vitest.js";
-import { temporary, thrown, UMASKS, UNENFORCED, umask, WINDOWS } from "../helpers.js";
+import {
+  LONG_NAMES_ABSENT,
+  temporary,
+  thrown,
+  UMASKS,
+  UNENFORCED,
+  umask,
+  WINDOWS,
+} from "../helpers.js";
 
 /** Returns the permission bits of the entry at path. */
 function modeAt(path: string): number {
@@ -97,7 +105,7 @@ describe("writer", () => {
           names(join(dir, "empty")),
           readlinkSync(join(dir, "current")),
         ],
-        ["# a\n", [], "docs/a.md"],
+        ["# a\n", [], join("docs", "a.md")],
         "the entries are written",
       );
     });
@@ -365,16 +373,19 @@ describe("writer", () => {
       },
     );
 
-    it("throws the fault of an entry that cannot be read", ({ seat }) => {
-      const name = "n".repeat(300);
+    it.skipIf(LONG_NAMES_ABSENT)(
+      "throws the fault of an entry that cannot be read",
+      ({ seat }) => {
+        const name = "n".repeat(300);
 
-      check.hasPrefix(
-        seat,
-        thrown(() => overwrite(temporary(), new Map([[name, text("a")]]))),
-        `${name}: the entry cannot be read: ENAMETOOLONG`,
-        "the fault",
-      );
-    });
+        check.hasPrefix(
+          seat,
+          thrown(() => overwrite(temporary(), new Map([[name, text("a")]]))),
+          `${name}: the entry cannot be read: ENAMETOOLONG`,
+          "the fault",
+        );
+      },
+    );
 
     it.skipIf(UNENFORCED)(
       "throws the fault of an entry that cannot be written",

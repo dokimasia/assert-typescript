@@ -16,7 +16,13 @@ import { kindOfStats, readPath, readTree } from "../../src/files/reader.js";
 import { treeOf } from "../../src/files/tree.js";
 import { check } from "../../src/index.js";
 import { test as it } from "../../src/vitest.js";
-import { temporary, thrown, UNENFORCED, WINDOWS } from "../helpers.js";
+import {
+  LONG_NAMES_ABSENT,
+  temporary,
+  thrown,
+  UNENFORCED,
+  WINDOWS,
+} from "../helpers.js";
 
 /** Writes the file at path with content, and gives it mode. */
 function file(path: string, content: string | Uint8Array, mode = 0o644): void {
@@ -241,14 +247,17 @@ describe("reader", () => {
       );
     });
 
-    it("throws the fault of a path that the file system refuses", ({ seat }) => {
-      check.hasPrefix(
-        seat,
-        thrown(() => readPath(join(temporary(), "n".repeat(300)), true)),
-        "the entry cannot be read: ENAMETOOLONG",
-        "the fault",
-      );
-    });
+    it.skipIf(LONG_NAMES_ABSENT)(
+      "throws the fault of a path that the file system refuses",
+      ({ seat }) => {
+        check.hasPrefix(
+          seat,
+          thrown(() => readPath(join(temporary(), "n".repeat(300)), true)),
+          "the entry cannot be read: ENAMETOOLONG",
+          "the fault",
+        );
+      },
+    );
 
     it.skipIf(WINDOWS)(
       "throws the fault of an entry that is no file, directory or link",
