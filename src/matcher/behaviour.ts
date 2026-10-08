@@ -5,11 +5,15 @@
  * JavaScript's equivalent is `AbortSignal`: it is what `fetch`, the
  * stream APIs and `events.once` all take, so a subject that can be
  * cancelled at all takes one.
+ *
+ * Each of these awaits, so each reads its call site when it starts.
  */
 
+import { callSite } from "../failure.js";
 import { equal as compare } from "./compare.js";
 import { type Option, settings } from "./option.js";
-import { clockOf, type Mode, reportFailure, type Seat } from "./seat.js";
+import { clockOf, type Mode, type Seat, signalOf } from "./seat.js";
+import { Running } from "./verdict.js";
 
 /** A subject that takes a cancellation handle and answers a promise. */
 export type Cancellable = (signal: AbortSignal) => Promise<unknown>;
@@ -31,11 +35,37 @@ function isAbort(thrown: unknown, signal: AbortSignal): boolean {
   return false;
 }
 
-/** Answer a signal that is already aborted, with the given reason. */
-function alreadyAborted(reason: string): AbortSignal {
+/** Returns a signal that is already aborted, with an error of the given name. */
+function aborted(name: "AbortError" | "TimeoutError", reason: string): AbortSignal {
   const controller = new AbortController();
-  controller.abort(Object.assign(new Error(reason), { name: "AbortError" }));
+  controller.abort(new DOMException(reason, name));
   return controller.signal;
+}
+
+/**
+ * Hands fn an aborted signal and reports whether it rejected with a
+ * cancellation: the failure states what it rejected with instead, or
+ * null when it settled.
+ */
+async function honours(
+  run: Running,
+  mode: Mode,
+  assertion: "honours-cancellation" | "honours-deadline",
+  fn: Cancellable,
+  signal: AbortSignal,
+  msg: string,
+): Promise<void> {
+  try {
+    await fn(signal);
+  } catch (thrown) {
+    if (isAbort(thrown, signal)) {
+      run.pass(mode, assertion, msg);
+      return;
+    }
+    run.fail(mode, assertion, msg, { got: thrown });
+    return;
+  }
+  run.fail(mode, assertion, msg, { got: null });
 }
 
 /**
@@ -45,81 +75,116 @@ function alreadyAborted(reason: string): AbortSignal {
  * whether it checks at all rather than how quickly it notices. A
  * subject that ignores the signal settles normally, and fails here.
  */
-export async function honoursCancellation(
+export function honoursCancellation(
   seat: Seat,
   mode: Mode,
   fn: Cancellable,
   msg: string,
 ): Promise<void> {
   seat.helper();
-  const signal = alreadyAborted("cancelled before the subject started");
-  try {
-    await fn(signal);
-  } catch (thrown) {
-    if (isAbort(thrown, signal)) return;
-    reportFailure(seat, mode, "honours-cancellation", msg, { got: thrown });
-    return;
-  }
-  reportFailure(seat, mode, "honours-cancellation", msg, { got: undefined });
+  const signal = aborted("AbortError", "cancelled before the subject started");
+  return honours(
+    Running.of(seat, callSite()),
+    mode,
+    "honours-cancellation",
+    fn,
+    signal,
+    msg,
+  );
 }
 
 /**
  * Fail when a subject given an expired deadline does not reject.
  *
- * This differs from cancellation in which failure it asks for: a
+ * This differs from cancellation in which failure it hands the subject: a
  * subject may tell a caller who gave up apart from one who ran out of
- * time, and `AbortSignal.timeout` aborts with a `TimeoutError`.
+ * time, and an expired deadline aborts with a `TimeoutError`, as
+ * `AbortSignal.timeout` does.
  */
-export async function honoursDeadline(
+export function honoursDeadline(
   seat: Seat,
   mode: Mode,
   fn: Cancellable,
   msg: string,
 ): Promise<void> {
   seat.helper();
-  const signal = AbortSignal.timeout(0);
-  // The timeout fires on a later turn of the loop, so wait for it
-  // rather than handing the subject a signal that has not fired yet.
-  await new Promise((resolve) => setTimeout(resolve, 1));
-
-  try {
-    await fn(signal);
-  } catch (thrown) {
-    if (isAbort(thrown, signal)) return;
-    reportFailure(seat, mode, "honours-deadline", msg, { got: thrown });
-    return;
-  }
-  reportFailure(seat, mode, "honours-deadline", msg, { got: undefined });
+  const signal = aborted(
+    "TimeoutError",
+    "the deadline passed before the subject started",
+  );
+  return honours(
+    Running.of(seat, callSite()),
+    mode,
+    "honours-deadline",
+    fn,
+    signal,
+    msg,
+  );
 }
 
+/** What ends the wait of completesWithin first: the subject, or its deadline. */
+type Ending = { readonly settled: true } | { readonly settled: false };
+
 /**
- * Fail when fn takes longer than within milliseconds.
+ * Fail when fn has not settled within milliseconds.
  *
- * The subject is measured, not interrupted: one that runs long runs to
- * completion and then fails. This spends real time, up to however long
- * fn takes.
+ * fn receives a signal that aborts with a `TimeoutError` when the
+ * duration has passed on the platform clock, and when the seat's signal
+ * aborts, so a subject that watches it can stop in time. A subject that
+ * has not settled when the duration has passed fails then, with got the
+ * milliseconds waited, and the assertion does not wait for it. A subject
+ * that settles is measured on the seat's clock, which a test can
+ * control. A rejection settles the subject: failing quickly is still
+ * finishing.
  */
-export async function completesWithin(
+export function completesWithin(
   seat: Seat,
   mode: Mode,
   within: number,
-  fn: () => unknown,
+  fn: (signal: AbortSignal) => unknown,
   msg: string,
 ): Promise<void> {
   seat.helper();
+  const run = Running.of(seat, callSite());
   const clock = clockOf(seat);
   const started = clock.now();
-  await fn();
-  const elapsed = clock.now() - started;
+  const waited = performance.now();
+  const deadline = new AbortController();
+  const signal = AbortSignal.any([signalOf(seat), deadline.signal]);
 
-  if (elapsed > within) {
-    // Tenths of a millisecond is the granularity this is about, and a
-    // raw reading carries far more digits than that.
-    reportFailure(seat, mode, "completes-within", msg, {
-      want: within,
-      got: Number(elapsed.toFixed(1)),
-    });
-  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<Ending>((resolve) => {
+    timer = setTimeout(() => {
+      deadline.abort(new DOMException(`${within} ms passed`, "TimeoutError"));
+      resolve({ settled: false });
+    }, within);
+  });
+  const subject = Promise.resolve()
+    .then(() => fn(signal))
+    .then(
+      () => ({ settled: true }) as const,
+      () => ({ settled: true }) as const,
+    );
+
+  return Promise.race([subject, late]).then((ending) => {
+    clearTimeout(timer);
+    if (!ending.settled) {
+      run.fail(mode, "completes-within", msg, {
+        want: within,
+        got: Math.round(performance.now() - waited),
+      });
+      return;
+    }
+    const elapsed = clock.now() - started;
+    if (elapsed > within) {
+      run.fail(mode, "completes-within", msg, {
+        want: within,
+        got: Math.round(elapsed),
+      });
+      return;
+    }
+    run.pass(mode, "completes-within", msg);
+  });
 }
 
 /**
@@ -139,21 +204,24 @@ export async function isPure(
   ...options: Option[]
 ): Promise<void> {
   seat.helper();
+  const run = Running.of(seat, callSite());
   const before = await observe();
   await fn();
   const after = await observe();
 
   if (!compare(after, before, settings(options))) {
-    reportFailure(seat, mode, "pure", msg, { want: before, got: after });
+    run.fail(mode, "pure", msg, { want: before, got: after });
+    return;
   }
+  run.pass(mode, "pure", msg);
 }
 
 /**
  * Fail when a subject given no cancellation handle crashes.
  *
  * Rejecting with an error of its own is fine and is usually right.
- * What fails here is dereferencing the missing signal, which is what a
- * caller does by accident and a middlebox by omission.
+ * What fails here is dereferencing the missing signal, a `TypeError`,
+ * which is what a caller does by accident and a middlebox by omission.
  */
 export async function nullHandleSafe(
   seat: Seat,
@@ -162,11 +230,14 @@ export async function nullHandleSafe(
   msg: string,
 ): Promise<void> {
   seat.helper();
+  const run = Running.of(seat, callSite());
   try {
     await fn(undefined);
   } catch (thrown) {
     if (thrown instanceof TypeError) {
-      reportFailure(seat, mode, "nil-context-safe", msg, { got: thrown });
+      run.fail(mode, "nil-context-safe", msg, { got: thrown });
+      return;
     }
   }
+  run.pass(mode, "nil-context-safe", msg);
 }

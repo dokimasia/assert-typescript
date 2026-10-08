@@ -15,7 +15,9 @@ const MAX_DEPTH = 100;
 /** What a value is, for the purpose of comparing two of them. */
 type Shape =
   | "primitive"
+  | "boxed"
   | "array"
+  | "typed"
   | "map"
   | "set"
   | "date"
@@ -23,16 +25,28 @@ type Shape =
   | "error"
   | "object";
 
+/** The constructors of the boxed primitives. */
+const BOXES: readonly unknown[] = [Number, String, Boolean, BigInt, Symbol];
+
 /** Answer which comparison rule a value falls under. */
 function shapeOf(value: unknown): Shape {
   if (value === null || typeof value !== "object") return "primitive";
+  if (BOXES.some((box) => value instanceof (box as abstract new () => object))) {
+    return "boxed";
+  }
   if (Array.isArray(value)) return "array";
+  if (ArrayBuffer.isView(value) && !(value instanceof DataView)) return "typed";
   if (value instanceof Map) return "map";
   if (value instanceof Set) return "set";
   if (value instanceof Date) return "date";
   if (value instanceof RegExp) return "regexp";
   if (value instanceof Error) return "error";
   return "object";
+}
+
+/** Whether a value is a reference: an object, an array or a function. */
+function isReference(value: unknown): boolean {
+  return typeof value === "function" || (typeof value === "object" && value !== null);
 }
 
 /** Whether a value is a collection that can be empty. */
@@ -63,11 +77,22 @@ function absentAgainstEmpty(a: unknown, b: unknown, relax: Relaxations): boolean
   return false;
 }
 
+/** Compares two primitives: no coercion, NaN unequal to itself unless relaxed, -0 equal to +0. */
+function equalPrimitives(a: unknown, b: unknown, relax: Relaxations): boolean {
+  if (typeof a === "number" && typeof b === "number") {
+    if (Number.isNaN(a) && Number.isNaN(b)) return relax.equateNans;
+    return a === b;
+  }
+  return Object.is(a, b) || a === b;
+}
+
 /**
  * Whether two values are structurally equal.
  *
- * Reaches inside arrays, plain objects, `Map`, `Set`, `Date`, `RegExp`
- * and `Error`. Different shapes never compare. A cycle stops the walk
+ * Reaches inside arrays, typed arrays, plain objects, `Map`, `Set`,
+ * `Date`, `RegExp`, `Error` and boxed primitives. Different shapes never
+ * compare. A map's keys compare by these rules, so no NaN key matches
+ * without `equateNans`, and -0 and +0 are one key. A cycle stops the walk
  * rather than overflowing the stack.
  *
  * @param got The value produced by the code under test.
@@ -88,18 +113,12 @@ function walk(
   seen: Set<unknown>,
 ): boolean {
   if (absentAgainstEmpty(a, b, relax)) return true;
+  if (relax.byIdentity && isReference(a) && isReference(b)) return a === b;
   if (depth > MAX_DEPTH) return true;
 
   const shape = shapeOf(a);
   if (shape !== shapeOf(b)) return false;
-
-  if (shape === "primitive") {
-    if (typeof a === "number" && typeof b === "number") {
-      if (Number.isNaN(a) && Number.isNaN(b)) return relax.equateNans;
-      return a === b;
-    }
-    return Object.is(a, b) || a === b;
-  }
+  if (shape === "primitive") return equalPrimitives(a, b, relax);
 
   if (a === b) return true;
   if (seen.has(a)) return true;
@@ -115,8 +134,16 @@ function walk(
 type Recurse = (a: unknown, b: unknown) => boolean;
 
 /** Compare two arrays: same length, and equal at every index. */
-function equalArrays(a: unknown[], b: unknown[], again: Recurse): boolean {
-  return a.length === b.length && a.every((item, i) => again(item, b[i]));
+function equalArrays(
+  a: ArrayLike<unknown>,
+  b: ArrayLike<unknown>,
+  again: Recurse,
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (!again(a[i], b[i])) return false;
+  }
+  return true;
 }
 
 /**
@@ -139,12 +166,12 @@ function equalSets(a: Set<unknown>, b: Set<unknown>, again: Recurse): boolean {
 }
 
 /**
- * Compare two maps: same size, same keys, equal values.
+ * Compare two maps: the same size, and a one-to-one matching of their
+ * entries, in which each entry of a takes the first unmatched entry of b
+ * whose key and value equal its own.
  *
- * Keys are matched by identity, the way `Map` itself looks them up. A
- * key that is only structurally equal to another map's key is a
- * different key, and pretending otherwise would disagree with every
- * read the subject does.
+ * Keys compare by the rules of {@link equal}, not as `Map` looks them up:
+ * `Map` finds a NaN key and compares an object key by identity.
  */
 function equalMaps(
   a: Map<unknown, unknown>,
@@ -153,9 +180,11 @@ function equalMaps(
 ): boolean {
   if (a.size !== b.size) return false;
 
+  const spare = [...b];
   for (const [key, value] of a) {
-    if (!b.has(key)) return false;
-    if (!again(value, b.get(key))) return false;
+    const at = spare.findIndex(([k, v]) => again(key, k) && again(value, v));
+    if (at < 0) return false;
+    spare.splice(at, 1);
   }
   return true;
 }
@@ -183,6 +212,11 @@ function walkDeep(
   const again: Recurse = (x, y) => walk(x, y, relax, depth + 1, seen);
 
   switch (shape) {
+    case "boxed":
+      return (
+        (a as object).constructor === (b as object).constructor &&
+        equalPrimitives((a as object).valueOf(), (b as object).valueOf(), relax)
+      );
     case "date":
       return (a as Date).getTime() === (b as Date).getTime();
     case "regexp":
@@ -194,6 +228,11 @@ function walkDeep(
       );
     case "array":
       return equalArrays(a as unknown[], b as unknown[], again);
+    case "typed":
+      return (
+        (a as object).constructor === (b as object).constructor &&
+        equalArrays(a as ArrayLike<unknown>, b as ArrayLike<unknown>, again)
+      );
     case "set":
       return equalSets(a as Set<unknown>, b as Set<unknown>, again);
     case "map":

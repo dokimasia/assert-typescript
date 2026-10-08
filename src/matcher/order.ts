@@ -6,10 +6,13 @@
  * adjacent pair and nothing more.
  */
 
-import { show } from "./inspect.js";
-import { type Mode, report, type Seat } from "./seat.js";
+import type { Mode, Seat } from "./seat.js";
+import { fail, pass } from "./verdict.js";
 
-/** Fail when an adjacent pair does not satisfy the predicate. */
+/**
+ * Fail when an adjacent pair does not satisfy the predicate. The failure
+ * states the index of the first item of the pair, and the two items.
+ */
 export function pairwise<T>(
   seat: Seat,
   mode: Mode,
@@ -19,16 +22,12 @@ export function pairwise<T>(
 ): void {
   seat.helper();
   for (let i = 1; i < items.length; i += 1) {
-    const earlier = items[i - 1] as T;
-    const later = items[i] as T;
-    if (!predicate(earlier, later)) {
-      report(
-        seat,
-        mode,
-        `${msg}: the pair at index ${i - 1} fails: ` +
-          `${show(earlier)} then ${show(later)}`,
-      );
+    const first = items[i - 1] as T;
+    const second = items[i] as T;
+    if (!predicate(first, second)) {
+      fail(seat, mode, "pairwise", msg, { index: i - 1, first, second });
       return;
     }
   }
+  pass(seat, mode, "pairwise", msg);
 }

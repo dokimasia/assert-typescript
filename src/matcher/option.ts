@@ -10,7 +10,7 @@
 /** One relaxation of the comparison rules. */
 export interface Option {
   /** Which rule this option relaxes. */
-  readonly kind: "equate-empty" | "equate-nans";
+  readonly kind: "equate-empty" | "equate-nans" | "by-identity";
 }
 
 /** What the options in force allow. */
@@ -19,6 +19,8 @@ export interface Relaxations {
   readonly equateEmpty: boolean;
   /** Whether NaN equals itself. */
   readonly equateNans: boolean;
+  /** Whether a reference equals only a reference to the same object. */
+  readonly byIdentity: boolean;
 }
 
 /**
@@ -47,6 +49,20 @@ export function equateNans(): Option {
 }
 
 /**
+ * Compare references by the objects they refer to.
+ *
+ * An object, an array and a function equal only themselves under this
+ * option, wherever the comparison meets one: at the top, in an element
+ * of a list, in a key or a value of a map, and in a field of a record. A
+ * value that is no reference compares as it does without the option.
+ *
+ * @returns The option, to pass to a comparing assertion.
+ */
+export function byIdentity(): Option {
+  return { kind: "by-identity" };
+}
+
+/**
  * Answer what the given options turn on.
  *
  * @param options The options passed to one call.
@@ -56,5 +72,6 @@ export function settings(options: readonly Option[]): Relaxations {
   return {
     equateEmpty: options.some((o) => o.kind === "equate-empty"),
     equateNans: options.some((o) => o.kind === "equate-nans"),
+    byIdentity: options.some((o) => o.kind === "by-identity"),
   };
 }

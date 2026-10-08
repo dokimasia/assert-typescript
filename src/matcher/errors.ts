@@ -10,7 +10,8 @@
  * Error is for and what lets a wrapped failure still be recognised.
  */
 
-import { type Mode, reportFailure, type Seat } from "./seat.js";
+import type { Mode, Seat } from "./seat.js";
+import { fail, pass } from "./verdict.js";
 
 /** How far down a cause chain to look before calling it cyclic. */
 const MAX_CAUSES = 100;
@@ -28,8 +29,12 @@ function chain(error: unknown): unknown[] {
   return found;
 }
 
-/** Whether target matches error, or anything it wraps. */
-function matchesTarget(error: unknown, target: unknown): boolean {
+/**
+ * Reports whether target matches error, or an error that it wraps: the
+ * same value, an instance of a target class, or an error of the same name
+ * with the same message.
+ */
+export function matchesTarget(error: unknown, target: unknown): boolean {
   return chain(error).some((link) => {
     if (link === target) return true;
     if (typeof target === "function" && link instanceof (target as never)) return true;
@@ -44,16 +49,20 @@ function matchesTarget(error: unknown, target: unknown): boolean {
 export function noError(seat: Seat, mode: Mode, err: unknown, msg: string): void {
   seat.helper();
   if (err !== null && err !== undefined) {
-    reportFailure(seat, mode, "err-absent", msg, { got: err });
+    fail(seat, mode, "err-absent", msg, { got: err });
+    return;
   }
+  pass(seat, mode, "err-absent", msg);
 }
 
 /** Fail when no error is present. */
 export function hasError(seat: Seat, mode: Mode, err: unknown, msg: string): void {
   seat.helper();
   if (err === null || err === undefined) {
-    reportFailure(seat, mode, "err-present", msg);
+    fail(seat, mode, "err-present", msg);
+    return;
   }
+  pass(seat, mode, "err-present", msg);
 }
 
 /** Fail when err does not match target, through the chain of causes. */
@@ -66,8 +75,10 @@ export function errorIs(
 ): void {
   seat.helper();
   if (!matchesTarget(err, target)) {
-    reportFailure(seat, mode, "err-is", msg, { want: target, got: err });
+    fail(seat, mode, "err-is", msg, { want: target, got: err });
+    return;
   }
+  pass(seat, mode, "err-is", msg);
 }
 
 /** Fail when err matches target. */
@@ -80,8 +91,10 @@ export function errorIsNot(
 ): void {
   seat.helper();
   if (matchesTarget(err, target)) {
-    reportFailure(seat, mode, "err-is-not", msg, { got: err });
+    fail(seat, mode, "err-is-not", msg, { got: err });
+    return;
   }
+  pass(seat, mode, "err-is-not", msg);
 }
 
 /** A class of error, as `errorAs` looks for one. */
@@ -102,8 +115,9 @@ export function errorAs<E>(
   seat.helper();
   const found = chain(err).find((link) => link instanceof want);
   if (found === undefined) {
-    reportFailure(seat, mode, "err-as", msg, { want, got: err });
+    fail(seat, mode, "err-as", msg, { want, got: err });
     return undefined;
   }
+  pass(seat, mode, "err-as", msg);
   return found as E;
 }

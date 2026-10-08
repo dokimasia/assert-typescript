@@ -2,48 +2,58 @@
  * The assertions that retry, and the one that checks nothing was left
  * running.
  *
- * These spend real time, deliberately. They are for a condition
- * something outside the test makes true, which is exactly what a
- * controlled clock cannot reach: a fake clock only moves when someone
- * advances it, and nobody will while this is awaiting. Where the
- * subject reads a clock the test controls, drive that clock and assert
- * the answer instead.
+ * These wait on the seat's clock. On the platform clock they spend real
+ * time, so they suit a condition that something outside the test makes
+ * true. On a controlled clock they advance it between attempts and spend
+ * none.
  */
 
-import { wait } from "../clock.js";
-import { clockOf, type Mode, reportFailure, type Seat } from "./seat.js";
+import { type Clock, wait } from "../clock.js";
+import { callSite } from "../failure.js";
+import { own } from "../record/calls.js";
+import { Body, Ended, runOn } from "./body.js";
+import { clockOf, type Mode, type Seat } from "./seat.js";
+import { fail, pass, Running } from "./verdict.js";
+
+/** The shortest wait between two attempts. Every wait moves a controlled clock forward. */
+const MIN_WAIT = 1;
 
 /**
- * A seat that keeps one trial's failure instead of reporting it.
- *
- * Not the public recorder: a retry loop needs nothing more than
- * whether the attempt failed and with what.
+ * The seat of one attempt of a body, which keeps the attempt's first
+ * failure instead of reporting it.
  */
-class Trial implements Seat {
+class Attempt extends Body {
   #message: string | undefined;
+  #failed = false;
 
-  /** Do nothing; a trial has no frames worth hiding. */
-  helper(): void {}
-
-  /** Keep the first failure of this attempt. */
-  fail(message: string): void {
-    this.#message ??= message;
+  /** Keeps the first failure of this attempt, and ends the attempt. */
+  fail(message: string): never {
+    this.record(message);
+    throw new Ended();
   }
 
-  /** Keep the first failure of this attempt. */
+  /** Keeps the first failure of this attempt. */
   record(message: string): void {
+    this.#failed = true;
     this.#message ??= message;
   }
 
-  /** The attempt's failure, or undefined when it passed. */
-  get failure(): string | undefined {
-    return this.#message;
+  /** Whether the attempt failed, and its first failure's message. */
+  get outcome(): { readonly failed: boolean; readonly message: string } {
+    return { failed: this.#failed, message: this.#message ?? "" };
   }
 }
 
-/** Wait for the given number of milliseconds. */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Waits d on clock, or the time left before deadline when that is less,
+ * and reports whether another attempt may start: whether the clock read
+ * before the deadline, and after the wait reads no later than it.
+ */
+async function waitWithin(clock: Clock, deadline: number, d: number): Promise<boolean> {
+  const now = clock.now();
+  if (!(now < deadline)) return false;
+  await wait(clock, Math.min(d, deadline - now));
+  return !(clock.now() > deadline);
 }
 
 /**
@@ -52,7 +62,10 @@ function sleep(ms: number): Promise<void> {
  * The body is handed a seat of its own, so assertions inside it record
  * an attempt rather than ending the test. It runs at least once
  * however short the timeout, and the failure carries the last
- * attempt's own reason rather than a bare timeout.
+ * attempt's own reason rather than a bare timeout. No attempt starts
+ * after the timeout, and an attempt passes the call only when it ends by
+ * the deadline. The calls of each attempt are recorded under the call of
+ * eventually.
  */
 export async function eventually(
   seat: Seat,
@@ -63,24 +76,22 @@ export async function eventually(
   msg: string,
 ): Promise<void> {
   seat.helper();
+  const call = Running.begin(seat, callSite());
   const clock = clockOf(seat);
   const deadline = clock.now() + timeout;
 
-  for (let attempt = 1; ; attempt += 1) {
-    const trial = new Trial();
-    await body(trial);
-
-    const failure = trial.failure;
-    if (failure === undefined) return;
-
-    if (clock.now() > deadline) {
-      reportFailure(seat, mode, "eventually", msg, {
-        attempts: attempt,
-        last: failure,
-      });
+  for (let attempts = 1; ; attempts += 1) {
+    const trial = await runOn(new Attempt(seat, call.slot), body);
+    call.slot?.take(own(trial));
+    const { failed, message } = trial.outcome;
+    if (!failed && !(clock.now() > deadline)) {
+      call.pass(mode, "eventually", msg);
       return;
     }
-    await wait(clock, interval);
+    if (!(await waitWithin(clock, deadline, Math.max(interval, MIN_WAIT)))) {
+      call.fail(mode, "eventually", msg, { attempts, last: message });
+      return;
+    }
   }
 }
 
@@ -101,20 +112,22 @@ export async function eventuallyTrue(
   msg: string,
 ): Promise<void> {
   seat.helper();
+  const call = Running.of(seat, callSite());
   const clock = clockOf(seat);
   const deadline = clock.now() + timeout;
-  const cap = timeout / 4;
-  let backoff = 1;
+  const cap = Math.max(timeout / 4, MIN_WAIT);
+  let backoff = MIN_WAIT;
 
-  for (let attempt = 1; ; attempt += 1) {
-    if (await predicate()) return;
-
-    if (clock.now() > deadline) {
-      reportFailure(seat, mode, "eventually-true", msg, { attempts: attempt });
+  for (let attempts = 1; ; attempts += 1) {
+    if ((await predicate()) && !(clock.now() > deadline)) {
+      call.pass(mode, "eventually-true", msg);
       return;
     }
-    await wait(clock, backoff);
-    backoff = Math.min(backoff * 2, cap > 0 ? cap : backoff * 2);
+    if (!(await waitWithin(clock, deadline, backoff))) {
+      call.fail(mode, "eventually-true", msg, { attempts });
+      return;
+    }
+    backoff = Math.min(Math.max(2 * backoff, MIN_WAIT), cap);
   }
 }
 
@@ -144,8 +157,10 @@ export function noTaskLeaks(seat: Seat, mode: Mode, msg: string): () => void {
       if (started > 0) leaked.push(`${started} ${kind}`);
     }
     if (leaked.length > 0) {
-      reportFailure(seat, mode, "no-task-leaks", msg, { leaked: leaked.sort() });
+      fail(seat, mode, "no-task-leaks", msg, { leaked: leaked.sort() });
+      return;
     }
+    pass(seat, mode, "no-task-leaks", msg);
   };
 }
 

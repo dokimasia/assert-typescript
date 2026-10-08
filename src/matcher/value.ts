@@ -7,39 +7,36 @@
  * from ending a run with a stack trace instead of a message.
  */
 
+import { compile } from "../pattern/match.js";
 import { equal as compare } from "./compare.js";
 import { type Option, settings } from "./option.js";
-import { type Mode, reportFailure, type Seat } from "./seat.js";
+import type { Mode, Seat } from "./seat.js";
+import { fail, pass } from "./verdict.js";
 
-/** Whether a value can answer for its own length. */
-function sized(value: unknown): number | undefined {
-  if (typeof value === "string") return value.length;
+/** Reports whether value is a plain object, whose own keys are its entries. */
+function isPlain(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object") return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+/**
+ * Returns the number of items of a value that has a length: the Unicode
+ * scalar values of a string, the elements of an array or a typed array,
+ * the entries of a `Map`, the members of a `Set`, and the own keys of a
+ * plain object. A string with a lone surrogate, null and any other value
+ * have no length.
+ */
+function lengthOf(value: unknown): number | undefined {
+  if (typeof value === "string")
+    return value.isWellFormed() ? [...value].length : undefined;
   if (Array.isArray(value)) return value.length;
-  if (value instanceof Map || value instanceof Set) return value.size;
-  if (value !== null && typeof value === "object") {
-    return Object.keys(value as object).length;
+  if (ArrayBuffer.isView(value) && !(value instanceof DataView)) {
+    return (value as unknown as ArrayLike<unknown>).length;
   }
+  if (value instanceof Map || value instanceof Set) return value.size;
+  if (isPlain(value)) return Object.keys(value).length;
   return undefined;
-}
-
-/** The name to use for a value's type in a failure. */
-function typeName(value: unknown): string {
-  if (value === null) return "null";
-  if (Array.isArray(value)) return "array";
-  if (value instanceof Map) return "Map";
-  if (value instanceof Set) return "Set";
-  return typeof value;
-}
-
-/** Report that a value cannot answer the question asked of it. */
-function unsupported(
-  seat: Seat,
-  mode: Mode,
-  msg: string,
-  assertion: string,
-  detail: Record<string, unknown>,
-): void {
-  reportFailure(seat, mode, assertion, msg, detail);
 }
 
 /** Fail when got and want differ. */
@@ -53,8 +50,10 @@ export function equal(
 ): void {
   seat.helper();
   if (!compare(got, want, settings(options))) {
-    reportFailure(seat, mode, "equal", msg, { want, got });
+    fail(seat, mode, "equal", msg, { want, got });
+    return;
   }
+  pass(seat, mode, "equal", msg);
 }
 
 /** Fail when got and want are equal. */
@@ -68,39 +67,53 @@ export function notEqual(
 ): void {
   seat.helper();
   if (compare(got, want, settings(options))) {
-    reportFailure(seat, mode, "not-equal", msg, { got });
+    fail(seat, mode, "not-equal", msg, { got });
+    return;
   }
+  pass(seat, mode, "not-equal", msg);
 }
 
 /** Fail when the condition does not hold. */
 export function isTrue(seat: Seat, mode: Mode, condition: boolean, msg: string): void {
   seat.helper();
-  if (!condition) reportFailure(seat, mode, "true", msg);
+  if (!condition) {
+    fail(seat, mode, "true", msg);
+    return;
+  }
+  pass(seat, mode, "true", msg);
 }
 
 /** Fail when the condition holds. */
 export function isFalse(seat: Seat, mode: Mode, condition: boolean, msg: string): void {
   seat.helper();
-  if (condition) reportFailure(seat, mode, "false", msg);
+  if (condition) {
+    fail(seat, mode, "false", msg);
+    return;
+  }
+  pass(seat, mode, "false", msg);
 }
 
 /** Fail when got is neither null nor undefined. */
 export function isNil(seat: Seat, mode: Mode, got: unknown, msg: string): void {
   seat.helper();
   if (got !== null && got !== undefined) {
-    reportFailure(seat, mode, "nil", msg, { got });
+    fail(seat, mode, "nil", msg, { got });
+    return;
   }
+  pass(seat, mode, "nil", msg);
 }
 
 /** Fail when got is null or undefined. */
 export function isNotNil(seat: Seat, mode: Mode, got: unknown, msg: string): void {
   seat.helper();
   if (got === null || got === undefined) {
-    reportFailure(seat, mode, "not-nil", msg);
+    fail(seat, mode, "not-nil", msg);
+    return;
   }
+  pass(seat, mode, "not-nil", msg);
 }
 
-/** Fail when got does not hold want entries. */
+/** Fail when got does not have want items. A value without a length fails with got null. */
 export function length(
   seat: Seat,
   mode: Mode,
@@ -109,80 +122,76 @@ export function length(
   msg: string,
 ): void {
   seat.helper();
-  const size = sized(got);
-  if (size === undefined) {
-    unsupported(seat, mode, msg, "length", { want, got });
+  const size = lengthOf(got);
+  if (size !== want) {
+    fail(seat, mode, "length", msg, { want, got: size ?? null });
     return;
   }
-  if (size !== want) {
-    reportFailure(seat, mode, "length", msg, { want, got: size });
-  }
+  pass(seat, mode, "length", msg);
 }
 
-/** Fail when got holds anything. */
+/** Fail when got has any item, or has no length. length is null for a value without one. */
 export function isEmpty(seat: Seat, mode: Mode, got: unknown, msg: string): void {
   seat.helper();
-  const size = sized(got);
-  if (size === undefined) {
-    unsupported(seat, mode, msg, "empty", { length: got });
+  const size = lengthOf(got);
+  if (size !== 0) {
+    fail(seat, mode, "empty", msg, { got, length: size ?? null });
     return;
   }
-  if (size !== 0) reportFailure(seat, mode, "empty", msg, { length: size });
+  pass(seat, mode, "empty", msg);
 }
 
-/** Fail when got holds nothing. */
+/** Fail when got has no item. A value without a length has none. */
 export function isNotEmpty(seat: Seat, mode: Mode, got: unknown, msg: string): void {
   seat.helper();
-  const size = sized(got);
-  if (size === undefined) {
-    unsupported(seat, mode, msg, "not-empty", {});
+  const size = lengthOf(got) ?? 0;
+  if (size === 0) {
+    fail(seat, mode, "not-empty", msg, { got });
     return;
   }
-  if (size === 0) reportFailure(seat, mode, "not-empty", msg);
+  pass(seat, mode, "not-empty", msg);
 }
 
 /**
- * Whether haystack holds needle, and whether it could answer at all.
+ * Whether haystack contains needle, and whether the question applies to
+ * the haystack at all.
  *
- * What holding means follows the haystack: text holds a substring, a
- * `Map` or object holds a key, and any other collection holds an
- * element compared structurally.
+ * What containing means follows the haystack: text contains a substring,
+ * a `Map` a key and a plain object an own key, and an array, a typed
+ * array or a `Set` an element. Keys and elements compare as
+ * {@link equal} compares, so no NaN key is found without `equateNans`.
  */
-function holds(
+function contained(
   haystack: unknown,
   needle: unknown,
-  options: Option[],
-): { held: boolean; answered: boolean } {
+  options: readonly Option[],
+): { found: boolean; supported: boolean } {
   const relax = settings(options);
-  const no = { held: false, answered: false };
+  const unsupported = { found: false, supported: false };
+  const among = (items: Iterable<unknown>) => {
+    for (const item of items) {
+      if (compare(item, needle, relax)) return { found: true, supported: true };
+    }
+    return { found: false, supported: true };
+  };
 
   if (typeof haystack === "string") {
-    if (typeof needle !== "string") return no;
-    return { held: haystack.includes(needle), answered: true };
+    if (typeof needle !== "string") return unsupported;
+    return { found: haystack.includes(needle), supported: true };
   }
-  if (haystack instanceof Map) {
-    return { held: haystack.has(needle), answered: true };
+  if (haystack instanceof Map) return among(haystack.keys());
+  if (haystack instanceof Set || Array.isArray(haystack)) return among(haystack);
+  if (ArrayBuffer.isView(haystack) && !(haystack instanceof DataView)) {
+    return among(haystack as unknown as Iterable<unknown>);
   }
-  if (haystack instanceof Set) {
-    return {
-      held: [...haystack].some((item) => compare(item, needle, relax)),
-      answered: true,
-    };
+  if (isPlain(haystack)) {
+    if (typeof needle !== "string") return unsupported;
+    return { found: Object.hasOwn(haystack, needle), supported: true };
   }
-  if (Array.isArray(haystack)) {
-    return {
-      held: haystack.some((item) => compare(item, needle, relax)),
-      answered: true,
-    };
-  }
-  if (haystack !== null && typeof haystack === "object") {
-    if (typeof needle !== "string") return no;
-    return { held: Object.hasOwn(haystack, needle), answered: true };
-  }
-  return no;
+  return unsupported;
 }
 
-/** Fail when haystack does not hold needle. */
+/** Fail when haystack does not contain needle. */
 export function contains(
   seat: Seat,
   mode: Mode,
@@ -192,17 +201,14 @@ export function contains(
   ...options: Option[]
 ): void {
   seat.helper();
-  const { held, answered } = holds(haystack, needle, options);
-  if (!answered) {
-    unsupported(seat, mode, msg, "contains", { haystack, needle });
+  if (!contained(haystack, needle, options).found) {
+    fail(seat, mode, "contains", msg, { haystack, needle });
     return;
   }
-  if (!held) {
-    reportFailure(seat, mode, "contains", msg, { haystack, needle });
-  }
+  pass(seat, mode, "contains", msg);
 }
 
-/** Fail when haystack holds needle. */
+/** Fail when haystack contains needle, or the question does not apply to it. */
 export function notContains(
   seat: Seat,
   mode: Mode,
@@ -212,30 +218,12 @@ export function notContains(
   ...options: Option[]
 ): void {
   seat.helper();
-  const { held, answered } = holds(haystack, needle, options);
-  if (!answered) {
-    unsupported(seat, mode, msg, "not-contains", { haystack, needle });
+  const { found, supported } = contained(haystack, needle, options);
+  if (found || !supported) {
+    fail(seat, mode, "not-contains", msg, { haystack, needle });
     return;
   }
-  if (held) {
-    reportFailure(seat, mode, "not-contains", msg, { haystack, needle });
-  }
-}
-
-/** Answer the text of a value, or undefined when it is not text. */
-function asText(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
-
-/** Report that an assertion needed text and was handed something else. */
-function requiresText(
-  seat: Seat,
-  mode: Mode,
-  msg: string,
-  assertion: string,
-  detail: Record<string, unknown>,
-): void {
-  reportFailure(seat, mode, assertion, msg, detail);
+  pass(seat, mode, "not-contains", msg);
 }
 
 /** Fail when got does not start with prefix. */
@@ -247,14 +235,11 @@ export function hasPrefix(
   msg: string,
 ): void {
   seat.helper();
-  const text = asText(got);
-  if (text === undefined) {
-    requiresText(seat, mode, msg, "has-prefix", { got, prefix });
+  if (typeof got !== "string" || !got.startsWith(prefix)) {
+    fail(seat, mode, "has-prefix", msg, { got, prefix });
     return;
   }
-  if (!text.startsWith(prefix)) {
-    reportFailure(seat, mode, "has-prefix", msg, { got: text, prefix });
-  }
+  pass(seat, mode, "has-prefix", msg);
 }
 
 /** Fail when got does not end with suffix. */
@@ -266,17 +251,19 @@ export function hasSuffix(
   msg: string,
 ): void {
   seat.helper();
-  const text = asText(got);
-  if (text === undefined) {
-    requiresText(seat, mode, msg, "has-suffix", { got, suffix });
+  if (typeof got !== "string" || !got.endsWith(suffix)) {
+    fail(seat, mode, "has-suffix", msg, { got, suffix });
     return;
   }
-  if (!text.endsWith(suffix)) {
-    reportFailure(seat, mode, "has-suffix", msg, { got: text, suffix });
-  }
+  pass(seat, mode, "has-suffix", msg);
 }
 
-/** Fail when got does not match the pattern. */
+/**
+ * Fail when got does not match the pattern, a pattern of the portable
+ * subset. A pattern outside the subset fails, with reason the text with
+ * which the subset's parser refuses it. reason is null for a pattern
+ * inside the subset.
+ */
 export function matches(
   seat: Seat,
   mode: Mode,
@@ -285,25 +272,21 @@ export function matches(
   msg: string,
 ): void {
   seat.helper();
-  const text = asText(got);
-  if (text === undefined) {
-    requiresText(seat, mode, msg, "matches", { got, pattern });
-    return;
-  }
-
-  let expression: RegExp;
+  let expression: RegExp | undefined;
+  let reason: string | null = null;
   try {
-    expression = new RegExp(pattern);
+    expression = compile(pattern);
   } catch (err) {
-    reportFailure(seat, mode, "matches", msg, { got, pattern });
+    reason = (err as Error).message;
+  }
+  if (typeof got !== "string" || expression === undefined || !expression.test(got)) {
+    fail(seat, mode, "matches", msg, { got, pattern, reason });
     return;
   }
-  if (!expression.test(text)) {
-    reportFailure(seat, mode, "matches", msg, { got: text, pattern });
-  }
+  pass(seat, mode, "matches", msg);
 }
 
-/** Fail when got does not hold every needle, in order. */
+/** Fail when got does not contain every needle, in order. */
 export function containsInOrder(
   seat: Seat,
   mode: Mode,
@@ -312,13 +295,8 @@ export function containsInOrder(
   msg: string,
 ): void {
   seat.helper();
-  const text = asText(got);
-  if (text === undefined) {
-    requiresText(seat, mode, msg, "contains-in-order", {
-      haystack: got,
-      needle: "",
-      index: 0,
-    });
+  if (typeof got !== "string") {
+    fail(seat, mode, "contains-in-order", msg, { haystack: got, needle: "", index: 0 });
     return;
   }
 
@@ -326,36 +304,27 @@ export function containsInOrder(
   // The index is the loop's own, not a lookup: a needle listed twice
   // would find its first position rather than the one that failed.
   for (const [index, needle] of needles.entries()) {
-    const at = text.indexOf(needle, from);
+    const at = got.indexOf(needle, from);
     if (at < 0) {
-      reportFailure(seat, mode, "contains-in-order", msg, {
-        haystack: text,
-        needle,
-        index,
-      });
+      fail(seat, mode, "contains-in-order", msg, { haystack: got, needle, index });
       return;
     }
     from = at + needle.length;
   }
+  pass(seat, mode, "contains-in-order", msg);
 }
 
-/** Answer a finite number, or undefined when the value is not one. */
-function asNumber(value: unknown): number | undefined {
-  return typeof value === "number" ? value : undefined;
+/** Returns a number or a bigint as a number, and undefined for any other value. */
+function numberOf(value: unknown): number | undefined {
+  if (typeof value === "number") return value;
+  if (typeof value === "bigint") return Number(value);
+  return undefined;
 }
 
-/** Report that an assertion needed a number and was handed something else. */
-function requiresNumber(
-  seat: Seat,
-  mode: Mode,
-  msg: string,
-  assertion: string,
-  detail: Record<string, unknown>,
-): void {
-  reportFailure(seat, mode, assertion, msg, detail);
-}
-
-/** Fail when got is further than tolerance from want. */
+/**
+ * Fail when got is further than tolerance from want. A NaN fails, on
+ * either side or as the tolerance, because no tolerance contains it.
+ */
 export function closeTo(
   seat: Seat,
   mode: Mode,
@@ -365,25 +334,21 @@ export function closeTo(
   msg: string,
 ): void {
   seat.helper();
-  const value = asNumber(got);
-  if (value === undefined) {
-    requiresNumber(seat, mode, msg, "close-to", { got, want, tolerance });
-    return;
-  }
-
+  const value = numberOf(got);
   // Every comparison against NaN is false, so a bare `diff > tolerance`
-  // would pass a NaN rather than reject it. Name the case instead.
-  const diff = Math.abs(value - want);
-  if (Number.isNaN(diff) || Number.isNaN(tolerance)) {
-    reportFailure(seat, mode, "close-to", msg, { got, want, tolerance });
+  // would pass a NaN rather than reject it.
+  const diff = value === undefined ? Number.NaN : Math.abs(value - want);
+  if (Number.isNaN(diff) || Number.isNaN(tolerance) || diff > tolerance) {
+    fail(seat, mode, "close-to", msg, { got, want, tolerance });
     return;
   }
-  if (diff > tolerance) {
-    reportFailure(seat, mode, "close-to", msg, { got, want, tolerance });
-  }
+  pass(seat, mode, "close-to", msg);
 }
 
-/** Fail when got falls outside low to high. */
+/**
+ * Fail when got falls outside low to high. A range whose low is above its
+ * high, or whose bound is NaN, contains no number.
+ */
 export function inRange(
   seat: Seat,
   mode: Mode,
@@ -393,16 +358,10 @@ export function inRange(
   msg: string,
 ): void {
   seat.helper();
-  const value = asNumber(got);
-  if (value === undefined) {
-    requiresNumber(seat, mode, msg, "in-range", { got, low, high });
+  const value = numberOf(got);
+  if (value === undefined || !(value >= low && value <= high)) {
+    fail(seat, mode, "in-range", msg, { got, low, high });
     return;
   }
-  if (low > high) {
-    reportFailure(seat, mode, "in-range", msg, { got, low, high });
-    return;
-  }
-  if (Number.isNaN(value) || !(value >= low && value <= high)) {
-    reportFailure(seat, mode, "in-range", msg, { got, low, high });
-  }
+  pass(seat, mode, "in-range", msg);
 }

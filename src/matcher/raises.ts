@@ -2,12 +2,12 @@
  * The assertions about a call that throws.
  *
  * Both take a callable rather than a value, because the throw has to
- * happen inside the assertion for it to be caught. A callable that
- * answers a promise is awaited, so the same assertion serves
- * synchronous and asynchronous code.
+ * happen inside the assertion for it to be caught.
  */
 
-import { type Mode, reportFailure, type Seat } from "./seat.js";
+import { callSite } from "../failure.js";
+import type { Mode, Seat } from "./seat.js";
+import { fail, pass, Running } from "./verdict.js";
 
 /** Whether a value is a promise this can await. */
 function isPromise(value: unknown): value is Promise<unknown> {
@@ -19,7 +19,9 @@ function isPromise(value: unknown): value is Promise<unknown> {
 }
 
 /**
- * Fail when fn does not throw.
+ * Fail when fn does not throw. A callable that answers a promise fails
+ * too: a rejection is no throw, and passing it would make this assertion
+ * lie.
  *
  * @returns What fn threw, or undefined when it returned.
  */
@@ -30,16 +32,15 @@ export function throws(
   msg: string,
 ): unknown {
   seat.helper();
+  let answered: unknown;
   try {
-    const answered = fn();
-    if (isPromise(answered)) {
-      reportFailure(seat, mode, "throws", msg);
-      return undefined;
-    }
+    answered = fn();
   } catch (thrown) {
+    pass(seat, mode, "throws", msg);
     return thrown;
   }
-  reportFailure(seat, mode, "throws", msg);
+  if (isPromise(answered)) answered.catch(() => undefined);
+  fail(seat, mode, "throws", msg);
   return undefined;
 }
 
@@ -54,8 +55,10 @@ export function doesNotThrow(
   try {
     fn();
   } catch (thrown) {
-    reportFailure(seat, mode, "not-throws", msg, { got: thrown });
+    fail(seat, mode, "not-throws", msg, { got: thrown });
+    return;
   }
+  pass(seat, mode, "not-throws", msg);
 }
 
 /**
@@ -70,11 +73,13 @@ export async function rejectsWith(
   msg: string,
 ): Promise<unknown> {
   seat.helper();
+  const run = Running.of(seat, callSite());
   try {
     await fn();
   } catch (thrown) {
+    run.pass(mode, "throws", msg);
     return thrown;
   }
-  reportFailure(seat, mode, "throws", msg);
+  run.fail(mode, "throws", msg, {});
   return undefined;
 }

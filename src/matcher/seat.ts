@@ -8,7 +8,7 @@
  */
 
 import { type Clock, System } from "../clock.js";
-import { callSite, type Failure, render } from "../failure.js";
+import type { Failure } from "../failure.js";
 
 /** Where an assertion reports, and what it may do about it. */
 export interface Seat {
@@ -25,6 +25,18 @@ export interface Seat {
 
   /** Report a failure the test may carry on past. */
   record(message: string): void;
+
+  /** Aborts when the test that runs on this seat ends, where the seat states one. */
+  readonly signal?: AbortSignal | undefined;
+}
+
+/** A seat that runs functions when the test that runs on it ends. */
+export interface Cleanups {
+  /**
+   * Registers fn to run when the test ends, also when the test fails. The
+   * functions run in the reverse order of their registration.
+   */
+  cleanup(fn: () => void): void;
 }
 
 /**
@@ -46,16 +58,13 @@ export const Mode = {
 export type Mode = (typeof Mode)[keyof typeof Mode];
 
 /**
- * Send one failure to the seat, under the given mode.
+ * Send one sentence to the seat, under the given mode: through `record`
+ * under {@link Mode.Soft} and through `fail` under {@link Mode.Fatal},
+ * where it may not return.
  *
- * This decides nothing about whether anything failed. A matcher calls
- * it only once its own comparison has failed, so every call produces
- * exactly one reported failure. Under {@link Mode.Fatal} it may not
- * return.
- *
- * @param seat Where the failure is reported.
- * @param mode Whether the failure stops the test or is recorded.
- * @param message The failure text, already formatted.
+ * @param seat - Where the failure is reported.
+ * @param mode - Whether the failure stops the test or is recorded.
+ * @param message - The failure text, already formatted.
  */
 export function report(seat: Seat, mode: Mode, message: string): void {
   seat.helper();
@@ -67,49 +76,24 @@ export function report(seat: Seat, mode: Mode, message: string): void {
 }
 
 /** A seat that takes the record rather than the sentence. */
-interface Reporter {
+export interface Reporter {
+  /**
+   * Receives one failure record.
+   *
+   * @param failure - The record of the failing call.
+   * @param aborting - True for the aborting surface, false for the recording one.
+   */
   report(failure: Failure, aborting: boolean): void;
 }
 
-/** Whether a seat can take a record. */
-function takesRecords(seat: Seat): seat is Seat & Reporter {
-  return typeof (seat as Partial<Reporter>).report === "function";
-}
-
 /**
- * Send one record to seat.
+ * Reports whether a seat takes records.
  *
- * A seat that takes records receives it; any other receives the
- * sentence rendered from it. The call site is read here, so a matcher
- * does not have to walk the stack.
- *
- * This does not decide whether anything failed. A matcher calls it
- * only once its own comparison has failed.
- *
- * @param seat - Where the failure is reported.
- * @param mode - Whether a failure throws or is recorded.
- * @param assertion - The canonical id the definition names.
- * @param contract - The caller's message, unchanged.
- * @param detail - The values this assertion declares.
+ * @param seat - The seat of a call.
+ * @returns True when the seat has a `report` member.
  */
-export function reportFailure(
-  seat: Seat,
-  mode: Mode,
-  assertion: string,
-  contract: string,
-  detail: Record<string, unknown> = {},
-): void {
-  seat.helper();
-  const where = callSite();
-  const failure: Failure = where
-    ? { assertion, contract, detail, where }
-    : { assertion, contract, detail };
-
-  if (takesRecords(seat)) {
-    seat.report(failure, mode !== Mode.Soft);
-    return;
-  }
-  report(seat, mode, render(failure));
+export function takesRecords(seat: Seat): seat is Seat & Reporter {
+  return typeof (seat as Partial<Reporter>).report === "function";
 }
 
 /** A seat that carries a clock. */
@@ -131,4 +115,44 @@ export function clockOf(seat: Seat): Clock {
     if (supplied) return supplied;
   }
   return new System();
+}
+
+/** The path of the test that each seat runs: its file's path and its titles. */
+const TESTS = new WeakMap<Seat, readonly string[]>();
+
+/**
+ * Names the test that seat runs: the segments of its file's path relative
+ * to the working directory, then the titles of its describe blocks and its
+ * own title. A property keeps its store under that path.
+ *
+ * @param seat - The seat of the test.
+ * @param path - The segments.
+ */
+export function nameTest(seat: Seat, path: readonly string[]): void {
+  TESTS.set(seat, path);
+}
+
+/**
+ * Returns the path of the test that seat runs, or undefined for a seat that
+ * runs no named test.
+ *
+ * @param seat - The seat.
+ * @returns The segments of the path.
+ */
+export function testOf(seat: Seat): readonly string[] | undefined {
+  return TESTS.get(seat);
+}
+
+/** The signal of a seat without one: its controller is unreachable, so it never aborts. */
+const NEVER = new AbortController().signal;
+
+/**
+ * Returns the seat's signal, or a signal that never aborts for a seat
+ * without one.
+ *
+ * @param seat - The seat of a call.
+ * @returns The seat's `signal`, or one that never aborts.
+ */
+export function signalOf(seat: Seat): AbortSignal {
+  return seat.signal ?? NEVER;
 }
