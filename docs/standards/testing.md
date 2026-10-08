@@ -81,6 +81,8 @@ rules.
 - A case that checks the modes that a write sets runs under the umasks
   0o022, 0o027 and 0o077. A case that needs a permission to cause an
   error is skipped on Windows and for root, where no permission does.
+- A case that needs the file system to refuse a name past its length
+  limit is skipped on Windows, which reports such a name as absent.
 - A case that changes the working directory restores it when it ends.
   vitest runs the specs in the pool `forks`, because a worker thread
   cannot change its working directory.
