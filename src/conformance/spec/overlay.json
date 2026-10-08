@@ -1,5 +1,5 @@
 {
-  "extends": "spec://assertions@1.1.0",
+  "extends": "spec://assertions@7.2.1",
   "language": "typescript",
   "diverge": [
     {
@@ -15,6 +15,24 @@
       "remedy": "The counter in V8's API that bench-max-allocs needs."
     },
     {
+      "id": "prop-max-allocs",
+      "stance": "blocked",
+      "why": "The form runs max-allocs on each input, and max-allocs is absent for the reason its entry gives.",
+      "remedy": "The counter in V8's API that bench-max-allocs needs."
+    },
+    {
+      "id": "max-allocs-with-setup",
+      "stance": "blocked",
+      "why": "V8 exposes no allocation count, for the reason the bench-max-allocs entry gives, so there is no count per call to hold to a ceiling, with a setup or without one.",
+      "remedy": "The counter in V8's API that bench-max-allocs needs."
+    },
+    {
+      "id": "prop-max-allocs-with-setup",
+      "stance": "blocked",
+      "why": "The form runs max-allocs-with-setup on each input, and max-allocs-with-setup is absent for the reason its entry gives.",
+      "remedy": "The counter in V8's API that bench-max-allocs needs."
+    },
+    {
       "id": "bench-max-bytes",
       "stance": "blocked",
       "why": "Bytes allocated per iteration can only be read as a heap-usage delta, which moves with whether the collector ran. Measuring one unchanged body six times gave 43, -3, 43, -10, -10 and -8 bytes per iteration, so a ceiling set from one run fails the next for no reason.",
@@ -23,19 +41,24 @@
   ],
   "limits": [
     {
-      "id": "pure",
-      "what": "Accepts no relaxations, where the other implementations let a caller equate NaNs or an absent container with an empty one for this call.",
-      "why": "An oversight rather than a decision: equal, notEqual, contains and notContains all take them here and isPure does not. It is recorded rather than fixed quietly so the gap is visible until it closes."
-    },
-    {
-      "id": "honours-cancellation",
-      "what": "Reports no call site. The assertion awaits the subject, and by the time it reports, the caller's frame has left the stack.",
-      "why": "V8 gives an async function no synchronous caller frame once it has awaited. The standard states a location as optional for this reason, and every assertion that does not await carries one."
-    },
-    {
       "id": "recorder-seat",
       "what": "Carries no lock. The runtime has one thread, so two assertions cannot report at the same instant.",
       "why": "The standard asks that a seat be usable from more than one thread. A runtime with one thread meets that without doing anything, and says so here rather than leaving a reader to work out which it is."
+    },
+    {
+      "id": "prop.workers",
+      "what": "Runs one case at a time, whatever the number of workers. The run reports what a run on one worker reports, as it does in every language.",
+      "why": "A body runs on the runtime's one thread. An asynchronous body would interleave with another case at each await instead of running beside it, and a body that is not safe to interleave with itself would then fail in a way that a run on one worker never shows."
+    },
+    {
+      "id": "prop.fuzz",
+      "what": "Does not run a fuzzer under vitest. Under vitest, prop.fuzz replays the cases that the store keeps for the property, as Go's prop.Fuzz does under go test without -fuzz. It returns the target that a fuzzer runs on its byte inputs, such as Jazzer.js.",
+      "why": "vitest has no fuzzing mode, and Node has no fuzzer in its standard library. The library depends on no fuzzer, so a suite that fuzzes exports the target to a fuzzer that it installs itself."
+    },
+    {
+      "id": "history.workers",
+      "what": "Searches one partition at a time, whatever the number of workers. A check reports what a check on one worker reports, as it does in every language.",
+      "why": "A spec is a set of functions, and the structured clone that copies a message to a worker thread refuses a function, so every partition is searched on the runtime's one thread."
     }
   ],
   "surface": [
@@ -52,12 +75,26 @@
       "why": "The harness owns the loop here, so setup goes in a second closure, handed to measuring, that the harness runs outside the measurement. Marking the setup in place would need the body to reach the contract it was handed to."
     },
     {
+      "id": "contract.run-parallel",
+      "why": "JavaScript runs every worker on one thread. Workers would interleave only where the body awaits, so a parallel body would measure the queue of the event loop and not contention between threads."
+    },
+    {
       "id": "assertion",
       "why": "equal and notEqual hold want to the type of got through NoInfer, so the static form already rejects a mismatched pair at compile time. A chain would be a second way to write what is checked either way."
     },
     {
       "id": "that",
       "why": "equal and notEqual hold want to the type of got through NoInfer, so the static form already rejects a mismatched pair at compile time. A chain would be a second way to write what is checked either way."
+    },
+    {
+      "id": "steps.repeat",
+      "why": "repeat sets the number of runs of a case whose concurrent section runs on real threads. A section runs here only as tasks of the task scheduler, which replays it from the case."
     }
-  ]
+  ],
+  "sections": ["tasks"],
+  "records": {
+    "artifact": "The JSON report that vitest run --reporter=json --outputFile.json=PATH writes to PATH when the run ends. Vitest's JUnit report states test annotations and no task meta, and an annotation cannot be written after a test's function returns.",
+    "location": "The array under the key dokimi.assert of the meta object of the test's entry in testResults[].assertionResults[], one call record per element, in the order the calls report their verdicts. The entry's ancestorTitles and title name the test inside the file that testResults[].name names.",
+    "status": "The status field of the same entry: passed, failed, skipped, todo or pending."
+  }
 }
