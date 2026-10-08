@@ -6,7 +6,7 @@
  * because each language reads its own conventions.
  */
 
-import { dirname, sep } from "node:path";
+import { dirname, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { show } from "./matcher/inspect.js";
 
@@ -157,9 +157,13 @@ const LIBRARY = dirname(fileURLToPath(import.meta.url)) + sep;
  */
 const FRAME = /(?:\(|^at (?:async )?)(?<file>[^()]+?):(?<line>\d+):\d+\)?$/;
 
-/** Returns the path of a frame's file, which V8 states as a path or a file URL. */
+/**
+ * Returns the path of a frame's file with the separators of the platform.
+ * The file of a frame is a file URL or a path, and a path on Windows can
+ * have forward slashes.
+ */
 function pathOf(file: string): string {
-  return file.startsWith("file://") ? fileURLToPath(file) : file;
+  return normalize(file.startsWith("file://") ? fileURLToPath(file) : file);
 }
 
 /**
