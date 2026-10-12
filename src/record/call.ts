@@ -11,7 +11,7 @@ import { basename } from "node:path";
 import { json } from "./literal.js";
 
 /** The definition version that this library implements, which every call record states. */
-export const DEFINITION = "7.2.1";
+export const DEFINITION = "8.0.0";
 
 /** How a call ended. */
 export type Verdict = "pass" | "fail" | "error";

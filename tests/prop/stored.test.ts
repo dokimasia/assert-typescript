@@ -50,7 +50,7 @@ describe("stored", () => {
           name: name("the total is positive", [int(3n)]),
           entry: {
             store: 1,
-            definition: "7.2.1",
+            definition: "8.0.0",
             property: "the total is positive",
             identity: { assertion: "equal", file: "total.test.ts", line: 9 },
             choices: encode([int(3n)]),
