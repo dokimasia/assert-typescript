@@ -14,7 +14,7 @@ function action(name: string, weight?: number): Action<unknown> {
 describe("machine", () => {
   describe("validate", () => {
     it("accepts a machine of actions with weights of 0 and more", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() =>
           validate({ actions: [action("a", 0), action("b"), action("c", 3)] }),
@@ -54,13 +54,13 @@ describe("machine", () => {
     ];
     for (const tt of tests) {
       it(`throws for ${tt.name}`, ({ seat }) => {
-        const err = check.throws(
+        const err = check.doesThrow(
           seat,
           () => validate({ actions: tt.give }),
           "a refusal",
         );
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [(err as Error).name, (err as Error).message],
           tt.want,

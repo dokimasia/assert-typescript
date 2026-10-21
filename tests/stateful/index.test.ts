@@ -9,7 +9,7 @@ describe("index", () => {
   it("exports the steps, their options, the scheduler and its strategies", ({
     seat,
   }) => {
-    check.equal(
+    check.isEqualTo(
       seat,
       Object.keys(stateful).sort(),
       [

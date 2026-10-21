@@ -70,7 +70,7 @@ describe("scheduler", () => {
       scheduler.spawn(task(scheduler, log, "b", 1));
       await scheduler.run();
 
-      check.equal(seat, log, ["p1", "b1", "c1", "p2"], "c runs before p resumes");
+      check.isEqualTo(seat, log, ["p1", "b1", "c1", "p2"], "c runs before p resumes");
     });
 
     it("requests a priority under PCT for each task", ({ seat }) => {
@@ -78,7 +78,7 @@ describe("scheduler", () => {
       scheduler.spawn(task(scheduler, log, "a", 1));
       scheduler.spawn(task(scheduler, log, "b", 1));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         engine.requests.map((request) => [request.bounds, request.edge]),
         [
@@ -105,7 +105,7 @@ describe("scheduler", () => {
         await scheduler.yield();
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         String(await rejection(scheduler.run())),
         "Error: stateful: a task called yield() again in one turn",
@@ -121,7 +121,7 @@ describe("scheduler", () => {
       scheduler.spawn(task(scheduler, log, "b", 2));
       await scheduler.run();
 
-      check.equal(seat, log, ["a1", "b1", "a2", "b2", "a3"], "a and b alternate");
+      check.isEqualTo(seat, log, ["a1", "b1", "a2", "b2", "a3"], "a and b alternate");
     });
 
     it("releases the task at the index that each release chooses", async ({ seat }) => {
@@ -130,7 +130,7 @@ describe("scheduler", () => {
       scheduler.spawn(task(scheduler, log, "b", 2));
       await scheduler.run();
 
-      check.equal(seat, log, ["b1", "a1", "b2", "a2"], "b first, then behind a");
+      check.isEqualTo(seat, log, ["b1", "a1", "b2", "a2"], "b first, then behind a");
     });
 
     it("records the uniform choice of a release with one ready task", async ({
@@ -141,7 +141,7 @@ describe("scheduler", () => {
       scheduler.spawn(task(scheduler, log, "b", 2));
       await scheduler.run();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         engine.requests.map((request) => [request.bounds, request.edge]),
         [
@@ -167,7 +167,7 @@ describe("scheduler", () => {
         want.push([twin.below(3n), twin.below(2n), 0n]);
       }
 
-      check.equal(seat, got, want, "below(3), below(2), then no draw");
+      check.isEqualTo(seat, got, want, "below(3), below(2), then no draw");
     });
 
     it("throws an Error for a task that calls run", async ({ seat }) => {
@@ -176,7 +176,7 @@ describe("scheduler", () => {
         await scheduler.run();
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         String(await rejection(scheduler.run())),
         "Error: stateful: a task called run() of its own scheduler",
@@ -192,7 +192,7 @@ describe("scheduler", () => {
       });
       scheduler.spawn(task(scheduler, log, "b", 1));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [await rejection(scheduler.run()), log],
         [broken, []],
@@ -207,7 +207,7 @@ describe("scheduler", () => {
         throw broken;
       });
 
-      check.equal(seat, await rejection(scheduler.run()), broken, "the error");
+      check.isEqualTo(seat, await rejection(scheduler.run()), broken, "the error");
     });
 
     it("runs the tasks spawned after a run that a task ended", async ({ seat }) => {
@@ -219,7 +219,7 @@ describe("scheduler", () => {
       scheduler.spawn(task(scheduler, log, "a", 1));
       await scheduler.run();
 
-      check.equal(seat, log, ["a1"], "the second run");
+      check.isEqualTo(seat, log, ["a1"], "the second run");
     });
 
     it("rejects for a task that settles after a yield that it did not await", async ({
@@ -230,7 +230,7 @@ describe("scheduler", () => {
         void scheduler.yield();
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         String(await rejection(scheduler.run())),
         "Error: stateful: a task settled after a yield() that it did not await",
@@ -253,7 +253,7 @@ describe("scheduler", () => {
         await Promise.resolve();
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         String(await rejection(scheduler.run())),
         "Error: stateful: a task settled after a yield() that it did not await",
@@ -269,7 +269,7 @@ describe("scheduler", () => {
       scheduler.spawn(task(scheduler, log, "b", 3));
       await scheduler.run();
 
-      check.equal(seat, log, ["b1", "b2", "b3", "a1", "a2"], "b has priority 5");
+      check.isEqualTo(seat, log, ["b1", "b2", "b3", "a1", "a2"], "b has priority 5");
     });
 
     it("runs the earliest ready task first among equal PCT priorities", async ({
@@ -280,7 +280,7 @@ describe("scheduler", () => {
       scheduler.spawn(task(scheduler, log, "b", 2));
       await scheduler.run();
 
-      check.equal(seat, log, ["a1", "b1", "a2", "b2"], "a and b alternate");
+      check.isEqualTo(seat, log, ["a1", "b1", "a2", "b2"], "a and b alternate");
     });
 
     it("requests a presence and a count for each PCT change point", async ({
@@ -292,7 +292,7 @@ describe("scheduler", () => {
       await scheduler.run();
       const wide = new IntegerBounds(0n, UINT64_MAX);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         engine.requests.map((request) => [request.bounds, request.edge]),
         [
@@ -314,7 +314,7 @@ describe("scheduler", () => {
       scheduler.spawn(task(scheduler, log, "b", 2));
       await scheduler.run();
 
-      check.equal(seat, log, ["a1", "b1", "b2", "a2"], "a falls at release 0");
+      check.isEqualTo(seat, log, ["a1", "b1", "b2", "a2"], "a falls at release 0");
     });
 
     it("drops the task of a later change point lower still", async ({ seat }) => {
@@ -323,7 +323,7 @@ describe("scheduler", () => {
         scheduler.spawn(task(scheduler, log, name, 2));
       await scheduler.run();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         log,
         ["a1", "b1", "c1", "c2", "a2", "b2"],
@@ -344,7 +344,12 @@ describe("scheduler", () => {
       scheduler.spawn(task(scheduler, log, "c", 1));
       await scheduler.run();
 
-      check.equal(seat, log, ["a1", "d1", "c1", "a2", "d2"], "d falls at release 1");
+      check.isEqualTo(
+        seat,
+        log,
+        ["a1", "d1", "c1", "a2", "d2"],
+        "d falls at release 1",
+      );
     });
 
     it("makes no choice for a PCT release", async ({ seat }) => {
@@ -353,7 +358,7 @@ describe("scheduler", () => {
       scheduler.spawn(task(scheduler, log, "b", 1));
       await scheduler.run();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [engine.requests.length, log],
         [2, ["a1", "b1"]],

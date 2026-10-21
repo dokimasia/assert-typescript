@@ -171,7 +171,7 @@ describe("steps", () => {
         max(0),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         engine.requests.slice(0, 3).map((request) => [request.bounds, request.edge]),
         [
@@ -194,7 +194,7 @@ describe("steps", () => {
         got.push(engine.choices.map((choice) => Number(choice.value)));
       }
 
-      check.equal(
+      check.isEqualTo(
         seat,
         got,
         [
@@ -231,7 +231,7 @@ describe("steps", () => {
         max(1),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [engine.requests[2]?.bounds, engine.steps],
         [new IntegerBounds(1n, 1n), [[0, { action: "c" }]]],
@@ -248,7 +248,7 @@ describe("steps", () => {
         [1, 0, 1, 0, 0],
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [engine.requests[3]?.bounds, engine.steps.map(([, step]) => step.action)],
         [ONE, ["a"]],
@@ -264,7 +264,7 @@ describe("steps", () => {
         swarm(false),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           engine.requests[0]?.edge,
@@ -296,7 +296,12 @@ describe("steps", () => {
         [1, 0, 0],
       );
 
-      check.equal(seat, engine.steps, [[0, { action: "d", drain: true }]], "one drain");
+      check.isEqualTo(
+        seat,
+        engine.steps,
+        [[0, { action: "d", drain: true }]],
+        "one drain",
+      );
     });
 
     it("records a sequential step as a flag and an index in a span of its action", async ({
@@ -309,7 +314,7 @@ describe("steps", () => {
         swarm(false),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [engine.spans, engine.steps, log.events, engine.requests[1]?.edge],
         [
@@ -342,7 +347,7 @@ describe("steps", () => {
         max(2),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [engine.requests.map((request) => request.bounds), seen],
         [
@@ -384,7 +389,7 @@ describe("steps", () => {
         want.push(meanSteps(twin, most));
       }
 
-      check.equal(seat, got, want, "a coin of 3 in 4 for each step");
+      check.isEqualTo(seat, got, want, "a coin of 3 in 4 for each step");
     });
 
     it("chooses the action of a step by weight", async ({ seat }) => {
@@ -410,7 +415,7 @@ describe("steps", () => {
         want.push(names);
       }
 
-      check.equal(seat, got, want, "weights 1 and 3 split below(4)");
+      check.isEqualTo(seat, got, want, "weights 1 and 3 split below(4)");
     });
 
     it("fails the case with the record of linearizable for a violated check", async ({
@@ -426,7 +431,7 @@ describe("steps", () => {
       );
       const { failure } = (err as Failed).record as Failing;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err instanceof Failed, failure.assertion, failure.detail["outcome"]],
         [true, "linearizable", "violated"],
@@ -446,7 +451,7 @@ describe("steps", () => {
       );
       const { failure } = (err as Failed).record as Failing;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [failure.detail["outcome"], failure.detail["limit"]],
         ["undecided", "steps"],
@@ -464,7 +469,7 @@ describe("steps", () => {
         swarm(false),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         log.events,
         [
@@ -494,7 +499,7 @@ describe("steps", () => {
         swarm(false),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         seen,
         [
@@ -532,7 +537,7 @@ describe("steps", () => {
         swarm(false),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [seen, log.events[0]],
         [Array.from({ length: 6 }, () => undefined), ["input", "a", undefined]],
@@ -561,7 +566,7 @@ describe("steps", () => {
         swarm(false),
       );
 
-      check.equal(seat, events, ["start 0", "end", "start 0", "end"], "two steps");
+      check.isEqualTo(seat, events, ["start 0", "end", "start 0", "end"], "two steps");
     });
 
     it("lists a concurrent step as a flag, a client and an index", async ({ seat }) => {
@@ -569,7 +574,7 @@ describe("steps", () => {
       const { c, engine } = bodyCase(replaying(0, 1, 2, 1, 0));
       await steps(c, { actions: [log.action("a"), log.action("b")] }, ...section(c));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           engine.requests.slice(1, 4).map((request) => [request.bounds, request.edge]),
@@ -594,7 +599,7 @@ describe("steps", () => {
       const { c } = bodyCase(replaying(0, 1, 2, 0, 1, 1, 0, 0));
       await steps(c, { spec: counting(), actions: [log.action("a")] }, ...section(c));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         log.events,
         [
@@ -614,7 +619,7 @@ describe("steps", () => {
       const { c } = bodyCase(replaying(0, 1, 1, 0, 1, 0, 0, 0));
       await steps(c, { actions: [log.action("a")] }, ...section(c));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         log.runs("a"),
         [
@@ -630,7 +635,7 @@ describe("steps", () => {
       const { c } = bodyCase(replaying(0, 1, 1, 0, 1, 2, 0, 0, 1));
       await steps(c, { actions: [log.action("a")] }, ...section(c));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         log.runs("a"),
         [
@@ -650,7 +655,7 @@ describe("steps", () => {
         ...section(c),
       );
 
-      check.equal(seat, engine.requests[3]?.bounds, ONE, "the index over a alone");
+      check.isEqualTo(seat, engine.requests[3]?.bounds, ONE, "the index over a alone");
     });
 
     it("records no flag of a section without an eligible action", async ({ seat }) => {
@@ -662,7 +667,7 @@ describe("steps", () => {
         ...section(c),
       );
 
-      check.length(seat, engine.requests, 1, "the sequential flag alone");
+      check.hasLength(seat, engine.requests, 1, "the sequential flag alone");
     });
 
     it("chooses the client of a concurrent step uniformly", async ({ seat }) => {
@@ -678,7 +683,7 @@ describe("steps", () => {
         want.push(listed.map(Number));
       }
 
-      check.equal(seat, got, want, "below(3) after a coin of 5 in 6");
+      check.isEqualTo(seat, got, want, "below(3) after a coin of 5 in 6");
     });
 
     it("checks the history once every task of a section ends", async ({ seat }) => {
@@ -696,7 +701,7 @@ describe("steps", () => {
         ...section(c),
       );
 
-      check.equal(seat, seen, [3], "the count of every call of the section");
+      check.isEqualTo(seat, seen, [3], "the count of every call of the section");
     });
 
     it("starts the drain from the state after the section", async ({ seat }) => {
@@ -714,7 +719,7 @@ describe("steps", () => {
         ...section(c, max(1)),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         engine.steps.at(-1),
         [0, { action: "d", drain: true }],
@@ -739,7 +744,7 @@ describe("steps", () => {
         ),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err instanceof Failed, log.runs("d")],
         [true, []],
@@ -750,7 +755,7 @@ describe("steps", () => {
     it("throws an Error for clients of 2 or more without tasks", async ({ seat }) => {
       const { c } = bodyCase(replaying());
 
-      check.equal(
+      check.isEqualTo(
         seat,
         String(
           await rejection(steps(c, { actions: [new Log().action("a")] }, clients(2))),
@@ -776,7 +781,7 @@ describe("steps", () => {
         swarm(false),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           engine.steps.map(([, step]) => step),
@@ -803,7 +808,7 @@ describe("steps", () => {
       const log = new Log();
       await replayed(draining(log, { n: 0 }), [1, 0, 1, 0, 0], swarm(false));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         log.events.filter((event) => event[0] === "invariant").map((event) => event[1]),
         [0, 1, 2, 3, 4, 4],
@@ -819,7 +824,7 @@ describe("steps", () => {
         max(3),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         engine.steps,
         Array.from({ length: 3 }, () => [0, { action: "d", drain: true }]),
@@ -832,7 +837,7 @@ describe("steps", () => {
       const { c, engine } = bodyCase(new Tracing([{ action: "b" }]));
       await steps(c, { actions: ["a", "b", "c"].map((name) => log.action(name)) });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [engine.choices.map((choice) => choice.value), engine.steps],
         [[0n, 1n, 0n, 1n, 0n, 0n], [[0, { action: "b" }]]],
@@ -852,7 +857,7 @@ describe("steps", () => {
       );
       await steps(c, { actions: [log.action("a", { draws: true })] });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         log.runs("a").map((event) => event[2]),
         [4n, 6n],
@@ -868,7 +873,7 @@ describe("steps", () => {
         steps(c, { actions: [new Log().action("a", { enabled: () => false })] }),
       )) as TraceError;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err instanceof TraceError, err.entry, err.what, err.reason],
         [true, 0, "a", "step"],
@@ -882,7 +887,7 @@ describe("steps", () => {
         steps(c, { actions: [new Log().action("a")] }, max(1)),
       );
 
-      check.equal(seat, (err as TraceError).entry, 1, "the second entry");
+      check.isEqualTo(seat, (err as TraceError).entry, 1, "the second entry");
     });
 
     it("takes the client of a concurrent step entry", async ({ seat }) => {
@@ -900,7 +905,7 @@ describe("steps", () => {
         tasks(new Scheduler(c, uniform())),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [engine.steps, log.runs("a").map((event) => event[1])],
         [
@@ -932,7 +937,7 @@ describe("steps", () => {
           ),
         )) as TraceError;
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [err instanceof TraceError, err.entry, err.reason],
           tt.want,
@@ -960,7 +965,7 @@ describe("steps", () => {
         ),
       );
 
-      check.equal(seat, (err as TraceError).entry, 1, "the second entry");
+      check.isEqualTo(seat, (err as TraceError).entry, 1, "the second entry");
     });
 
     it("throws a TraceError for a concurrent step entry where no section runs", async ({
@@ -1006,7 +1011,7 @@ describe("steps", () => {
         ],
       });
 
-      check.equal(seat, delivered, ["e", "d"], "e, then d");
+      check.isEqualTo(seat, delivered, ["e", "d"], "e, then d");
     });
 
     it("throws a TraceError for a drain step entry after the drain", async ({
@@ -1041,7 +1046,7 @@ describe("steps", () => {
         }),
       )) as TraceError;
 
-      check.equal(seat, [err.entry, err.what], [2, "d"], "the second drain entry");
+      check.isEqualTo(seat, [err.entry, err.what], [2, "d"], "the second drain entry");
     });
 
     it("states the position and the action of each swarm choice", async ({ seat }) => {
@@ -1052,7 +1057,7 @@ describe("steps", () => {
         max(0),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         engine.wheres.slice(0, 2).map((where) => where.place),
         [
@@ -1077,7 +1082,7 @@ describe("steps", () => {
       const first = { part: "sequential", position: 0 };
       const second = { part: "sequential", position: 1 };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         engine.wheres,
         [
@@ -1113,7 +1118,7 @@ describe("steps", () => {
         swarm(false),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         engine.wheres,
         [
@@ -1136,7 +1141,7 @@ describe("steps", () => {
       );
       const listed = { label: undefined, place: { part: "concurrent", position: 0 } };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [engine.wheres, engine.observed],
         [
@@ -1165,7 +1170,7 @@ describe("steps", () => {
         swarm(false),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         engine.observed.map((where) => where.place),
         [{ part: "setup" }, { part: "settle" }, { part: "settle" }],
@@ -1178,7 +1183,12 @@ describe("steps", () => {
       engine.place = { part: "outer" };
       await steps(c, { actions: [new Log().action("a")] }, swarm(false));
 
-      check.equal(seat, engine.place, { part: "outer" }, "the place before the steps");
+      check.isEqualTo(
+        seat,
+        engine.place,
+        { part: "outer" },
+        "the place before the steps",
+      );
     });
   });
 });

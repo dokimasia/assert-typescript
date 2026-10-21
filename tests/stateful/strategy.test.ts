@@ -9,13 +9,13 @@ import { thrown } from "../helpers.js";
 describe("strategy", () => {
   describe("uniform", () => {
     it("returns the strategy of depth 0", ({ seat }) => {
-      check.equal(seat, uniform(), { depth: 0 }, "the uniform strategy");
+      check.isEqualTo(seat, uniform(), { depth: 0 }, "the uniform strategy");
     });
   });
 
   describe("pct", () => {
     it("returns the strategy of its depth", ({ seat }) => {
-      check.equal(seat, pct(3), { depth: 3 }, "depth 3");
+      check.isEqualTo(seat, pct(3), { depth: 3 }, "depth 3");
     });
 
     const tests: { name: string; give: number; want: string }[] = [
@@ -24,9 +24,9 @@ describe("strategy", () => {
     ];
     for (const tt of tests) {
       it(`throws a RangeError for the depth ${tt.name}`, ({ seat }) => {
-        const err = check.throws(seat, () => pct(tt.give), "a refusal");
+        const err = check.doesThrow(seat, () => pct(tt.give), "a refusal");
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [err instanceof RangeError, thrown(() => pct(tt.give))],
           [true, tt.want],

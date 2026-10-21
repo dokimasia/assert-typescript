@@ -21,14 +21,19 @@ import { bodyCase } from "../helpers.js";
 
 /** Checks that option, alone, changes the defaults by want. */
 function sets(seat: Seat, option: Option, want: Record<string, unknown>): void {
-  check.equal(seat, configure([option]), { ...configure([]), ...want }, "one setting");
+  check.isEqualTo(
+    seat,
+    configure([option]),
+    { ...configure([]), ...want },
+    "one setting",
+  );
 }
 
 /** Checks that make throws a RangeError of message. */
 function refuses(seat: Seat, make: () => Option, message: string): void {
-  const err = check.throws(seat, make, "a refusal");
+  const err = check.doesThrow(seat, make, "a refusal");
 
-  check.equal(
+  check.isEqualTo(
     seat,
     [err instanceof RangeError, (err as Error).message],
     [true, message],
@@ -39,7 +44,7 @@ function refuses(seat: Seat, make: () => Option, message: string): void {
 describe("option", () => {
   describe("configure", () => {
     it("returns the settings that the definition fixes for no option", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         configure([]),
         {
@@ -55,7 +60,7 @@ describe("option", () => {
     });
 
     it("applies a later option of one setting over an earlier one", ({ seat }) => {
-      check.equal(seat, configure([mean(3), mean(5)]).mean, 5, "the later mean");
+      check.isEqualTo(seat, configure([mean(3), mean(5)]).mean, 5, "the later mean");
     });
   });
 
@@ -125,7 +130,7 @@ describe("option", () => {
     });
 
     it("throws a TypeError for a scheduler that is no Scheduler", ({ seat }) => {
-      const err = check.throws(
+      const err = check.doesThrow(
         seat,
         () => tasks(new Engine(new Replaying([])) as unknown as Scheduler),
         "a refusal",
