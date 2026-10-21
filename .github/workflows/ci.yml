@@ -54,6 +54,14 @@ jobs:
           fi
           echo "dist names only .js"
 
+      - name: Check the build ships no import.meta in the CommonJS build
+        run: |
+          if grep -rln 'import\.meta' dist/cjs/; then
+            echo "the CommonJS build reads import.meta, which CommonJS has not"
+            exit 1
+          fi
+          echo "dist/cjs reads no import.meta"
+
       - name: Check the package installs and imports
         run: |
           npm pack --silent
@@ -61,13 +69,82 @@ jobs:
           npm init -y --silent >/dev/null
           npm install --silent "$GITHUB_WORKSPACE"/dokimi-assert-*.tgz
           node --input-type=module -e "
-            import { check, soft } from '@dokimi/assert';
-            import { Recorder } from '@dokimi/assert';
+            import { check, Recorder } from '@dokimi/assert';
+            import { cases } from '@dokimi/assert/conformance';
             const seat = new Recorder();
-            check.equal(seat, 1, 2, 'the package works');
+            check.isEqualTo(seat, 1, 2, 'the package works');
             if (!seat.failed) { throw new Error('the assertion reported nothing'); }
             console.log('installed and imported:', seat.message);
+            console.log('conformance cases:', cases().length);
           "
+          node -e "
+            const { check, Recorder } = require('@dokimi/assert');
+            const seat = new Recorder();
+            check.isEqualTo(seat, 1, 2, 'the CommonJS build works');
+            if (!seat.failed) { throw new Error('the assertion reported nothing'); }
+            console.log('required:', seat.message);
+          "
+
+  # The specs of the adapters run against each supported major of each
+  # runner. The check job runs them on vitest 4 and jest 30, the development
+  # dependencies. The specs read the names of the running engine, so a
+  # release that defines one of the assertion names fails here.
+  runners:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: vitest 5
+            install: vitest@^5.0.3 @vitest/coverage-v8@^5.0.3
+            specs: ""
+          - name: jest 29
+            install: jest@^29.7.0
+            specs: tests/jest.test.ts tests/jest/api.test.ts
+    name: Specs on ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26.x"
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm install --no-save ${{ matrix.install }}
+
+      - name: Build
+        run: npm run build
+
+      - name: Tests
+        run: npx vitest run ${{ matrix.specs }}
+
+  # A consumer project installs the packed library beside one runner, with
+  # the declarations of its dependencies checked, compiles the type probes
+  # of tools/consumer and runs one test file that registers the matchers.
+  consumer:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        consumer: [vitest4, vitest5, jest29, jest30]
+    name: Consumer on ${{ matrix.consumer }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26.x"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install, compile and run
+        run: ./tools/consumer/run.sh ${{ matrix.consumer }}
 
   # The file helpers and assertions call the file system of each platform,
   # and Windows records no permission bits. The tests run there without

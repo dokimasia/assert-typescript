@@ -1,0 +1,15 @@
+{
+  // The type probe of the consumer project, with the declarations of its
+  // dependencies checked.
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "files": ["vitest.setup.ts", "types.ts"]
+}
