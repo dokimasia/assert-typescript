@@ -81,14 +81,19 @@ describe("parse", () => {
           err instanceof PatternError,
           "the parser refuses the pattern",
         );
-        check.contains(seat, String((err as Error).message), tt.wantAt, "the position");
+        check.doesContain(
+          seat,
+          String((err as Error).message),
+          tt.wantAt,
+          "the position",
+        );
       });
     }
 
     it("states the pattern with the position of the construct that it refuses", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         String((refusal("(a)\\1") as Error).message),
         'pattern "(a)\\\\1" at 5: \\1 is not in the portable subset',
@@ -97,7 +102,7 @@ describe("parse", () => {
     });
 
     it("returns the tree of a pattern with its anchors", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         parse("^a(?:b|c)*d{2,3}$"),
         {
@@ -122,7 +127,7 @@ describe("parse", () => {
     });
 
     it("returns a class as the merged ranges of its code points", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         parse("[a-cb-e\\d]").node,
         {
@@ -139,7 +144,7 @@ describe("parse", () => {
     it("returns a negated class as the ranges of every other scalar value", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         parse("[^b-y]").node,
         {
@@ -155,7 +160,7 @@ describe("parse", () => {
     });
 
     it("returns a negated class of a range that starts at NUL", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         parse(`[^${String.fromCodePoint(0)}-a]`).node,
         {
@@ -172,7 +177,7 @@ describe("parse", () => {
     it("returns a negated class of a member that is the last code point", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         parse(`[^a${String.fromCodePoint(0x10ffff)}]`).node,
         {
@@ -203,7 +208,7 @@ describe("parse", () => {
     it("returns an error named PatternError with the message", ({ seat }) => {
       const err = new PatternError('pattern "x" at 0: a reason');
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.name, err.message],
         ["PatternError", 'pattern "x" at 0: a reason'],

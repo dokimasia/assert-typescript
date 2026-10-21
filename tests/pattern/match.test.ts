@@ -150,7 +150,7 @@ describe("match", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           compile(tt.givePattern).test(tt.giveText),
           tt.want,
@@ -160,7 +160,11 @@ describe("match", () => {
     }
 
     it("throws a PatternError for a pattern outside the subset", ({ seat }) => {
-      const err = check.throws(seat, () => compile("a(?=b)"), "the pattern is refused");
+      const err = check.doesThrow(
+        seat,
+        () => compile("a(?=b)"),
+        "the pattern is refused",
+      );
 
       check.isTrue(seat, err instanceof PatternError, "the error is a PatternError");
     });
