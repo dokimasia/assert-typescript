@@ -37,7 +37,7 @@ describe("registry", () => {
     it("makes a generator the generator of a name", ({ seat }) => {
       register("Digit", DIGIT);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         of("Digit") === DIGIT,
         true,
@@ -46,7 +46,7 @@ describe("registry", () => {
     });
 
     it("throws for a name that has a registration", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => register("Digit", DIGIT)),
         'prop: register("Digit") registers "Digit" a second time',
@@ -55,7 +55,7 @@ describe("registry", () => {
     });
 
     it("throws a RangeError for an empty name", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => register("", DIGIT)),
         'prop: register("") names no shape',
@@ -66,7 +66,7 @@ describe("registry", () => {
     it("throws for a name that a read has looked up", ({ seat }) => {
       thrown(() => of("Late"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => register("Late", DIGIT)),
         'prop: register("Late") follows a read of "Late", whose generators would not see it',
@@ -81,7 +81,7 @@ describe("registry", () => {
     }) => {
       registerValues<unknown>("Color", "red", "green", { r: 1 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [decoded(of("Color"), 0n), decoded(of("Color"), 2n)],
         ["red", { r: 1 }],
@@ -90,7 +90,7 @@ describe("registry", () => {
     });
 
     it("runs a registered value back to its typed literal", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(of("Color"), { r: 1 }),
         { type: "record", fields: [["r", { type: "int", value: 1 }]] },
@@ -101,7 +101,7 @@ describe("registry", () => {
     it("states a value that is none of the registered values by its own literal", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(of("Color"), "blue"),
         { type: "string", value: "blue" },
@@ -110,7 +110,7 @@ describe("registry", () => {
     });
 
     it("throws a RangeError for no value", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => registerValues("None")),
         'prop: registerValues("None") states no value',
@@ -119,7 +119,7 @@ describe("registry", () => {
     });
 
     it("throws a RangeError for a value that no typed literal states", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => registerValues("Callable", () => 1)),
         'prop: registerValues("Callable"): value 0 states no typed literal',
@@ -128,7 +128,7 @@ describe("registry", () => {
     });
 
     it("throws a RangeError for two values of one typed literal", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => registerValues<unknown>("Twice", 1, 1n)),
         'prop: registerValues("Twice"): values 0 and 1 state one typed literal',
@@ -144,7 +144,7 @@ describe("registry", () => {
       registerValues("Radius", 1, 2);
       registerVariants("Shape", { circle: "Radius", empty: undefined });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [decoded(of("Shape"), 0n, 1n), decoded(of("Shape"), 1n)],
         [{ name: "circle", payload: 2 }, { name: "empty" }],
@@ -155,7 +155,7 @@ describe("registry", () => {
     it("generates a recursive enum through its own name", ({ seat }) => {
       registerVariants("Chain", { end: undefined, link: "Chain" });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(of("Chain"), 1n, 1n, 0n),
         { name: "link", payload: { name: "link", payload: { name: "end" } } },
@@ -166,7 +166,7 @@ describe("registry", () => {
     it("generates a variant's payload with a registered generator", ({ seat }) => {
       registerVariants("Box", { full: "Digit" });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(of("Box"), 0n, 7n),
         { name: "full", payload: 7 },
@@ -198,7 +198,7 @@ describe("registry", () => {
     ];
     for (const tt of tests) {
       it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => registerVariants("Bad", tt.give)),
           tt.want,
@@ -220,7 +220,7 @@ describe("registry", () => {
     });
 
     it("throws a RangeError for a name without a registration", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of("Nowhere")),
         'prop: of("Nowhere") names no registration',
@@ -233,7 +233,7 @@ describe("registry", () => {
     }) => {
       registerVariants("Broken", { some: "Missing" });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of("Broken")),
         'prop: of("Broken"): "Missing" names no registration',
@@ -244,7 +244,7 @@ describe("registry", () => {
 
   describe("shapeOf", () => {
     it("returns the shape file of registered values with sorted keys", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         shapeOf("Radius"),
         `${JSON.stringify(
@@ -268,7 +268,7 @@ describe("registry", () => {
     }) => {
       const file = JSON.parse(shapeOf("Shape")) as Record<string, unknown>;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         file,
         {
@@ -297,7 +297,7 @@ describe("registry", () => {
         definitions: Record<string, unknown>;
       };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         Object.keys(file.definitions),
         ["Chain"],
@@ -306,7 +306,7 @@ describe("registry", () => {
     });
 
     it("throws for a name of a registered generator", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => shapeOf("Box")),
         'prop: shapeOf("Box"): "Digit" has a registered generator, which states no shape',
@@ -315,7 +315,7 @@ describe("registry", () => {
     });
 
     it("throws a RangeError for a name without a registration", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => shapeOf("Elsewhere")),
         'prop: shapeOf("Elsewhere"): "Elsewhere" names no registration',
@@ -335,7 +335,7 @@ describe("registry", () => {
         }),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(generator, 0n, 0n),
         { shape: { name: "circle", payload: 1 } },
@@ -354,7 +354,7 @@ describe("registry", () => {
         }),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(generator, 3n),
         3,
@@ -391,7 +391,7 @@ describe("registry", () => {
     it("makes a later registration throw", ({ seat }) => {
       close();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => register("After", DIGIT)),
         'prop: register("After") follows the first property, which closed the registry',
@@ -400,7 +400,7 @@ describe("registry", () => {
     });
 
     it("lets a read of a registered name follow it", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(ofShape('{"shape": "ref", "name": "Radius"}'), 1n),
         2,

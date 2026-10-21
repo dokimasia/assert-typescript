@@ -50,7 +50,7 @@ function times<T>(count: number, fn: (_: unknown, index: number) => T): T[] {
 describe("draw", () => {
   describe("REUSE_ODDS", () => {
     it("reuses an earlier value one time in four", ({ seat }) => {
-      check.equal(seat, REUSE_ODDS, 4n, "the odds");
+      check.isEqualTo(seat, REUSE_ODDS, 4n, "the odds");
     });
   });
 
@@ -75,7 +75,7 @@ describe("draw", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           integerEdges(new IntegerBounds(...tt.give)),
           tt.want,
@@ -90,7 +90,7 @@ describe("draw", () => {
       const source = new Source(1n);
       const twin = new Source(1n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [integer(source, new IntegerBounds(7n, 7n)), source.next()],
         [7n, twin.next()],
@@ -141,14 +141,19 @@ describe("draw", () => {
         return [value, twin.next()];
       });
 
-      check.equal(seat, got, want, "the draws and the stream after them for 50 seeds");
+      check.isEqualTo(
+        seat,
+        got,
+        want,
+        "the draws and the stream after them for 50 seeds",
+      );
     });
 
     it("returns the pinned draws of seed 42", ({ seat }) => {
       const source = new Source(42n);
       const bounds = new IntegerBounds(-100n, 100n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         times(10, () => integer(source, bounds)),
         [11n, 24n, 14n, 62n, -71n, -5n, 8n, -21n, -29n, -69n],
@@ -162,7 +167,7 @@ describe("draw", () => {
       const source = new Source(42n);
       const bounds = new IntegerBounds(INT64_MIN, INT64_MAX);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         times(10, () => integer(source, bounds)),
         [
@@ -199,7 +204,7 @@ describe("draw", () => {
     it("returns the certain outcome of a probability of 0 or 1", ({ seat }) => {
       const source = new Source(2n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         times(100, () => [
           boolean(source, { num: 0n, den: 1n }),
@@ -214,7 +219,7 @@ describe("draw", () => {
       const source = new Source(3n);
       const twin = new Source(3n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         times(100, () => boolean(source, { num: 1n, den: 3n })),
         times(100, () => (twin.coin(1n, 3n) ? 1n : 0n)),
@@ -228,7 +233,7 @@ describe("draw", () => {
       const source = new Source(4n);
       const twin = new Source(4n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [weighted(source, [3n]), source.next()],
         [0, twin.next()],
@@ -242,7 +247,7 @@ describe("draw", () => {
       const source = new Source(6n);
       const twin = new Source(6n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         times(DRAWS, () => weighted(source, [1n, 2n, 1n])),
         times(DRAWS, () => [0, 1, 1, 2][Number(twin.below(4n))] as number),
@@ -256,7 +261,7 @@ describe("draw", () => {
       const source = new Source(8n);
       const twin = new Source(8n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [1, 3].flatMap((remaining) =>
           times(50, () => keep(source, HALF, true, remaining)),
@@ -270,7 +275,7 @@ describe("draw", () => {
       const source = new Source(8n);
       const twin = new Source(8n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [keep(source, HALF, false, 1), source.next()],
         [1n, twin.next()],
@@ -292,7 +297,7 @@ describe("draw", () => {
         return [coins[0] as bigint, twin.next()];
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         got,
         want,
@@ -341,7 +346,7 @@ describe("draw", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, averageLength(...tt.give), tt.want, "the average");
+        check.isEqualTo(seat, averageLength(...tt.give), tt.want, "the average");
       });
     }
   });
@@ -371,7 +376,7 @@ describe("draw", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, flagBounds(...tt.give).id, tt.want, "the bounds");
+        check.isEqualTo(seat, flagBounds(...tt.give).id, tt.want, "the bounds");
       });
     }
   });
@@ -381,7 +386,7 @@ describe("draw", () => {
       const source = new Source(5n);
       const twin = new Source(5n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [flag(source, 1, 2, 9, 7), source.next()],
         [1n, twin.next()],
@@ -393,7 +398,7 @@ describe("draw", () => {
       const source = new Source(5n);
       const twin = new Source(5n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [flag(source, 9, 2, 9, 7), source.next()],
         [0n, twin.next()],
@@ -405,7 +410,7 @@ describe("draw", () => {
       const source = new Source(5n);
       const twin = new Source(5n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         times(100, () => flag(source, 3, 0, undefined, 5)),
         times(100, () => (twin.coin(5n, 6n) ? 1n : 0n)),
@@ -427,7 +432,7 @@ describe("draw", () => {
         return elements;
       });
 
-      check.equal(seat, got, want, "100 seeds");
+      check.isEqualTo(seat, got, want, "100 seeds");
     });
 
     it("returns a sequence that the bounds admit for every draw", ({ seat }) => {
@@ -458,7 +463,7 @@ describe("draw", () => {
     });
 
     it("returns each edge once", ({ seat }) => {
-      check.equal(seat, floatEdges(new FloatBounds(2, 2)), [2], "one edge");
+      check.isEqualTo(seat, floatEdges(new FloatBounds(2, 2)), [2], "one edge");
     });
   });
 

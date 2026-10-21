@@ -35,7 +35,7 @@ function groups(...values: number[]): Uint8Array {
 describe("convert", () => {
   describe("IDENTITY", () => {
     it("returns a value in both directions", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [IDENTITY.to(1n), IDENTITY.back(1n)],
         [1n, 1n],
@@ -48,7 +48,7 @@ describe("convert", () => {
     it("returns the nanoseconds of a duration with days of 24 hours", ({ seat }) => {
       const duration = Temporal.Duration.from({ days: 1, hours: 1, nanoseconds: 5 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         nanosecondsOf(duration),
         90_000_000_000_005n,
@@ -57,7 +57,7 @@ describe("convert", () => {
     });
 
     it("throws a RangeError for a duration with a calendar unit", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => nanosecondsOf(Temporal.Duration.from({ months: 1 }))),
         "prop: P1M states a calendar unit, which has no fixed length",
@@ -68,7 +68,7 @@ describe("convert", () => {
 
   describe("durationOf", () => {
     it("returns a duration balanced from the hours down", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         durationOf(90_000_000_000_005n).toString(),
         "PT25H0.000000005S",
@@ -77,7 +77,7 @@ describe("convert", () => {
     });
 
     it("returns a negative duration of negative nanoseconds", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         durationOf(-1_500_000_000n).toString(),
         "-PT1.5S",
@@ -96,7 +96,7 @@ describe("convert", () => {
         new Variant("some", [2n]),
       ];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         plainOf(value),
         [
@@ -113,7 +113,7 @@ describe("convert", () => {
     it("returns a number of an int of 32 bits", ({ seat }) => {
       const converter = of(INT32);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [converter.to(3n), converter.back(3), converter.back(3n)],
         [3, 3n, 3n],
@@ -124,7 +124,7 @@ describe("convert", () => {
     it("throws a TypeError for a number that is no safe integer of an int of 32 bits", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of(INT32).back(1.5)),
         "prop: 1.5 is no value of the int shape",
@@ -135,13 +135,18 @@ describe("convert", () => {
     it("returns a bigint of an int of 64 bits", ({ seat }) => {
       const converter = of({ shape: "int", width: 64, signed: true });
 
-      check.equal(seat, [converter.to(3n), converter.back(3n)], [3n, 3n], "a bigint");
+      check.isEqualTo(
+        seat,
+        [converter.to(3n), converter.back(3n)],
+        [3n, 3n],
+        "a bigint",
+      );
     });
 
     it("returns the elements of a list each converted", ({ seat }) => {
       const converter = of({ shape: "list", of: INT32 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [converter.to([1n, 2n]), converter.back([1, 2])],
         [
@@ -153,7 +158,7 @@ describe("convert", () => {
     });
 
     it("throws a TypeError for a value that is no array of a list", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "fixed-list", of: INT32, size: 1 }).back(1)),
         "prop: 1 is no value of the list shape",
@@ -164,7 +169,7 @@ describe("convert", () => {
     it("maps a set to a Set both ways", ({ seat }) => {
       const converter = of({ shape: "set", of: INT32 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [converter.to([1n]), converter.back(new Set([1])), converter.back([2])],
         [new Set([1]), [1n], [2n]],
@@ -173,7 +178,7 @@ describe("convert", () => {
     });
 
     it("throws a TypeError for a value that is no set", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "set", of: INT32 }).back(1)),
         "prop: 1 is no value of the set shape",
@@ -184,7 +189,7 @@ describe("convert", () => {
     it("maps a map to a Map both ways", ({ seat }) => {
       const converter = of({ shape: "map", key: INT32, of: { shape: "bool" } });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           converter.to(new Pairs([[1n, true]])),
@@ -197,7 +202,7 @@ describe("convert", () => {
     });
 
     it("throws a TypeError for a value that is no map", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "map", key: INT32, of: INT32 }).back([])),
         "prop: [] is no value of the map shape",
@@ -208,7 +213,7 @@ describe("convert", () => {
     it("maps an absent optional value to undefined both ways", ({ seat }) => {
       const converter = of({ shape: "optional", of: INT32 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           converter.to(undefined),
@@ -235,7 +240,7 @@ describe("convert", () => {
         ["ok", true],
       ]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           converter.to(fields),
@@ -250,7 +255,7 @@ describe("convert", () => {
     it("throws a TypeError for a value that is no record", ({ seat }) => {
       const converter = of({ shape: "record", fields: [["ok", { shape: "bool" }]] });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => converter.back(null)),
         "prop: null is no value of the record shape",
@@ -267,7 +272,7 @@ describe("convert", () => {
         ],
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           converter.to(new Variant("none")),
@@ -290,7 +295,7 @@ describe("convert", () => {
     it("throws a TypeError for a variant that the enum does not name", ({ seat }) => {
       const converter = of({ shape: "enum", variants: [["none", null]] });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => converter.back({ name: "z" })),
         'prop: {"name":"z"} is no value of the enum shape',
@@ -301,7 +306,7 @@ describe("convert", () => {
     it("throws a TypeError for a value that is no variant", ({ seat }) => {
       const converter = of({ shape: "enum", variants: [["none", null]] });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => converter.back(undefined)),
         "prop: undefined is no value of the enum shape",
@@ -319,7 +324,7 @@ describe("convert", () => {
       });
       const decoded = new Fields([["a", 2n]]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           converter.to(decoded),
@@ -335,7 +340,7 @@ describe("convert", () => {
     it("throws a TypeError for a value that the literal does not state", ({ seat }) => {
       const converter = of({ shape: "literal", values: [{ type: "int", value: 1 }] });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => converter.back(5n)),
         "prop: 5n is no value of the literal shape",
@@ -361,7 +366,7 @@ describe("convert", () => {
       );
       const value = new Fields([["next", new Fields([["next", undefined]])]]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [converter.to(value), converter.back({ next: { next: undefined } })],
         [{ next: { next: undefined } }, value],
@@ -381,7 +386,7 @@ describe("convert", () => {
         new Map([["X", doubled]]),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [converter.to([1]), converter.back([4])],
         [[2], [2]],
@@ -392,7 +397,7 @@ describe("convert", () => {
     it("maps a UUID to lowercase text both ways", ({ seat }) => {
       const converter = of({ shape: "uuid" });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           converter.to(sixteen()),
@@ -405,7 +410,7 @@ describe("convert", () => {
     });
 
     it("throws a TypeError for text that is no UUID", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "uuid" }).back("00010203")),
         'prop: "00010203" is no value of the uuid shape',
@@ -450,7 +455,7 @@ describe("convert", () => {
         it(`maps ${tt.name} to its text both ways`, ({ seat }) => {
           const converter = of({ shape: "ip-address" });
 
-          check.equal(
+          check.isEqualTo(
             seat,
             [converter.to(tt.give), converter.back(tt.want)],
             [tt.want, tt.give],
@@ -461,7 +466,7 @@ describe("convert", () => {
     }
 
     it("runs an IPv6 address with an IPv4 tail back to its bytes", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         of({ shape: "ip-address" }).back("::ffff:1.2.3.4"),
         groups(0, 0, 0, 0, 0, 0xffff, 0x102, 0x304),
@@ -470,7 +475,7 @@ describe("convert", () => {
     });
 
     it("runs an address's bytes back as they are", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         of({ shape: "ip-address" }).back(Uint8Array.of(1, 2, 3, 4)),
         Uint8Array.of(1, 2, 3, 4),
@@ -487,7 +492,7 @@ describe("convert", () => {
       ];
       for (const tt of tests) {
         it(`throws a TypeError for ${tt.name}`, ({ seat }) => {
-          check.equal(
+          check.isEqualTo(
             seat,
             thrown(() => of({ shape: "ip-address" }).back(tt.give)),
             `prop: ${JSON.stringify(tt.give)} is no value of the ip-address shape`,
@@ -502,7 +507,7 @@ describe("convert", () => {
     }) => {
       const converter = of({ shape: "decimal", scale: 2 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [converter.to(-5n), converter.to(1234n)],
         ["-0.05", "12.34"],
@@ -511,13 +516,18 @@ describe("convert", () => {
     });
 
     it("returns the text of a decimal of scale 0 without a point", ({ seat }) => {
-      check.equal(seat, of({ shape: "decimal", scale: 0 }).to(-7n), "-7", "an integer");
+      check.isEqualTo(
+        seat,
+        of({ shape: "decimal", scale: 0 }).to(-7n),
+        "-7",
+        "an integer",
+      );
     });
 
     it("runs the text of a decimal back to its unscaled integer", ({ seat }) => {
       const converter = of({ shape: "decimal", scale: 2 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           converter.back("12.34"),
@@ -534,7 +544,7 @@ describe("convert", () => {
     it("throws a RangeError for a decimal with more digits than its scale", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "decimal", scale: 2 }).back("1.234")),
         "prop: 1.234 has more digits than the scale of 2",
@@ -543,7 +553,7 @@ describe("convert", () => {
     });
 
     it("throws a TypeError for a value that is no decimal text", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "decimal", scale: 2 }).back(1.5)),
         "prop: 1.5 is no value of the decimal shape",
@@ -559,7 +569,7 @@ describe("convert", () => {
       ]);
       const instant = Temporal.Instant.from("1969-12-31T23:59:59.5Z");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [String(converter.to(fields)), converter.back(instant), converter.back(fields)],
         [instant.toString(), fields, fields],
@@ -570,7 +580,7 @@ describe("convert", () => {
     it("throws a RangeError for an instant finer than its unit", ({ seat }) => {
       const instant = Temporal.Instant.from("1970-01-01T00:00:00.0005Z");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "instant", unit: "ms" }).back(instant)),
         "prop: 1970-01-01T00:00:00.0005Z is finer than the shape's unit of 1000000 ns",
@@ -579,7 +589,7 @@ describe("convert", () => {
     });
 
     it("throws a TypeError for a value that is no Instant", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "instant", unit: "s" }).back("x")),
         'prop: "x" is no value of the instant shape',
@@ -591,7 +601,7 @@ describe("convert", () => {
       const converter = of({ shape: "date" });
       const date = Temporal.PlainDate.from("2000-01-01");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [String(converter.to(-1n)), converter.back(date), converter.back(3n)],
         ["1969-12-31", 10957n, 3n],
@@ -600,7 +610,7 @@ describe("convert", () => {
     });
 
     it("throws a TypeError for a value that is no PlainDate", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "date" }).back("2000-01-01")),
         'prop: "2000-01-01" is no value of the date shape',
@@ -611,7 +621,7 @@ describe("convert", () => {
     it("maps a time of day to a PlainTime both ways", ({ seat }) => {
       const converter = of({ shape: "time-of-day", unit: "s" });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           String(converter.to(3661n)),
@@ -624,7 +634,7 @@ describe("convert", () => {
     });
 
     it("throws a RangeError for a time of day finer than its unit", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() =>
           of({ shape: "time-of-day", unit: "s" }).back(
@@ -637,7 +647,7 @@ describe("convert", () => {
     });
 
     it("throws a TypeError for a value that is no PlainTime", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "time-of-day", unit: "s" }).back(1)),
         "prop: 1 is no value of the time-of-day shape",
@@ -653,7 +663,7 @@ describe("convert", () => {
       ]);
       const local = Temporal.PlainDateTime.from("1970-01-02T00:00:01.5");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [String(converter.to(fields)), converter.back(local), converter.back(fields)],
         [local.toString(), fields, fields],
@@ -662,7 +672,7 @@ describe("convert", () => {
     });
 
     it("throws a TypeError for a value that is no PlainDateTime", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "local-date-time", unit: "s" }).back(1)),
         "prop: 1 is no value of the local-date-time shape",
@@ -673,7 +683,7 @@ describe("convert", () => {
     it("maps a duration to a Duration both ways", ({ seat }) => {
       const converter = of({ shape: "duration", unit: "ms" });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           String(converter.to(1500n)),
@@ -686,7 +696,7 @@ describe("convert", () => {
     });
 
     it("throws a TypeError for a value that is no Duration", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "duration", unit: "s" }).back("PT1S")),
         'prop: "PT1S" is no value of the duration shape',
@@ -697,7 +707,7 @@ describe("convert", () => {
     it("returns the seconds of an offset as a number", ({ seat }) => {
       const converter = of({ shape: "offset" });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [converter.to(3600n), converter.back(-1800), converter.back(60n)],
         [3600, -1800n, 60n],
@@ -706,7 +716,7 @@ describe("convert", () => {
     });
 
     it("throws a TypeError for an offset that is no safe integer", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "offset" }).back(0.5)),
         "prop: 0.5 is no value of the offset shape",
@@ -730,7 +740,7 @@ describe("convert", () => {
         "1970-01-01T01:00:00+01:00[Europe/Amsterdam]",
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [String(converter.to(fields)), converter.back(zoned), converter.back(fields)],
         [zoned.toString(), fields, fields],
@@ -739,7 +749,7 @@ describe("convert", () => {
     });
 
     it("throws a TypeError for a value that is no ZonedDateTime", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => of({ shape: "zoned-date-time", unit: "s" }).back(1)),
         "prop: 1 is no value of the zoned-date-time shape",
@@ -765,7 +775,7 @@ describe("convert", () => {
         zone: string;
       };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           wall.local.toString(),
@@ -789,7 +799,7 @@ describe("convert", () => {
       ];
       for (const tt of tests) {
         it(`throws a TypeError for ${tt.name} as a wall time`, ({ seat }) => {
-          check.equal(
+          check.isEqualTo(
             seat,
             thrown(() => of({ shape: "wall-time", unit: "s" }).back(tt.give)),
             `prop: ${tt.want} is no value of the wall-time shape`,
@@ -802,7 +812,7 @@ describe("convert", () => {
     it("returns the value of a shape whose values are the engine's as it is", ({
       seat,
     }) => {
-      check.equal(seat, of({ shape: "zone" }).to("UTC"), "UTC", "a zone's name");
+      check.isEqualTo(seat, of({ shape: "zone" }).to("UTC"), "UTC", "a zone's name");
     });
   });
 });

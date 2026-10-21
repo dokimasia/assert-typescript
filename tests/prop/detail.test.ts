@@ -75,13 +75,13 @@ function flaky(divergence: Divergence): Outcome {
 describe("detail", () => {
   describe("FOR_ALL", () => {
     it("is the id of the assertion of forAll", ({ seat }) => {
-      check.equal(seat, FOR_ALL, "prop-for-all", "the id");
+      check.isEqualTo(seat, FOR_ALL, "prop-for-all", "the id");
     });
   });
 
   describe("detailOf", () => {
     it("returns null for every part of a run that passed", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         detailOf(outcome("passed")),
         {
@@ -103,7 +103,7 @@ describe("detail", () => {
     it("returns every part of a counterexample", ({ seat }) => {
       const d = detailOf(COUNTEREXAMPLE);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [d["counterexample"], d["failure"], d["choices"], d["others"]],
         [
@@ -139,7 +139,7 @@ describe("detail", () => {
         }),
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         detailOf(run)["counterexample"],
         [
@@ -157,7 +157,7 @@ describe("detail", () => {
     }) => {
       const d = detailOf(outcome("flaky", { failing: failing(5n), token: "prop1:AQ" }));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [d["failure"], d["choices"], d["others"]],
         [RECORD, null, null],
@@ -213,7 +213,7 @@ describe("detail", () => {
             unknown
           >;
 
-          check.equal(
+          check.isEqualTo(
             seat,
             [d["recorded"], d["replayed"]] as readonly unknown[],
             tt.want,
@@ -233,7 +233,7 @@ describe("detail", () => {
         step: { part: "sequential", position: 1, action: "put" },
       };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         detailOf(flaky(divergence))["divergence"],
         {
@@ -259,7 +259,7 @@ describe("detail", () => {
         step: { part: "swarm" },
       };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (detailOf(flaky(divergence))["divergence"] as Record<string, unknown>)["step"],
         { part: "swarm", position: null, action: null },
@@ -277,7 +277,7 @@ describe("detail", () => {
         },
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         detailOf(run)["coverage"],
         { label: "even", share: 0.5, counted: 1, valid: 100, verdict: "unmet" },
@@ -292,7 +292,7 @@ describe("detail", () => {
     }) => {
       const json = detailJson(COUNTEREXAMPLE, detailOf(COUNTEREXAMPLE));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         json["counterexample"],
         [
@@ -313,7 +313,7 @@ describe("detail", () => {
       const run = outcome("counterexample", { failing: failing(5n) });
       const json = detailJson(run, detailOf(run));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         json["counterexample"],
         [
@@ -353,7 +353,7 @@ describe("detail", () => {
         ],
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         detailJson(run, detailOf(run))["counterexample"],
         [
@@ -371,7 +371,7 @@ describe("detail", () => {
     it("returns the failure as the JSON of its record", ({ seat }) => {
       const json = detailJson(COUNTEREXAMPLE, detailOf(COUNTEREXAMPLE));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         json["failure"],
         {
@@ -396,7 +396,7 @@ describe("detail", () => {
         },
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         detailJson(run, detailOf(run))["failure"],
         { assertion: null, contract: "it broke", detail: {}, where: null },
@@ -410,7 +410,7 @@ describe("detail", () => {
       const json = detailJson(COUNTEREXAMPLE, detailOf(COUNTEREXAMPLE));
       const [other] = json["others"] as Record<string, unknown>[];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [other?.["counterexample"], other?.["choices"]],
         [
@@ -426,7 +426,7 @@ describe("detail", () => {
         failing: failing(5n, (c) => c.step({ action: "put" })),
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (detailJson(run, detailOf(run))["counterexample"] as unknown[])[1],
         { step: "put" },
@@ -446,7 +446,7 @@ describe("detail", () => {
         unknown
       >;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [divergence["recorded"], divergence["replayed"]],
         [5, null],
@@ -457,7 +457,7 @@ describe("detail", () => {
     it("returns null for the parts that the outcome does not use", ({ seat }) => {
       const json = detailJson(outcome("passed"), detailOf(outcome("passed")));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [json["counterexample"], json["failure"], json["others"], json["divergence"]],
         [null, null, null, null],
@@ -475,7 +475,7 @@ describe("detail", () => {
         WHERE,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           failure.assertion,
@@ -505,7 +505,7 @@ describe("detail", () => {
         WHERE,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         sentence(failure),
         [
@@ -619,7 +619,7 @@ describe("detail", () => {
       });
       const { failure } = recordOf(run, FOR_ALL, "c", WHERE);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         sentence(failure),
         'c: coverage-unmet after 3 valid and 1 rejected cases, seed 7\ncoverage: unmet, "even" counted 1 of 100 valid cases against a required share of 0.5',
@@ -630,7 +630,7 @@ describe("detail", () => {
     it("states no note of a record that recordOf did not return", ({ seat }) => {
       const failure = new Failure(FOR_ALL, "c", detailOf(outcome("vacuous")));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         sentence(failure),
         "c: vacuous after 3 valid and 1 rejected cases, seed 7",
@@ -650,7 +650,12 @@ describe("detail", () => {
         detailOf(outcome("rejected")),
       );
 
-      check.equal(seat, render(failure), sentence(failure), "the registered sentence");
+      check.isEqualTo(
+        seat,
+        render(failure),
+        sentence(failure),
+        "the registered sentence",
+      );
     });
   });
 });

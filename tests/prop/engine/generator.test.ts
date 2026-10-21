@@ -119,7 +119,7 @@ describe("generator", () => {
     it("returns a generator of the function of each value", ({ seat }) => {
       const doubled = DIGIT.map((value) => value * 2n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [doubled instanceof Mapped, decode(doubled, 4n)[0]],
         [true, 8n],
@@ -132,7 +132,7 @@ describe("generator", () => {
     it("returns a generator of the values that the predicate keeps", ({ seat }) => {
       const even = DIGIT.filter((value) => value % 2n === 0n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [even instanceof Filter, decode(even, 4n)[0]],
         [true, 4n],
@@ -148,7 +148,7 @@ describe("generator", () => {
       const bound = DIGIT.bind((n) => new Integer(new IntegerBounds(0n, n)));
       const [value, c] = decode(bound, 5n, 3n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [bound instanceof Bound, value, labels(c)],
         [true, 3n, ["bind", "integer", "integer"]],
@@ -159,20 +159,25 @@ describe("generator", () => {
 
   describe("Integer", () => {
     it("decodes a recorded value to itself", ({ seat }) => {
-      check.equal(seat, decode(DIGIT, 7n)[0], 7n, "7");
+      check.isEqualTo(seat, decode(DIGIT, 7n)[0], 7n, "7");
     });
 
     it("decodes the value closest to zero from no choice", ({ seat }) => {
       const above = new Integer(new IntegerBounds(3n, 9n));
       const below = new Integer(new IntegerBounds(-9n, -3n));
 
-      check.equal(seat, [decode(above)[0], decode(below)[0]], [3n, -3n], "the targets");
+      check.isEqualTo(
+        seat,
+        [decode(above)[0], decode(below)[0]],
+        [3n, -3n],
+        "the targets",
+      );
     });
 
     it("makes one reusable value choice in a span of its id", ({ seat }) => {
       const [, c] = decode(DIGIT, 7n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.spans, c.requests[0]?.edge, c.requests[0]?.reuse],
         [
@@ -190,7 +195,7 @@ describe("generator", () => {
         5n,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [value, labels(c)],
         [5n, ["duration"]],
@@ -201,11 +206,16 @@ describe("generator", () => {
 
   describe("Float", () => {
     it("decodes a recorded value to itself", ({ seat }) => {
-      check.equal(seat, decode(new Float(new FloatBounds(-1, 1)), 0.5)[0], 0.5, "0.5");
+      check.isEqualTo(
+        seat,
+        decode(new Float(new FloatBounds(-1, 1)), 0.5)[0],
+        0.5,
+        "0.5",
+      );
     });
 
     it("decodes the simplest float in range from no choice", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(new Float(new FloatBounds(0.6, 0.7)))[0],
         0.625,
@@ -227,7 +237,7 @@ describe("generator", () => {
     });
 
     it("decodes the target for NaN where the bounds refuse it", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(new Float(new FloatBounds(1, 2)), Number.NaN)[0],
         1,
@@ -238,7 +248,7 @@ describe("generator", () => {
     it("decodes the target for a value off its width", ({ seat }) => {
       const narrow = new Float(new FloatBounds(0, 1, false, 32));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode(narrow, 0.1)[0], decode(narrow, 0.5)[0]],
         [0, 0.5],
@@ -247,7 +257,7 @@ describe("generator", () => {
     });
 
     it("decodes in a span labelled float", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         labels(decode(new Float(new FloatBounds(0, 1)), 0.5)[1]),
         ["float"],
@@ -258,7 +268,7 @@ describe("generator", () => {
 
   describe("Bool", () => {
     it("decodes true from the choice 1 alone", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode(COIN, 1n)[0], decode(COIN)[0]],
         [true, false],
@@ -275,7 +285,7 @@ describe("generator", () => {
         new Source(BigInt(seed)).coin(1n, 3n),
       );
 
-      check.equal(seat, got, want, "a coin of 1 in 3 for 50 seeds");
+      check.isEqualTo(seat, got, want, "a coin of 1 in 3 for 50 seeds");
     });
   });
 
@@ -283,7 +293,7 @@ describe("generator", () => {
     it("decodes its value without a choice", ({ seat }) => {
       const [value, c] = decode(new Just("x"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [value, c.choices, c.spans],
         ["x", [], [{ label: "just", start: 0, end: 0, depth: 0, parent: undefined }]],
@@ -294,13 +304,13 @@ describe("generator", () => {
 
   describe("SampledFrom", () => {
     it("decodes the value at the recorded index", ({ seat }) => {
-      check.equal(seat, decode(LETTERS, 2n)[0], "c", "index 2");
+      check.isEqualTo(seat, decode(LETTERS, 2n)[0], "c", "index 2");
     });
 
     it("decodes the first value from no choice or an index past the end", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode(LETTERS)[0], decode(LETTERS, 3n)[0]],
         ["a", "a"],
@@ -311,7 +321,7 @@ describe("generator", () => {
     it("chooses its index as a structure choice with the edge 0", ({ seat }) => {
       const [, c] = decode(LETTERS, 1n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.requests[0]?.edge, c.requests[0]?.bounds.id],
         [0n, "integer 0 2"],
@@ -324,7 +334,7 @@ describe("generator", () => {
     const either = new OneOf([DIGIT, TEEN]);
 
     it("decodes the value of the alternative at the recorded index", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(either, 1n, 15n)[0],
         15n,
@@ -333,19 +343,19 @@ describe("generator", () => {
     });
 
     it("decodes the first alternative's simplest value from no choice", ({ seat }) => {
-      check.equal(seat, decode(either)[0], 0n, "0");
+      check.isEqualTo(seat, decode(either)[0], 0n, "0");
     });
 
     it("decodes the target of the chosen alternative for a value outside it", ({
       seat,
     }) => {
-      check.equal(seat, decode(either, 1n, 5n)[0], 10n, "5 is outside [10, 20]");
+      check.isEqualTo(seat, decode(either, 1n, 5n)[0], 10n, "5 is outside [10, 20]");
     });
 
     it("chooses its index as a structure choice in its span", ({ seat }) => {
       const [, c] = decode(either, 1n, 15n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.requests.map((request) => request.edge), c.spans[0]],
         [
@@ -363,11 +373,11 @@ describe("generator", () => {
     it("decodes undefined for an absent value with one choice", ({ seat }) => {
       const [value, c] = decode(maybe, 0n, 4n);
 
-      check.equal(seat, [value, c.choices.length], [undefined, 1], "absent");
+      check.isEqualTo(seat, [value, c.choices.length], [undefined, 1], "absent");
     });
 
     it("decodes the value of a present value", ({ seat }) => {
-      check.equal(seat, decode(maybe, 1n, 4n)[0], 4n, "present");
+      check.isEqualTo(seat, decode(maybe, 1n, 4n)[0], 4n, "present");
     });
 
     it("decodes undefined from no choice", ({ seat }) => {
@@ -375,7 +385,7 @@ describe("generator", () => {
     });
 
     it("chooses its presence as a structure choice with the edge 1", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(maybe, 1n, 4n)[1].requests.map((request) => request.edge),
         [1n, undefined],
@@ -386,11 +396,16 @@ describe("generator", () => {
 
   describe("List", () => {
     it("decodes its flags and elements", ({ seat }) => {
-      check.equal(seat, decode(DIGITS, 1n, 7n, 1n, 3n, 0n)[0], [7n, 3n], "two digits");
+      check.isEqualTo(
+        seat,
+        decode(DIGITS, 1n, 7n, 1n, 3n, 0n)[0],
+        [7n, 3n],
+        "two digits",
+      );
     });
 
     it("decodes minSize simplest elements from no choice", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode(DIGITS)[0], decode(new List(DIGIT, new Sizes(2, 3)))[0]],
         [[], [0n, 0n]],
@@ -401,7 +416,7 @@ describe("generator", () => {
     it("forces the flag at its maximum to stop", ({ seat }) => {
       const [value, c] = decode(DIGITS, 1n, 1n, 1n, 2n, 1n, 3n, 1n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [value, c.choices.at(-1), c.requests.at(-1)?.bounds.id],
         [[1n, 2n, 3n], { kind: "integer", value: 0n }, "integer 0 0"],
@@ -410,7 +425,7 @@ describe("generator", () => {
     });
 
     it("gives an edge to its flags alone", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(DIGITS, 1n, 7n, 1n, 3n, 0n)[1].requests.map((request) => request.edge),
         [1n, undefined, 0n, undefined, 0n],
@@ -419,7 +434,7 @@ describe("generator", () => {
     });
 
     it("opens the span of each element at its flag", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(DIGITS, 1n, 7n, 1n, 3n, 0n)[1].spans,
         [
@@ -434,11 +449,16 @@ describe("generator", () => {
     });
 
     it("keeps duplicates of a list that is not unique", ({ seat }) => {
-      check.equal(seat, decode(DIGITS, 1n, 4n, 1n, 4n, 0n)[0], [4n, 4n], "both fours");
+      check.isEqualTo(
+        seat,
+        decode(DIGITS, 1n, 4n, 1n, 4n, 0n)[0],
+        [4n, 4n],
+        "both fours",
+      );
     });
 
     it("discards a duplicate element of a unique list", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(UNIQUE, 1n, 4n, 1n, 4n, 1n, 5n, 0n)[0],
         [4n, 5n],
@@ -449,7 +469,7 @@ describe("generator", () => {
     it("throws Rejected for a unique list that remains below its minimum", ({
       seat,
     }) => {
-      const err = check.throws(
+      const err = check.doesThrow(
         seat,
         () => decode(new List(DIGIT, new Sizes(2), true)),
         "the targets repeat",
@@ -477,13 +497,13 @@ describe("generator", () => {
         return values;
       });
 
-      check.equal(seat, got, want, "200 seeds");
+      check.isEqualTo(seat, got, want, "200 seeds");
     });
   });
 
   describe("Dict", () => {
     it("discards an entry whose key repeats", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(TABLE, 1n, 3n, 1n, 1n, 3n, 0n, 0n)[0],
         new Pairs([[3n, true]]),
@@ -492,7 +512,7 @@ describe("generator", () => {
     });
 
     it("opens the span of each entry at its flag", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(TABLE, 1n, 3n, 1n, 0n)[1].spans.slice(0, 2),
         [
@@ -504,13 +524,13 @@ describe("generator", () => {
     });
 
     it("decodes no entry from no choice", ({ seat }) => {
-      check.equal(seat, decode(TABLE)[0], new Pairs([]), "empty");
+      check.isEqualTo(seat, decode(TABLE)[0], new Pairs([]), "empty");
     });
 
     it("throws Rejected for a minimum of two that the targets cannot meet", ({
       seat,
     }) => {
-      const err = check.throws(
+      const err = check.doesThrow(
         seat,
         () => decode(new Dict(DIGIT, COIN, new Sizes(2, 3))),
         "both target keys are 0",
@@ -522,7 +542,7 @@ describe("generator", () => {
 
   describe("Text", () => {
     it("spells the indices in the default alphabet", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(new Text(undefined, new SequenceBounds(0x10f800)), [10, 0])[0],
         "a0",
@@ -533,14 +553,14 @@ describe("generator", () => {
     it("spells the indices in a stated alphabet in its order", ({ seat }) => {
       const xyz = new Text(["x", "y", "z"], new SequenceBounds(3));
 
-      check.equal(seat, decode(xyz, [2, 0, 1])[0], "zxy", "the stated order");
+      check.isEqualTo(seat, decode(xyz, [2, 0, 1])[0], "zxy", "the stated order");
     });
 
     it("repeats the first character minSize times from no choice", ({ seat }) => {
       const xyz = new Text(["x", "y", "z"], new SequenceBounds(3, 2));
       const digits = new Text(undefined, new SequenceBounds(0x10f800, 2));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode(xyz)[0], decode(digits)[0]],
         ["xx", "00"],
@@ -549,7 +569,7 @@ describe("generator", () => {
     });
 
     it("spells an index past the alphabet as its first character", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(new Text(["x", "y", "z"], new SequenceBounds(3)), [5])[0],
         "x",
@@ -558,7 +578,7 @@ describe("generator", () => {
     });
 
     it("decodes in a span labelled string", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         labels(decode(new Text(undefined, new SequenceBounds(10)))[1]),
         ["string"],
@@ -571,7 +591,7 @@ describe("generator", () => {
     const bytes = new Bytes(new SequenceBounds(256));
 
     it("decodes a sequence of 256 element values", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode(bytes, [104, 105])[0], decode(bytes, [256])[0], decode(bytes)[0]],
         [Uint8Array.of(104, 105), Uint8Array.of(0), Uint8Array.of()],
@@ -589,7 +609,7 @@ describe("generator", () => {
       };
       const [value, c] = decode(new Matching(piece), 7n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [value, labels(c)],
         ["a7", ["string-matching"]],
@@ -602,7 +622,7 @@ describe("generator", () => {
     const ordering = new Permutation(["a", "b", "c"]);
 
     it("swaps each position with the recorded index", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(ordering, 2n, 2n)[0],
         ["c", "a", "b"],
@@ -613,7 +633,7 @@ describe("generator", () => {
     it("keeps the stated order from no choice", ({ seat }) => {
       const [value, c] = decode(ordering);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [value, c.requests.map((request) => request.bounds.id)],
         [
@@ -627,7 +647,7 @@ describe("generator", () => {
     it("decodes no values without a choice", ({ seat }) => {
       const [value, c] = decode(new Permutation([]));
 
-      check.equal(seat, [value, c.choices], [[], []], "an empty ordering");
+      check.isEqualTo(seat, [value, c.choices], [[], []], "an empty ordering");
     });
   });
 
@@ -635,7 +655,7 @@ describe("generator", () => {
     it("decodes a kept first attempt in one filter span", ({ seat }) => {
       const [value, c] = decode(KEEP_EVEN, 4n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [value, c.spans],
         [
@@ -652,7 +672,7 @@ describe("generator", () => {
     it("removes a rejected attempt from the record", ({ seat }) => {
       const c = new Case(feed(3n, 4n));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [KEEP_EVEN[DECODE](c), c.choices, labels(c)],
         [4n, [{ kind: "integer", value: 4n }], ["filter", "integer"]],
@@ -662,10 +682,14 @@ describe("generator", () => {
 
     it("throws Rejected after three rejected attempts", ({ seat }) => {
       const c = new Case(feed(1n, 3n, 5n, 6n));
-      const err = check.throws(seat, () => KEEP_EVEN[DECODE](c), "1, 3 and 5 are odd");
+      const err = check.doesThrow(
+        seat,
+        () => KEEP_EVEN[DECODE](c),
+        "1, 3 and 5 are odd",
+      );
 
       check.errorIs(seat, err, Rejected, "the case is rejected");
-      check.equal(
+      check.isEqualTo(
         seat,
         c.choices,
         [{ kind: "integer", value: 5n }],
@@ -678,7 +702,7 @@ describe("generator", () => {
     }) => {
       check.errorIs(
         seat,
-        check.throws(seat, () => decode(KEEP_EVEN, 3n), "each attempt reads 3"),
+        check.doesThrow(seat, () => decode(KEEP_EVEN, 3n), "each attempt reads 3"),
         Rejected,
         "the case is rejected",
       );
@@ -691,7 +715,7 @@ describe("generator", () => {
         [...values].sort((a, b) => Number(a - b)),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(sorted, 1n, 3n, 1n, 1n, 0n)[0],
         [1n, 3n],
@@ -702,7 +726,7 @@ describe("generator", () => {
     it("makes the source's choices without a span of its own", ({ seat }) => {
       const [value, c] = decode(new Mapped(DIGIT, (n) => n >= 0n), 4n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [value, c.choices, labels(c)],
         [true, [{ kind: "integer", value: 4n }], ["integer"]],
@@ -727,7 +751,7 @@ describe("generator", () => {
       );
       const [value, c] = decode(bound, 3n, 2n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [value, c.spans[0]],
         [2, { label: "bind", start: 0, end: 2, depth: 0, parent: undefined }],
@@ -741,17 +765,22 @@ describe("generator", () => {
       const pair = new Composite((c) => [c.draw(DIGIT, "a"), c.draw(DIGIT, "b")]);
       const [value, c] = decode(pair, 1n, 2n);
 
-      check.equal(seat, [value, c.spans[0]?.label], [[1n, 2n], "composite"], "a pair");
+      check.isEqualTo(
+        seat,
+        [value, c.spans[0]?.label],
+        [[1n, 2n], "composite"],
+        "a pair",
+      );
     });
   });
 
   describe("Recursive", () => {
     it("decodes the base's simplest value from no choice", ({ seat }) => {
-      check.equal(seat, decode(tree())[0], 0n, "the base");
+      check.isEqualTo(seat, decode(tree())[0], 0n, "the base");
     });
 
     it("decodes its positions recursively", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode(tree(), 1n, 1n, 0n, 5n, 1n, 0n, 7n, 0n)[0],
@@ -767,7 +796,7 @@ describe("generator", () => {
     }) => {
       const [, c] = decode(tree(), 1n, 1n, 0n, 5n, 0n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [labels(c), c.requests[0]?.edge],
         [["recursive", "list", "element", "recursive", "integer"], 0n],
@@ -778,7 +807,7 @@ describe("generator", () => {
     it("forces the base for each position after maxLeaves", ({ seat }) => {
       const [value, c] = decode(tree(1), 1n, 1n, 0n, 5n, 1n, 1n, 7n, 0n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [value, c.requests[5]?.bounds.id],
         [[5n, 7n], "integer 0 0"],
@@ -789,7 +818,7 @@ describe("generator", () => {
     it("counts the leaves of each value from zero", ({ seat }) => {
       const one = tree(1);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode(one, 1n, 1n, 0n, 5n, 0n)[0], decode(one, 1n, 1n, 0n, 5n, 0n)[0]],
         [[5n], [5n]],
@@ -804,7 +833,7 @@ describe("generator", () => {
         (self) => new List(self, new Sizes(0, 3)),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(outer, 0n, 1n, 1n, 0n, 5n, 1n, 1n, 7n, 0n)[0],
         [5n, 7n],
@@ -820,7 +849,7 @@ describe("generator", () => {
       const owner = tree();
       const position = new Position(owner);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [position.owner === owner, decode(owner, 1n, 1n, 0n, 4n, 0n)[0]],
         [true, [4n]],

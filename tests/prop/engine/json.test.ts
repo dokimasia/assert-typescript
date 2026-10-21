@@ -11,7 +11,7 @@ describe("json", () => {
     it("returns the error of a text", ({ seat }) => {
       const err = new JsonError("prop: the JSON at 0: no value starts here");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.name, err.message],
         ["JsonError", "prop: the JSON at 0: no value starts here"],
@@ -40,14 +40,14 @@ describe("json", () => {
     ];
     for (const tt of tests) {
       it(`reads ${tt.name}`, ({ seat }) => {
-        check.equal(seat, parse(tt.give, 4), tt.want, "the value");
+        check.isEqualTo(seat, parse(tt.give, 4), tt.want, "the value");
       });
     }
 
     it("reads an object without a prototype", ({ seat }) => {
       const value = parse('{ "a" : 1, "b": {} }', 4) as Record<string, unknown>;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           Object.getPrototypeOf(value),
@@ -63,11 +63,11 @@ describe("json", () => {
     it("reads a name that Object.prototype has as a name of its own", ({ seat }) => {
       const value = parse('{"toString": 1}', 4) as Record<string, unknown>;
 
-      check.equal(seat, value["toString"], 1n, "the stated value");
+      check.isEqualTo(seat, value["toString"], 1n, "the stated value");
     });
 
     it("reads objects and arrays down to the most levels", ({ seat }) => {
-      check.equal(seat, parse("[[[]]]", 3), [[[]]], "three levels");
+      check.isEqualTo(seat, parse("[[[]]]", 3), [[[]]], "three levels");
     });
 
     const refusals = [
@@ -144,7 +144,7 @@ describe("json", () => {
     ];
     for (const tt of refusals) {
       it(`throws a JsonError for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => parse(tt.give, 3)),
           tt.want,

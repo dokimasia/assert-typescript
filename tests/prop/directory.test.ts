@@ -52,7 +52,7 @@ function filled(
 describe("directory", () => {
   describe("storeOf", () => {
     it("returns the stated directory", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         storeOf(new Recorder(), "kept"),
         "kept",
@@ -64,11 +64,11 @@ describe("directory", () => {
       const named = new Recorder();
       nameTest(named, ["a.test.ts", "t"]);
 
-      check.equal(seat, storeOf(named, ""), "", "no store");
+      check.isEqualTo(seat, storeOf(named, ""), "", "no store");
     });
 
     it("returns the empty string for a seat that runs no named test", ({ seat }) => {
-      check.equal(seat, storeOf(new Recorder(), undefined), "", "no store");
+      check.isEqualTo(seat, storeOf(new Recorder(), undefined), "", "no store");
     });
 
     it("returns the store of the test below testdata/prop with each segment escaped", ({
@@ -86,7 +86,7 @@ describe("directory", () => {
         "\u0001",
       ]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         storeOf(named, undefined),
         join(
@@ -111,7 +111,7 @@ describe("directory", () => {
       const named = new Recorder();
       nameTest(named, ["a.test.ts", "parses"]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         seedsOf(named),
         join("testdata", "fuzz", "a.test.ts", "parses"),
@@ -120,7 +120,7 @@ describe("directory", () => {
     });
 
     it("returns the empty string for a seat that runs no named test", ({ seat }) => {
-      check.equal(seat, seedsOf(new Recorder()), "", "no directory");
+      check.isEqualTo(seat, seedsOf(new Recorder()), "", "no directory");
     });
   });
 
@@ -155,7 +155,7 @@ describe("directory", () => {
       const third = claim(collector, "dir", "c");
       cleanUp(collector);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [first, second, third],
         [true, false, true],
@@ -168,13 +168,13 @@ describe("directory", () => {
       const claims = [claim(collector, "dir", "a"), claim(collector, "dir", "b")];
       cleanUp(collector);
 
-      check.equal(seat, claims, [true, true], "the store grants both claims");
+      check.isEqualTo(seat, claims, [true, true], "the store grants both claims");
     });
   });
 
   describe("load", () => {
     it("returns no entry for a store that does not exist", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         load(join(temporary(), "absent"), "c"),
         { entries: [], skipped: [] },
@@ -189,7 +189,7 @@ describe("directory", () => {
       const other = stored("d", 3n, "2025-01-01");
       const dir = filled(temporary(), later, earlier, between, other);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         load(dir, "c").entries.map((one) => [one.name, one.choices]),
         [
@@ -206,7 +206,7 @@ describe("directory", () => {
       const b = stored("c", 2n, "2026-10-08");
       const dir = filled(temporary(), a, b);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         load(dir, "c").entries.map((one) => one.name),
         [a.name, b.name].sort(),
@@ -221,7 +221,7 @@ describe("directory", () => {
       const earlier = { ...larger, entry: { ...larger.entry, found: "2026-01-01" } };
       const dir = filled(temporary(), smaller, earlier);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         load(dir, "c").entries.map((loaded) => loaded.name),
         [larger.name, smaller.name],
@@ -232,7 +232,7 @@ describe("directory", () => {
     it("returns each entry's counterexample", ({ seat }) => {
       const dir = filled(temporary(), stored("c", 1n, "2026-10-08"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         load(dir, "c").entries[0]?.counterexample,
         [{ label: "x" }],
@@ -244,7 +244,7 @@ describe("directory", () => {
       const dir = temporary();
       writeFileSync(join(dir, "later.json"), JSON.stringify({ store: 2 }));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         load(dir, "c"),
         { entries: [], skipped: ["later.json"] },
@@ -257,7 +257,7 @@ describe("directory", () => {
       mkdirSync(join(dir, "nested.json"));
       writeFileSync(join(dir, "notes.txt"), "free text");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         load(dir, "c"),
         { entries: [], skipped: [] },
@@ -270,7 +270,7 @@ describe("directory", () => {
       writeFileSync(join(dir, "a.json"), "{");
       writeFileSync(join(dir, "b.json"), Uint8Array.of(0xff, 0xfe));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => load(dir, "c")),
         `${dir}: the store has damaged files: a.json, b.json`,
@@ -296,7 +296,7 @@ describe("directory", () => {
       const dir = join(temporary(), "deep", "store");
       const written = save(dir, "e.json", { store: 1 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [written, readFileSync(join(dir, "e.json"), "utf8")],
         [true, '{\n  "store": 1\n}\n'],
@@ -309,7 +309,7 @@ describe("directory", () => {
       save(dir, "e.json", { store: 1 });
       const written = save(dir, "e.json", { store: 2 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [written, readFileSync(join(dir, "e.json"), "utf8")],
         [false, '{\n  "store": 1\n}\n'],
@@ -321,7 +321,7 @@ describe("directory", () => {
       const file = join(temporary(), "file");
       writeFileSync(file, "");
 
-      check.notEqual(
+      check.isNotEqualTo(
         seat,
         thrown(() => save(file, "e.json", {})),
         "",
@@ -330,7 +330,7 @@ describe("directory", () => {
     });
 
     it("throws the error of a name that no file can have", ({ seat }) => {
-      check.notEqual(
+      check.isNotEqualTo(
         seat,
         thrown(() => save(temporary(), "a\u0000.json", {})),
         "",
@@ -352,7 +352,7 @@ describe("directory", () => {
       writeFileSync(join(dir, "a"), Uint8Array.of(1, 1));
       mkdirSync(join(dir, "c"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         seeds(dir),
         [

@@ -111,19 +111,19 @@ const tenths = body((c) => {
 describe("runner", () => {
   describe("DEFAULT_CASES", () => {
     it("aims for 100 valid cases", ({ seat }) => {
-      check.equal(seat, DEFAULT_CASES, 100, "the cases");
+      check.isEqualTo(seat, DEFAULT_CASES, 100, "the cases");
     });
   });
 
   describe("new Values", () => {
     it("keeps the values of the draws", ({ seat }) => {
-      check.equal(seat, new Values([1n, "x"]).values, [1n, "x"], "two values");
+      check.isEqualTo(seat, new Values([1n, "x"]).values, [1n, "x"], "two values");
     });
   });
 
   describe("resolve", () => {
     it("fills in every default", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         resolve({ seed: SEED }),
         {
@@ -144,7 +144,7 @@ describe("runner", () => {
     });
 
     it("throws a RangeError for a run of no case", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => resolve({ seed: SEED, cases: 0 })),
         "prop: a run of 0 cases tests nothing",
@@ -164,7 +164,7 @@ describe("runner", () => {
         }),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         known.map(([phase, provider]) => [phase, provider.constructor.name]),
         [
@@ -182,7 +182,7 @@ describe("runner", () => {
     it("counts no case of its seed", ({ seat }) => {
       const tally = new Tally(SEED);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [tally.seed, tally.valid, tally.rejected, tally.requested, tally.labels.size],
         [SEED, 0, 0, false, 0],
@@ -206,7 +206,7 @@ describe("runner", () => {
       const atLimit = tally.failureWithoutCounterexample();
       tally.take(await drive(execute(rejects, new Replaying([]), MAX_CHOICES)));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [atLimit, tally.failureWithoutCounterexample()?.kind],
         [undefined, "rejected"],
@@ -226,7 +226,7 @@ describe("runner", () => {
         ),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         tally.failureWithoutCounterexample()?.kind,
         "vacuous",
@@ -245,7 +245,7 @@ describe("runner", () => {
         { label: "never", share: 0.5 },
       ];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         shortfallOf(tally, requirements, true, true),
         [
@@ -266,7 +266,7 @@ describe("runner", () => {
       tally.valid = 10;
       tally.labels.set("seven", 1);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         shortfallOf(tally, [{ label: "seven", share: 0.1 }], true, true),
         [undefined, true],
@@ -281,7 +281,7 @@ describe("runner", () => {
     }) => {
       const outcome = await ran(passes, { seed: SEED });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases],
         ["passed", 100],
@@ -298,7 +298,7 @@ describe("runner", () => {
         { seed: SEED },
       );
 
-      check.equal(seat, [outcome.kind, outcome.cases], ["passed", 6], "six inputs");
+      check.isEqualTo(seat, [outcome.kind, outcome.cases], ["passed", 6], "six inputs");
     });
 
     it("counts no repeated case", async ({ seat }) => {
@@ -309,7 +309,7 @@ describe("runner", () => {
         { seed: SEED },
       );
 
-      check.equal(seat, outcome.cases, 2, "a boolean has two inputs");
+      check.isEqualTo(seat, outcome.cases, 2, "a boolean has two inputs");
     });
 
     it("stops generating after ten times the cases", async ({ seat }) => {
@@ -323,7 +323,7 @@ describe("runner", () => {
         { seed: SEED, cases: 20 },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases, calls],
         ["passed", 1, 1 + 4 + 10 * 20],
@@ -339,7 +339,7 @@ describe("runner", () => {
         { seed: SEED },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases, outcome.failing?.case.choices],
         ["counterexample", 0, integers(0n)],
@@ -355,7 +355,7 @@ describe("runner", () => {
         { seed: SEED },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases],
         ["counterexample", 3],
@@ -373,7 +373,7 @@ describe("runner", () => {
       );
       const drawn = outcome.failing?.case.draws[0]?.value as bigint[];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           outcome.kind,
@@ -393,7 +393,7 @@ describe("runner", () => {
         { seed: SEED, stored: [integers(7n)] },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases, outcome.stored.length],
         ["counterexample", 0, 1],
@@ -406,7 +406,7 @@ describe("runner", () => {
         execute(passes, new Generating(caseSource(SEED, 3n)), MAX_CHOICES),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         execution.case.draws[0]?.value,
         DIGITS[DECODE](new Case(new Generating(caseSource(SEED, 3n)))),
@@ -424,7 +424,7 @@ describe("runner", () => {
       const outcome = await ran(nonzeroThenZero, { seed: SEED, shrink: 0 });
       const first = WIDE[DECODE](new Case(new Generating(caseSource(SEED, 0n))));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases, outcome.failing?.case.choices],
         ["counterexample", 2, integers(first, 0n)],
@@ -439,7 +439,7 @@ describe("runner", () => {
       });
       const outcome = await ran(nonzeroThenZero, { seed: SEED, cases: 20, shrink: 0 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases],
         ["counterexample", 2],
@@ -457,7 +457,7 @@ describe("runner", () => {
         seen,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, seen.phases],
         ["passed", ["simplest", "edge", "edge", "edge", "edge"]],
@@ -475,7 +475,7 @@ describe("runner", () => {
         seen,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, seen.phases],
         ["counterexample", ["simplest", "edge", "edge"]],
@@ -492,11 +492,11 @@ describe("runner", () => {
         { seed: SEED, cases: 10 },
       );
 
-      check.equal(seat, outcome.kind, "rejected", "every case rejected");
+      check.isEqualTo(seat, outcome.kind, "rejected", "every case rejected");
     });
 
     it("returns rejected for cases past their cap", async ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         (await ran(passes, { seed: SEED, maxChoices: 3 })).kind,
         "rejected",
@@ -510,7 +510,7 @@ describe("runner", () => {
         { seed: SEED },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases],
         ["vacuous", 1],
@@ -526,7 +526,7 @@ describe("runner", () => {
         { seed: SEED },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases],
         ["passed", 100],
@@ -545,7 +545,7 @@ describe("runner", () => {
         { seed: SEED },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.divergence?.index],
         ["flaky", 0],
@@ -564,7 +564,7 @@ describe("runner", () => {
         { seed: SEED },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.divergence?.what],
         ["flaky", "verdict"],
@@ -581,7 +581,7 @@ describe("runner", () => {
         requirements: [{ label: "even", share: 0.2 }],
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases],
         ["passed", 100],
@@ -595,7 +595,7 @@ describe("runner", () => {
         requirements: [{ label: "never", share: 0.5 }],
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           outcome.kind,
@@ -620,7 +620,7 @@ describe("runner", () => {
         requirements: [{ label: "seven", share: 0.2 }],
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [met.kind, unmet.kind, unmet.cases],
         ["passed", "coverage-unmet", 10],
@@ -635,7 +635,7 @@ describe("runner", () => {
         requirements: [{ label: "tenth", share: 0.1 }],
       });
 
-      check.equal(seat, outcome.cases, 400, "eight times the cases");
+      check.isEqualTo(seat, outcome.cases, 400, "eight times the cases");
     });
 
     it("decides an undecided requirement by its share at the last check", async ({
@@ -647,7 +647,7 @@ describe("runner", () => {
         requirements: [{ label: "tenth", share: 0.12 }],
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           outcome.shortfall?.counted,
@@ -670,7 +670,7 @@ describe("runner", () => {
       );
       const first = seen.phases.indexOf("coverage");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           seen.calls.slice(0, first).filter(([, status]) => status === "passed").length,
@@ -698,7 +698,7 @@ describe("runner", () => {
         seen,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [seen.phases.slice(0, 4), seen.calls.length],
         [["example", "stored", "stored", "simplest"], calls],
@@ -722,7 +722,7 @@ describe("runner", () => {
         seen,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [seen.phases.slice(0, 3), values.slice(0, 2)],
         [
@@ -765,7 +765,7 @@ describe("runner", () => {
         seen,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         seen.phases.slice(1, 3),
         ["random", "prefix"],
@@ -782,7 +782,7 @@ describe("runner", () => {
       const after = seen.phases.slice(replay + 1);
       const shrinks = after.filter((phase) => phase === "shrink").length;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [seen.calls[replay - 1]?.[1], after, after.length - shrinks > 0, after.length],
         [
@@ -809,7 +809,7 @@ describe("runner", () => {
         seen,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         seen.phases,
         ["simplest", "replay", "shrink", "explain", "explain", "explain", "explain"],
@@ -830,13 +830,18 @@ describe("runner", () => {
         seen,
       );
 
-      check.equal(seat, seen.calls.at(-1), ["explain", "passed"], "the step passes");
+      check.isEqualTo(
+        seat,
+        seen.calls.at(-1),
+        ["explain", "passed"],
+        "the step passes",
+      );
     });
 
     it("explains nothing when the explanation is off", async ({ seat }) => {
       const outcome = await ran(aboveMillion, { seed: SEED, explain: false });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.explanation],
         ["counterexample", []],
@@ -848,7 +853,7 @@ describe("runner", () => {
       const seen = new Seen();
       const outcome = await ran(aboveMillion, { seed: SEED, shrink: 0 }, seen);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           seen.calls.at(-1)?.[1],
@@ -869,7 +874,7 @@ describe("runner", () => {
         seen,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [seen.calls, outcome.kind, outcome.token === undefined],
         [[["token", "failed"]], "counterexample", false],
@@ -878,7 +883,7 @@ describe("runner", () => {
     });
 
     it("passes a replay that passes", async ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         (await ran(aboveMillion, { seed: SEED, replay: integers(1n) })).kind,
         "passed",
@@ -887,7 +892,7 @@ describe("runner", () => {
     });
 
     it("returns vacuous for a replay that requests no input", async ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         (
           await ran(
@@ -908,7 +913,7 @@ describe("runner", () => {
         { seed: SEED, examples: [new Values([true])] },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases],
         ["passed", 3],
@@ -924,7 +929,7 @@ describe("runner", () => {
         seen,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           seen.calls,
@@ -956,7 +961,7 @@ describe("runner", () => {
         examples: [integers(MILLION + 5n)],
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           outcome.valued,
@@ -978,7 +983,7 @@ describe("runner", () => {
         ),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         replayed.case.draws[0]?.value,
         MILLION + 1n,
@@ -1003,7 +1008,7 @@ describe("runner", () => {
         ]),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         Object.fromEntries(found),
         { big: 52n, odd: 1n },
@@ -1018,7 +1023,7 @@ describe("runner", () => {
         runStored(aboveMillion, { seed: SEED, stored: [integers(1n), integers(2n)] }),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases, outcome.stored.length],
         ["passed", 2, 2],
@@ -1038,7 +1043,7 @@ describe("runner", () => {
         ),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.stored.length, outcome.token === undefined, seen.phases],
         ["counterexample", 2, false, ["stored", "stored"]],
@@ -1071,7 +1076,7 @@ describe("runner", () => {
       );
       const outcome = await drive(concludeCase(aboveMillion, { seed: SEED }, failing));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases, outcome.failing?.case.draws[0]?.value],
         ["counterexample", 0, MILLION + 1n],

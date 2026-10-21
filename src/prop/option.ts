@@ -20,6 +20,14 @@ const SEED_LIMIT = 2n ** 64n;
 /** The time that shrinking and explaining may take when no option states one, in milliseconds. */
 const DEFAULT_SHRINK_TIME = 30_000;
 
+/**
+ * A wrapper of the runs of a property's body. It calls run once inside an
+ * environment that it chooses, and settles after the promise of run
+ * settles. That promise settles after the body and its cleanups end, and it
+ * never rejects.
+ */
+export type Wrapper = (run: () => Promise<void>) => void | Promise<void>;
+
 /** One setting of a run of forAll, fuzz or a property form. */
 export type Option =
   | { readonly kind: "cases"; readonly value: number }
@@ -36,6 +44,7 @@ export type Option =
   | { readonly kind: "explain"; readonly value: boolean }
   | { readonly kind: "workers"; readonly value: number }
   | { readonly kind: "hermetic" }
+  | { readonly kind: "around"; readonly value: Wrapper }
   | { readonly kind: "draws"; readonly value: string };
 
 /** An option that only a property form takes: the generator of its input, or its examples. */
@@ -49,7 +58,7 @@ export type FormOption = Option | Relaxation | FormOnly;
 
 /**
  * What the options of one run state. A setting that no option states has
- * its default, and seed, replay, store and draws are undefined.
+ * its default, and seed, replay, store, around and draws are undefined.
  */
 export interface Config {
   readonly cases: number;
@@ -62,6 +71,7 @@ export interface Config {
   readonly store: string | undefined;
   readonly explain: boolean;
   readonly hermetic: boolean;
+  readonly around: Wrapper | undefined;
   readonly draws: string | undefined;
 }
 
@@ -90,6 +100,8 @@ function apply(config: Config, option: Option): Config {
       return config;
     case "hermetic":
       return { ...config, hermetic: true };
+    case "around":
+      return { ...config, around: option.value };
     default:
       return { ...config, draws: option.value };
   }
@@ -115,6 +127,7 @@ export function configure(options: readonly Option[]): Config {
     store: undefined,
     explain: true,
     hermetic: false,
+    around: undefined,
     draws: undefined,
   };
   for (const option of options) config = apply(config, option);
@@ -188,7 +201,7 @@ export function replay(token: string): Option {
  * @returns The option.
  * @throws RangeError for a share outside [0, 1].
  */
-export function require(label: string, share: number): Option {
+function requireShare(label: string, share: number): Option {
   if (!(share >= 0 && share <= 1)) {
     throw new RangeError(
       `prop: require(${JSON.stringify(label)}, ${share}) states a share outside [0, 1]`,
@@ -196,6 +209,10 @@ export function require(label: string, share: number): Option {
   }
   return { kind: "require", value: { label, share } };
 }
+
+// A CommonJS module reserves the name require, so the function has a local
+// name of its own.
+export { requireShare as require };
 
 /**
  * Sets the budget of runs of the body that shrinking and explaining every
@@ -295,6 +312,40 @@ export function workers(n: number): Option {
  */
 export function hermetic(): Option {
   return { kind: "hermetic" };
+}
+
+/**
+ * Runs each run of the body inside wrapper. The wrapper calls run once, and
+ * settles after the promise of run settles. That promise settles after the
+ * body and its cleanups end, and it does not reject for a failing case. The
+ * case's verdict comes from the body's records, so the wrapper cannot
+ * change it. Given more than once, the last wrapper applies.
+ *
+ * The wrapper runs the case of draws, each stored case, each generated case,
+ * each shrink candidate, each filling that explains a draw, each case of a
+ * campaign, the case of replay and the case of each fuzz input. The engine's
+ * own work runs outside it, such as the store and the limit of shrinkTime.
+ * run takes no test, so the signal of each case derives from the signal of
+ * the property's seat, as it does without the option.
+ *
+ * A wrapper that returns without a call of run ends the call with a fault.
+ * So does a wrapper that calls run a second time, and the second call runs
+ * nothing. So does a wrapper that throws.
+ *
+ * @param wrapper - The wrapper.
+ * @returns The option.
+ * @example
+ * prop.around(async (run) => {
+ *   vi.useFakeTimers();
+ *   try {
+ *     await run();
+ *   } finally {
+ *     vi.useRealTimers();
+ *   }
+ * });
+ */
+export function around(wrapper: Wrapper): Option {
+  return { kind: "around", value: wrapper };
 }
 
 /**

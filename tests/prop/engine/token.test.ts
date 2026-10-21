@@ -48,23 +48,23 @@ function same(a: readonly Choice[], b: readonly Choice[]): boolean {
 describe("token", () => {
   describe("PREFIX", () => {
     it("starts every token of this version with prop1:", ({ seat }) => {
-      check.equal(seat, PREFIX, "prop1:", "the prefix");
+      check.isEqualTo(seat, PREFIX, "prop1:", "the prefix");
     });
   });
 
   describe("encode", () => {
     it("encodes each kind as a tag with its payload", ({ seat }) => {
-      check.equal(seat, encode(CHOICES), token(BYTES), "the pinned bytes");
+      check.isEqualTo(seat, encode(CHOICES), token(BYTES), "the pinned bytes");
     });
 
     it("encodes no choice to the prefix alone", ({ seat }) => {
-      check.equal(seat, encode([]), PREFIX, "the prefix");
+      check.isEqualTo(seat, encode([]), PREFIX, "the prefix");
     });
 
     it("encodes every NaN with the canonical bits", ({ seat }) => {
       const payload = -Number.NaN;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         encode([{ kind: "float", value: payload }]),
         token("02000000000000f87f"),
@@ -75,7 +75,7 @@ describe("token", () => {
     it("writes base64url without padding", ({ seat }) => {
       const text = encode([LOWEST]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [text.includes("_"), ["+", "/", "="].some((char) => text.includes(char))],
         [true, false],
@@ -110,7 +110,7 @@ describe("token", () => {
     });
 
     it("decodes the largest number from ten bytes", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(token("00ffffffffffffffffff01")),
         [{ kind: "integer", value: UINT64_MAX }],
@@ -119,7 +119,7 @@ describe("token", () => {
     });
 
     it("decodes the most negative integer", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(token("0180808080808080808001")),
         [{ kind: "integer", value: INT64_MIN }],
@@ -130,11 +130,16 @@ describe("token", () => {
     it("keeps the sign of negative zero", ({ seat }) => {
       const [zero] = decode(encode([{ kind: "float", value: -0 }]));
 
-      check.equal(seat, bitsOf(zero?.value as number), bitsOf(-0), "the bits of -0");
+      check.isEqualTo(
+        seat,
+        bitsOf(zero?.value as number),
+        bitsOf(-0),
+        "the bits of -0",
+      );
     });
 
     it("reads an element at or above 2^32 as 2^32 − 1", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(token("03018080808010")),
         [{ kind: "sequence", value: [2 ** 32 - 1] }],
@@ -227,7 +232,7 @@ describe("token", () => {
     ];
     for (const tt of tests) {
       it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => decode(tt.give)),
           tt.want,

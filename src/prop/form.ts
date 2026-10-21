@@ -35,7 +35,7 @@ export const TRIPLE: readonly string[] = ["a", "b", "c"];
 
 /** What a property form states: its operation, its id, whether its assertion takes relaxations, and the labels of the arguments that it generates. */
 export interface Form {
-  /** The operation, which names the form's faults, such as prop.equal. */
+  /** The operation that the form's faults name, such as prop.isEqualTo. */
   readonly op: string;
   /** The form's id, the assertion of its record, such as prop-equal. */
   readonly id: string;

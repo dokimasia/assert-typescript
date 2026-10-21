@@ -32,7 +32,7 @@ const DIGIT = new Integer(new IntegerBounds(0n, 9n));
 describe("literal", () => {
   describe("drawnLiteral", () => {
     it("returns the int of a number that integer drew", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(integer(0, 9), 3),
         { type: "int", value: 3 },
@@ -41,7 +41,7 @@ describe("literal", () => {
     });
 
     it("returns the float of an integral number that float drew", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(float(0, 9), 3),
         { type: "float", value: 3 },
@@ -54,7 +54,7 @@ describe("literal", () => {
     }) => {
       const doubled = integer(0, 9).map((x) => x * 2);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(doubled, 6),
         { type: "int", value: 6 },
@@ -73,7 +73,7 @@ describe("literal", () => {
         },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(refusing, 4n),
         { type: "int", value: 4 },
@@ -86,11 +86,11 @@ describe("literal", () => {
     }) => {
       const even = integer(0, 9).filter((x) => x % 2 === 0);
 
-      check.equal(seat, drawnLiteral(even, 4), { type: "int", value: 4 }, "an int");
+      check.isEqualTo(seat, drawnLiteral(even, 4), { type: "int", value: 4 }, "an int");
     });
 
     it("returns null for an absent optional value", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(optional(boolean()), undefined),
         { type: "null" },
@@ -99,7 +99,7 @@ describe("literal", () => {
     });
 
     it("returns the literal of a present optional value", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(optional(boolean()), true),
         { type: "bool", value: true },
@@ -108,7 +108,7 @@ describe("literal", () => {
     });
 
     it("returns a list of one scalar type", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(list(integer(0, 9)), [1, 2]),
         { type: "list", of: "int", value: [1, 2] },
@@ -119,7 +119,7 @@ describe("literal", () => {
     it("returns a list of item literals for elements that are no scalars", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(list(list(boolean())), [[true]]),
         { type: "list", items: [{ type: "list", of: "bool", value: [true] }] },
@@ -128,7 +128,7 @@ describe("literal", () => {
     });
 
     it("returns an empty list as items", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(list(boolean()), []),
         { type: "list", items: [] },
@@ -151,7 +151,7 @@ describe("literal", () => {
     it("returns the literal of the value's own type for a non-list value of a list's generator", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(list(boolean()), "x"),
         { type: "string", value: "x" },
@@ -166,7 +166,7 @@ describe("literal", () => {
         new Sizes(0, undefined),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(generator, new Pairs([[1n, true]])),
         {
@@ -201,7 +201,7 @@ describe("literal", () => {
     it("returns the literal of a Map of dict through the dict's inverse", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(dict(string(), boolean()), new Map([["a", false]])),
         {
@@ -222,7 +222,7 @@ describe("literal", () => {
     }) => {
       const generator = new Dict(DIGIT, DIGIT, new Sizes(0, undefined));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(generator, 1n),
         { type: "int", value: 1 },
@@ -239,7 +239,7 @@ describe("literal", () => {
         of: { shape: "bool" },
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(shape, new Pairs([["k", true]])),
         {
@@ -264,7 +264,7 @@ describe("literal", () => {
         ],
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(
           shape,
@@ -304,7 +304,7 @@ describe("literal", () => {
     }) => {
       const shape = read({ shape: "record", fields: [["id", { shape: "bool" }]] });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(shape, true),
         { type: "bool", value: true },
@@ -321,7 +321,7 @@ describe("literal", () => {
         ],
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(shape, new Variant("some", 3n)),
         { type: "variant", name: "some", payload: { type: "int", value: 3 } },
@@ -332,7 +332,7 @@ describe("literal", () => {
     it("returns the variant of an enum shape without a payload", ({ seat }) => {
       const shape = read({ shape: "enum", variants: [["none", null]] });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(shape, new Variant("none")),
         { type: "variant", name: "none" },
@@ -357,7 +357,7 @@ describe("literal", () => {
     }) => {
       const shape = read({ shape: "enum", variants: [["none", null]] });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(shape, "none"),
         { type: "string", value: "none" },
@@ -374,7 +374,7 @@ describe("literal", () => {
         definitions: { Tree: { shape: "list", of: { shape: "ref", name: "Tree" } } },
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(shape, [[]]),
         { type: "list", items: [{ type: "list", items: [] }] },
@@ -385,7 +385,7 @@ describe("literal", () => {
     it("returns the int of a 128-bit integer", ({ seat }) => {
       const shape = read({ shape: "int", width: 128, signed: true });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(shape, 2n ** 100n),
         { type: "int", value: String(2n ** 100n) },
@@ -396,7 +396,7 @@ describe("literal", () => {
     it("returns the bytes of a byte string", ({ seat }) => {
       const generator = new Bytes(new SequenceBounds(256, 0, undefined));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(generator, Uint8Array.of(1, 255)),
         { type: "bytes", value: "01ff" },
@@ -407,7 +407,7 @@ describe("literal", () => {
     it("returns the bytes of an IP address", ({ seat }) => {
       const shape = read({ shape: "ip-address" });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(shape, Uint8Array.of(127, 0, 0, 1)),
         { type: "bytes", value: "7f000001" },
@@ -418,7 +418,7 @@ describe("literal", () => {
     it("returns the string of a text generator", ({ seat }) => {
       const generator = new Text(undefined, new SequenceBounds(10, 0, undefined));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(generator, "ab"),
         { type: "string", value: "ab" },
@@ -429,7 +429,7 @@ describe("literal", () => {
     it("returns the literal of the value's own type for a value of another type than its generator's", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(DIGIT, "3"),
         { type: "string", value: "3" },
@@ -450,7 +450,7 @@ describe("literal", () => {
     it("returns the engine's literal of a decoded variant of another generator", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         drawnLiteral(DIGIT, new Variant("v")),
         { type: "variant", name: "v" },

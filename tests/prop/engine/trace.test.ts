@@ -18,10 +18,10 @@ const DIGIT = new Integer(new IntegerBounds(0n, 9n));
 
 /** Returns the fields of the TraceError that fn throws. */
 function refusal(
-  seat: Parameters<typeof check.throws>[0],
+  seat: Parameters<typeof check.doesThrow>[0],
   fn: () => unknown,
 ): unknown[] {
-  const err = check.throws(seat, fn, "the trace is refused") as TraceError;
+  const err = check.doesThrow(seat, fn, "the trace is refused") as TraceError;
   check.errorIs(seat, err, TraceError, "the error is a TraceError");
   return [err.entry, err.what, err.reason];
 }
@@ -29,7 +29,7 @@ function refusal(
 describe("trace", () => {
   describe("isStep", () => {
     it("returns true only for a step entry", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [isStep({ action: "put" }), isStep({ label: "v", value: 1n })],
         [true, false],
@@ -42,7 +42,7 @@ describe("trace", () => {
     it("returns the error of an entry at its position", ({ seat }) => {
       const err = new TraceError(1, "get", "step");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.name, err.message, err.entry, err.what, err.reason],
         ["TraceError", "prop: trace entry 1 (get): step", 1, "get", "step"],
@@ -66,7 +66,7 @@ describe("trace", () => {
       c.draw(DIGIT, "w");
       c.step({ action: "get" });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         entries(c),
         [
@@ -91,7 +91,7 @@ describe("trace", () => {
         ]),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.draw(DIGIT, "x"), c.draw(new Optional(DIGIT), "y"), c.choices],
         [
@@ -110,7 +110,7 @@ describe("trace", () => {
       const c = new Case(new Tracing([{ label: "x", value: 7n }]));
       c.draw(DIGIT, "x");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.draw(new Integer(new IntegerBounds(3n, 9n)), "y"),
         3n,
@@ -123,7 +123,7 @@ describe("trace", () => {
     }) => {
       const c = new Case(new Tracing([{ label: "y", value: 7n }]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         refusal(seat, () => c.draw(DIGIT, "x")),
         [0, "x", "label"],
@@ -134,7 +134,7 @@ describe("trace", () => {
     it("throws a TraceError for a draw where a step entry is next", ({ seat }) => {
       const c = new Case(new Tracing([{ action: "put" }]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         refusal(seat, () => c.draw(DIGIT, "v")),
         [0, "v", "label"],
@@ -153,7 +153,7 @@ describe("trace", () => {
       );
       c.draw(DIGIT, "x");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         refusal(seat, () => c.draw(DIGIT, "x")),
         [1, "x", "value"],
@@ -173,7 +173,7 @@ describe("trace", () => {
 
       check.errorIs(
         seat,
-        check.throws(seat, () => c.draw(broken, "x"), "the map throws"),
+        check.doesThrow(seat, () => c.draw(broken, "x"), "the map throws"),
         TypeError,
         "the map's error",
       );
@@ -184,7 +184,7 @@ describe("trace", () => {
     it("returns the target of a request outside a draw", ({ seat }) => {
       const c = new Case(new Tracing([{ label: "x", value: 7n }]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.integer(new IntegerBounds(2n, 5n)),
         2n,
@@ -199,7 +199,7 @@ describe("trace", () => {
       const c = new Case(trace);
       trace.prepare(0n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.integer(new IntegerBounds(1n, 1n)),
         1n,
@@ -210,7 +210,7 @@ describe("trace", () => {
 
   describe("Tracing.nextStep", () => {
     it("returns the next entry when it is a step entry", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         new Tracing([{ action: "put" }]).nextStep(),
         { action: "put" },
@@ -246,7 +246,7 @@ describe("trace", () => {
       const values = [c.integer(bounds), c.integer(bounds), c.integer(bounds)];
       trace.take();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [before, after, values, trace.nextStep()],
         [
@@ -269,7 +269,7 @@ describe("trace", () => {
         { action: "put" },
       ]);
 
-      check.equal(seat, [...trace.actions()], ["put", "get"], "each action once");
+      check.isEqualTo(seat, [...trace.actions()], ["put", "get"], "each action once");
     });
   });
 
@@ -279,7 +279,7 @@ describe("trace", () => {
       const c = new Case(trace);
       c.draw(DIGIT, "v");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         refusal(seat, () => trace.refuse()),
         [1, "get", "step"],

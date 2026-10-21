@@ -56,7 +56,7 @@ describe("execution", () => {
     it("passes a body that returns", async ({ seat }) => {
       const execution = await run(draws, integers(4n));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [execution.status, execution.case.draws[0]?.value, identityOf(execution)],
         ["passed", 4n, undefined],
@@ -71,7 +71,7 @@ describe("execution", () => {
       }
       const execution = await run(waits);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [execution.status, execution.case.notes],
         ["passed", ["waited for 3"]],
@@ -84,7 +84,7 @@ describe("execution", () => {
     }) => {
       const execution = await run((c) => c.fail("broken", "why"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [execution.status, identityOf(execution), execution.failure?.record],
         ["failed", "broken", "why"],
@@ -98,7 +98,7 @@ describe("execution", () => {
         return undefined;
       });
 
-      check.equal(seat, execution.status, "rejected", "a rejection");
+      check.isEqualTo(seat, execution.status, "rejected", "a rejection");
     });
 
     it("rejects a case past its cap", async ({ seat }) => {
@@ -108,7 +108,7 @@ describe("execution", () => {
         return undefined;
       };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (await run(two, [], undefined, 1)).status,
         "rejected",
@@ -149,7 +149,7 @@ describe("execution", () => {
       const tree = new Tree();
       await run(draws, integers(4n), tree);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (await run(draws, integers(4n), tree)).status,
         "repeated",
@@ -169,7 +169,7 @@ describe("execution", () => {
         tree,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [other.status, other.divergence],
         [
@@ -200,7 +200,7 @@ describe("execution", () => {
         tree,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         other.divergence?.step,
         { part: "sequential", position: 3 },
@@ -213,7 +213,7 @@ describe("execution", () => {
       await run(draws, [], tree);
       const other = await run(() => undefined, [], tree);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [other.status, other.divergence],
         [
@@ -243,7 +243,7 @@ describe("execution", () => {
         tree,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         tree.root.children.get("3")?.ending,
         "rejected",

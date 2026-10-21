@@ -40,7 +40,7 @@ const TINY32 = fromBits32(1n);
 
 describe("choice", () => {
   it("exports the bounds of the signed and the unsigned 64-bit ranges", ({ seat }) => {
-    check.equal(
+    check.isEqualTo(
       seat,
       [INT64_MIN, INT64_MAX, UINT64_MAX],
       [-(2n ** 63n), 2n ** 63n - 1n, 2n ** 64n - 1n],
@@ -50,7 +50,7 @@ describe("choice", () => {
 
   describe("choiceOf", () => {
     it("returns the choice of the kind of the bounds", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         choiceOf(new SequenceBounds(4), [1, 2]),
         { kind: "sequence", value: [1, 2] },
@@ -81,7 +81,12 @@ describe("choice", () => {
     ];
     for (const tt of tests) {
       it(`targets ${tt.name}`, ({ seat }) => {
-        check.equal(seat, new IntegerBounds(...tt.give).target, tt.want, "the target");
+        check.isEqualTo(
+          seat,
+          new IntegerBounds(...tt.give).target,
+          tt.want,
+          "the target",
+        );
       });
     }
 
@@ -91,7 +96,7 @@ describe("choice", () => {
         new IntegerBounds(0n, UINT64_MAX).id,
       ];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         ids,
         [`integer ${INT64_MIN} ${INT64_MAX}`, `integer 0 ${UINT64_MAX}`],
@@ -119,7 +124,7 @@ describe("choice", () => {
       ];
     for (const tt of refusals) {
       it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => new IntegerBounds(...tt.give)),
           tt.want,
@@ -135,7 +140,7 @@ describe("choice", () => {
     }) => {
       const bounds = new IntegerBounds(-2n, 2n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         sortedBy(range(-2n, 2n), (v) => bounds.key(v)),
         [0n, 1n, -1n, 2n, -2n],
@@ -160,7 +165,7 @@ describe("choice", () => {
         return sortedBy(range(lo, hi), (v) => bounds.key(v)).map((v) => bounds.rank(v));
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         got,
         all.map(([lo, hi]) => range(0n, hi - lo)),
@@ -169,7 +174,7 @@ describe("choice", () => {
     });
 
     it("returns the last rank for the largest unsigned value", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         new IntegerBounds(0n, UINT64_MAX).rank(UINT64_MAX),
         UINT64_MAX,
@@ -198,13 +203,13 @@ describe("choice", () => {
         return sortedBy(range(lo, hi), (v) => bounds.key(v));
       });
 
-      check.equal(seat, got, want, "the sorted values");
+      check.isEqualTo(seat, got, want, "the sorted values");
     });
 
     it("continues on the longer side past the end of the shorter one", ({ seat }) => {
       const bounds = new IntegerBounds(-2n, 9n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [4n, 5n, 6n, 7n].map((r) => bounds.atRank(r)),
         [-2n, 3n, 4n, 5n],
@@ -213,7 +218,7 @@ describe("choice", () => {
     });
 
     it("returns the largest unsigned value at the last rank", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         new IntegerBounds(0n, UINT64_MAX).atRank(UINT64_MAX),
         UINT64_MAX,
@@ -230,7 +235,7 @@ describe("choice", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.want} for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           new IntegerBounds(3n, 9n).admits(tt.give),
           tt.want,
@@ -242,7 +247,7 @@ describe("choice", () => {
 
   describe("IntegerBounds.coerce", () => {
     it("returns a recorded integer inside the bounds", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         new IntegerBounds(0n, 9n).coerce({ kind: "integer", value: 4n }),
         4n,
@@ -257,7 +262,12 @@ describe("choice", () => {
     ];
     for (const tt of tests) {
       it(`returns the target for ${tt.name}`, ({ seat }) => {
-        check.equal(seat, new IntegerBounds(3n, 9n).coerce(tt.give), 3n, "the target");
+        check.isEqualTo(
+          seat,
+          new IntegerBounds(3n, 9n).coerce(tt.give),
+          3n,
+          "the target",
+        );
       });
     }
   });
@@ -329,7 +339,7 @@ describe("choice", () => {
     }
 
     it("states its bounds in its id", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         new FloatBounds(-1, 1, true, 32).id,
         "float -1 1 true 32",
@@ -363,7 +373,7 @@ describe("choice", () => {
       it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
         const [lo, hi, width] = tt.give;
 
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => new FloatBounds(lo, hi, false, width as Width)),
           tt.want,
@@ -415,7 +425,7 @@ describe("choice", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.want} for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           new FloatBounds(1, 2, false, 32).admits(tt.give),
           tt.want,
@@ -445,7 +455,7 @@ describe("choice", () => {
     it("returns the canonical NaN for a recorded NaN with a payload", ({ seat }) => {
       const payload = -Number.NaN;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         bitsOf(new FloatBounds(0, 1, true).coerce({ kind: "float", value: payload })),
         NAN_BITS,
@@ -464,7 +474,7 @@ describe("choice", () => {
     ];
     for (const tt of tests) {
       it(`returns the target for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           new FloatBounds(1, 2, false, 32).coerce(tt.give),
           1,
@@ -476,11 +486,16 @@ describe("choice", () => {
 
   describe("new SequenceBounds", () => {
     it("targets minSize zeros", ({ seat }) => {
-      check.equal(seat, new SequenceBounds(256, 3, 8).target, [0, 0, 0], "three zeros");
+      check.isEqualTo(
+        seat,
+        new SequenceBounds(256, 3, 8).target,
+        [0, 0, 0],
+        "three zeros",
+      );
     });
 
     it("states its bounds in its id", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         new SequenceBounds(256, 1).id,
         "sequence 256 1 undefined",
@@ -511,7 +526,7 @@ describe("choice", () => {
     ];
     for (const tt of refusals) {
       it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => new SequenceBounds(...tt.give)),
           tt.want,
@@ -526,7 +541,7 @@ describe("choice", () => {
       const bounds = new SequenceBounds(4);
       const values = [[1, 0], [0, 0], [1], [0, 1]];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         sortedBy(values, (v) => bounds.key(v)),
         [[1], [0, 0], [0, 1], [1, 0]],
@@ -546,7 +561,7 @@ describe("choice", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.want} for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           new SequenceBounds(3, 1, 2).admits(tt.give),
           tt.want,
@@ -584,7 +599,7 @@ describe("choice", () => {
     ];
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           new SequenceBounds(10, 2, 4).coerce({ kind: "sequence", value: tt.give }),
           tt.want,
@@ -594,7 +609,7 @@ describe("choice", () => {
     }
 
     it("keeps every element without a maximum", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         new SequenceBounds(10).coerce({ kind: "sequence", value: [1, 2, 3, 4, 5] }),
         [1, 2, 3, 4, 5],
@@ -603,7 +618,7 @@ describe("choice", () => {
     });
 
     it("returns the target for another kind", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         new SequenceBounds(10, 1).coerce({ kind: "integer", value: 5n }),
         [0],
@@ -673,7 +688,7 @@ describe("choice", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.want} for ${tt.name}`, ({ seat }) => {
-        check.equal(seat, sameChoice(...tt.give), tt.want, "the verdict");
+        check.isEqualTo(seat, sameChoice(...tt.give), tt.want, "the verdict");
       });
     }
   });

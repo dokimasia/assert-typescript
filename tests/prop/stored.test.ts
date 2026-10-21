@@ -12,6 +12,7 @@ import { encode } from "../../src/prop/engine/token.js";
 import { float, integer } from "../../src/prop/generators.js";
 import { keyOf, ofRecord } from "../../src/prop/identity.js";
 import { differs, entryOf } from "../../src/prop/stored.js";
+import { DEFINITION } from "../../src/record/call.js";
 import { test as it } from "../../src/vitest.js";
 
 /** The location of the failure of the executions. */
@@ -43,14 +44,14 @@ describe("stored", () => {
     it("returns the name and the entry of a failing case", ({ seat }) => {
       const execution = failing([int(3n)], ["x", integer(0, 9)]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         entryOf("the total is positive", execution, "2026-10-08"),
         {
           name: name("the total is positive", [int(3n)]),
           entry: {
             store: 1,
-            definition: "8.0.0",
+            definition: DEFINITION,
             property: "the total is positive",
             identity: { assertion: "equal", file: "total.test.ts", line: 9 },
             choices: encode([int(3n)]),
@@ -67,7 +68,7 @@ describe("stored", () => {
     }) => {
       const execution = failing([int(3n)], ["f", integer(0, 9).map(() => () => 1)]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         entryOf("c", execution, "2026-10-08").entry["counterexample"],
         [{ label: "f" }],
@@ -109,7 +110,7 @@ describe("stored", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, differs(tt.give, replayed), tt.want, "the verdict");
+        check.isEqualTo(seat, differs(tt.give, replayed), tt.want, "the verdict");
       });
     }
 

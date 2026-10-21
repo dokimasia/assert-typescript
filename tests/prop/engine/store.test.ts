@@ -69,7 +69,7 @@ function depthOf(node: unknown): number {
 describe("store", () => {
   describe("MAX_DEPTH", () => {
     it("nests a file at most 64 levels deep", ({ seat }) => {
-      check.equal(seat, MAX_DEPTH, 64, "the levels");
+      check.isEqualTo(seat, MAX_DEPTH, 64, "the levels");
     });
   });
 
@@ -81,7 +81,7 @@ describe("store", () => {
         Buffer.from(encode(CHOICES)),
       ]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         name(CONTRACT, CHOICES),
         `${mix(data).toString(16).padStart(16, "0")}.json`,
@@ -90,7 +90,7 @@ describe("store", () => {
     });
 
     it("returns the pinned name of the failure", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         name(CONTRACT, CHOICES),
         "ccc741d57d7f920d.json",
@@ -99,7 +99,7 @@ describe("store", () => {
     });
 
     it("returns another name for another contract", ({ seat }) => {
-      check.notEqual(
+      check.isNotEqualTo(
         seat,
         name("another", CHOICES),
         name(CONTRACT, CHOICES),
@@ -108,7 +108,12 @@ describe("store", () => {
     });
 
     it("pads a small mix to 16 digits", ({ seat }) => {
-      check.matches(seat, name("", []), "^[0-9a-f]{16}\\.json$", "16 lowercase digits");
+      check.doesMatch(
+        seat,
+        name("", []),
+        "^[0-9a-f]{16}\\.json$",
+        "16 lowercase digits",
+      );
     });
   });
 
@@ -116,7 +121,7 @@ describe("store", () => {
     it("states exactly the fields of the format", ({ seat }) => {
       const one = written();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [Object.keys(one).sort(), one["store"], one["found"], one["choices"]],
         [
@@ -144,7 +149,7 @@ describe("store", () => {
         "2026-10-01",
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [depthOf(deep), verdictOf(deep)],
         [MAX_DEPTH, "replay"],
@@ -162,13 +167,18 @@ describe("store", () => {
         "2026-10-01",
       );
 
-      check.equal(seat, deep["counterexample"], [{ label: "v" }], "the label alone");
+      check.isEqualTo(
+        seat,
+        deep["counterexample"],
+        [{ label: "v" }],
+        "the label alone",
+      );
     });
   });
 
   describe("read", () => {
     it("replays the choices of an entry that a runner wrote", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         read(JSON.stringify(written()), CONTRACT),
         { verdict: "replay", choices: CHOICES },
@@ -207,12 +217,12 @@ describe("store", () => {
     ];
     for (const tt of replays) {
       it(`replays ${tt.name}`, ({ seat }) => {
-        check.equal(seat, verdictOf(written(tt.give)), "replay", "a replay");
+        check.isEqualTo(seat, verdictOf(written(tt.give)), "replay", "a replay");
       });
     }
 
     it("returns other for an entry of another property", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         read(JSON.stringify(written({ property: "another" })), CONTRACT),
         { verdict: "other", choices: [] },
@@ -233,7 +243,7 @@ describe("store", () => {
     ];
     for (const tt of skips) {
       it(`skips ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           read(tt.give, CONTRACT),
           { verdict: "skip", choices: [] },
@@ -255,7 +265,7 @@ describe("store", () => {
     ];
     for (const tt of texts) {
       it(`returns damaged for ${tt.name}`, ({ seat }) => {
-        check.equal(seat, read(tt.give, CONTRACT).verdict, "damaged", "damaged");
+        check.isEqualTo(seat, read(tt.give, CONTRACT).verdict, "damaged", "damaged");
       });
     }
 
@@ -264,7 +274,7 @@ describe("store", () => {
         counterexample: [{ label: "v", value: nested(DEEPEST_VALUE + 1) }],
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [depthOf(tooDeep), verdictOf(tooDeep)],
         [MAX_DEPTH + 1, "damaged"],
@@ -281,7 +291,7 @@ describe("store", () => {
     ];
     for (const tt of formats) {
       it(`returns damaged for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           verdictOf(written({ store: tt.give })),
           "damaged",
@@ -370,7 +380,7 @@ describe("store", () => {
     ];
     for (const tt of changes) {
       it(`returns damaged for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           verdictOf(written(tt.give)),
           "damaged",
@@ -383,11 +393,11 @@ describe("store", () => {
       const missing = written();
       delete missing["found"];
 
-      check.equal(seat, verdictOf(missing), "damaged", "no date");
+      check.isEqualTo(seat, verdictOf(missing), "damaged", "no date");
     });
 
     it("returns damaged for an entry with a field outside the format", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         verdictOf(written({ comment: "found in review" })),
         "damaged",
@@ -399,7 +409,7 @@ describe("store", () => {
       await prop.fuzz(seat, "read returns a verdict for any text", (c) => {
         const text = Buffer.from(c.draw(prop.bytes(), "text")).toString("utf8");
 
-        check.contains(
+        check.doesContain(
           c,
           ["replay", "other", "skip", "damaged"],
           read(text, CONTRACT).verdict,

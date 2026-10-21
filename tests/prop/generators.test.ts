@@ -46,11 +46,11 @@ function seq(...value: number[]): Choice {
 describe("generators", () => {
   describe("integer", () => {
     it("returns numbers of bounds stated as numbers", ({ seat }) => {
-      check.equal(seat, decoded(integer(-5, 5), int(-3n)), -3, "a number");
+      check.isEqualTo(seat, decoded(integer(-5, 5), int(-3n)), -3, "a number");
     });
 
     it("returns bigints up to 2^64 - 1 for bounds stated as bigints", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(integer(0n, 2n ** 64n - 1n), int(2n ** 64n - 1n)),
         2n ** 64n - 1n,
@@ -59,7 +59,7 @@ describe("generators", () => {
     });
 
     it("runs a number or a bigint back to one choice", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [invert(integer(0, 9), 3), invert(integer(0, 9), 3n)],
         [[int(3n)], [int(3n)]],
@@ -92,7 +92,7 @@ describe("generators", () => {
       ];
       for (const tt of tests) {
         it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-          check.equal(seat, thrown(tt.give), tt.want, "the refusal");
+          check.isEqualTo(seat, thrown(tt.give), tt.want, "the refusal");
         });
       }
     }
@@ -100,7 +100,7 @@ describe("generators", () => {
 
   describe("float", () => {
     it("returns the float of a choice", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(float(0, 1), { kind: "float", value: 0.5 }),
         0.5,
@@ -122,7 +122,7 @@ describe("generators", () => {
     });
 
     it("throws a RangeError for bounds of no float", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => float(2, 1)),
         "prop: float(2, 1) states no value: float bounds [2, 1] are empty",
@@ -131,7 +131,7 @@ describe("generators", () => {
     });
 
     it("throws a RangeError for a bound that is no value of the width", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => float(0.1, 1, { width: 32 })),
         "prop: float(0.1, 1) states no value: float bound 0.1 is no value of width 32",
@@ -142,7 +142,7 @@ describe("generators", () => {
 
   describe("boolean", () => {
     it("returns the boolean of a choice of 0 or 1", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [decoded(boolean(), int(0n)), decoded(boolean(), int(1n))],
         [false, true],
@@ -155,7 +155,7 @@ describe("generators", () => {
     });
 
     it("throws a RangeError for a probability above 1", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => boolean({ p: [3n, 2n] })),
         "prop: boolean({ p: [3, 2] }) states no probability",
@@ -168,7 +168,7 @@ describe("generators", () => {
     it("returns the value without a choice", ({ seat }) => {
       const c = new Case(new Replaying([]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.draw(just("x"), "v"), c.choices.length],
         ["x", 0],
@@ -179,7 +179,7 @@ describe("generators", () => {
 
   describe("sampledFrom", () => {
     it("returns the value of an index", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(sampledFrom("a", "b", "c"), int(2n)),
         "c",
@@ -188,7 +188,7 @@ describe("generators", () => {
     });
 
     it("throws a RangeError for no value", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => sampledFrom()),
         "prop: sampledFrom() states no value",
@@ -199,7 +199,7 @@ describe("generators", () => {
 
   describe("oneOf", () => {
     it("returns a value of the generator of an index", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(oneOf(just(10), integer(0, 9)), int(1n), int(4n)),
         4,
@@ -208,7 +208,7 @@ describe("generators", () => {
     });
 
     it("throws a RangeError for no generator", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => oneOf()),
         "prop: oneOf() states no generator",
@@ -219,7 +219,7 @@ describe("generators", () => {
 
   describe("optional", () => {
     it("returns undefined only for an absent value", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decoded(optional(integer(0, 9)), int(0n)),
@@ -233,7 +233,7 @@ describe("generators", () => {
 
   describe("list", () => {
     it("returns the elements of the continue choices", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(list(integer(0, 9)), int(1n), int(4n), int(1n), int(5n), int(0n)),
         [4, 5],
@@ -242,7 +242,7 @@ describe("generators", () => {
     });
 
     it("discards an element equal to an earlier one of a unique list", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(
           list(integer(0, 9), { unique: true }),
@@ -277,7 +277,7 @@ describe("generators", () => {
       ];
       for (const tt of tests) {
         it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-          check.equal(
+          check.isEqualTo(
             seat,
             thrown(() => list(integer(0, 9), tt.give)),
             tt.want,
@@ -290,7 +290,7 @@ describe("generators", () => {
 
   describe("dict", () => {
     it("returns a Map of the entries", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(dict(integer(0, 9), boolean()), int(1n), int(3n), int(1n), int(0n)),
         new Map([[3, true]]),
@@ -301,7 +301,7 @@ describe("generators", () => {
     it("runs a Map or the engine's entries back to choices", ({ seat }) => {
       const generator = dict(integer(0, 9), boolean(), { maxSize: 1 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         invert(generator, new Map([[3, true]])),
         invert(generator, new Pairs([[3n, true]])),
@@ -310,7 +310,7 @@ describe("generators", () => {
     });
 
     it("throws a RangeError for sizes that admit no length", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => dict(integer(0, 9), boolean(), { minSize: 3, maxSize: 2 })),
         "prop: dict states the sizes [3, 2], which admit no length",
@@ -323,11 +323,16 @@ describe("generators", () => {
     it("returns the characters of the default alphabet with the digits first", ({
       seat,
     }) => {
-      check.equal(seat, decoded(string(), seq(0, 1, 10)), "01a", "three characters");
+      check.isEqualTo(
+        seat,
+        decoded(string(), seq(0, 1, 10)),
+        "01a",
+        "three characters",
+      );
     });
 
     it("returns the characters of a stated alphabet", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(string({ alphabet: "xy" }), seq(1, 0)),
         "yx",
@@ -355,7 +360,7 @@ describe("generators", () => {
       ];
       for (const tt of tests) {
         it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-          check.equal(
+          check.isEqualTo(
             seat,
             thrown(() => string({ alphabet: tt.give })),
             tt.want,
@@ -366,7 +371,7 @@ describe("generators", () => {
     }
 
     it("throws a RangeError for sizes that admit no length", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => string({ maxSize: -1 })),
         "prop: string states the sizes [0, -1], which admit no length",
@@ -377,7 +382,7 @@ describe("generators", () => {
 
   describe("bytes", () => {
     it("returns the bytes of a sequence", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(bytes(), seq(1, 255)),
         Uint8Array.of(1, 255),
@@ -386,7 +391,7 @@ describe("generators", () => {
     });
 
     it("throws a RangeError for sizes that admit no length", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => bytes({ minSize: 0.5 })),
         "prop: bytes states the sizes [0.5, undefined], which admit no length",
@@ -400,7 +405,7 @@ describe("generators", () => {
     const hi = Temporal.Duration.from("P2D");
 
     it("returns a duration of nanoseconds balanced from the hours down", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(duration(lo, hi), int(90_000_000_000_000n)).toString(),
         "PT25H",
@@ -409,7 +414,7 @@ describe("generators", () => {
     });
 
     it("runs a duration or its nanoseconds back to one choice", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           invert(duration(lo, hi), Temporal.Duration.from("PT1H")),
@@ -440,7 +445,7 @@ describe("generators", () => {
       ];
       for (const tt of tests) {
         it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-          check.equal(seat, thrown(tt.give), tt.want, "the refusal");
+          check.isEqualTo(seat, thrown(tt.give), tt.want, "the refusal");
         });
       }
     }
@@ -448,7 +453,7 @@ describe("generators", () => {
 
   describe("permutation", () => {
     it("returns the values in their order for the target swaps", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(permutation("a", "b", "c"), int(0n), int(1n)),
         ["a", "b", "c"],
@@ -459,7 +464,7 @@ describe("generators", () => {
 
   describe("stringMatching", () => {
     it("returns a string that the pattern matches", ({ seat }) => {
-      check.equal(seat, decoded(stringMatching("ab")), "ab", "the literal pattern");
+      check.isEqualTo(seat, decoded(stringMatching("ab")), "ab", "the literal pattern");
     });
 
     it("throws a RangeError for a pattern outside the portable subset", ({ seat }) => {
@@ -476,11 +481,11 @@ describe("generators", () => {
     it("returns the base's value at a position that takes the base", ({ seat }) => {
       const generator = recursive<unknown>(integer(0, 9), (self) => list(self));
 
-      check.equal(seat, decoded(generator, int(0n), int(6n)), 6, "a leaf");
+      check.isEqualTo(seat, decoded(generator, int(0n), int(6n)), 6, "a leaf");
     });
 
     it("throws a RangeError for a maxLeaves below 1", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => recursive(integer(0, 9), (self) => self, { maxLeaves: 0 })),
         "prop: recursive({ maxLeaves: 0 }) states no count of 1 or more",
@@ -496,7 +501,7 @@ describe("generators", () => {
         c.draw(integer(0, 9), "b"),
       ]);
 
-      check.equal(seat, decoded(pair, int(1n), int(2n)), [1, 2], "two draws");
+      check.isEqualTo(seat, decoded(pair, int(1n), int(2n)), [1, 2], "two draws");
     });
   });
 });

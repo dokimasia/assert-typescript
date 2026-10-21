@@ -23,7 +23,7 @@ const FALLBACK = { file: "/work/tests/call.test.ts", line: 3 };
 describe("identity", () => {
   describe("ofRecord", () => {
     it("identifies an assertion's record without its contract", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         ofRecord(new Failure("equal", "the total", {}, WHERE)),
         { assertion: "equal", contract: undefined, where: WHERE },
@@ -32,7 +32,7 @@ describe("identity", () => {
     });
 
     it("identifies a record without a location by its contract", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         ofRecord(new Failure("equal", "the total", {})),
         { assertion: "equal", contract: "the total", where: undefined },
@@ -41,7 +41,7 @@ describe("identity", () => {
     });
 
     it("returns the location alone of a message", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         ofRecord(new Failure("", "it broke", {}, WHERE)),
         { assertion: undefined, contract: undefined, where: WHERE },
@@ -56,7 +56,7 @@ describe("identity", () => {
     }) => {
       const identity = ofError(new TypeError("bad"), FALLBACK);
 
-      check.equal(seat, identity.error, "TypeError", "the class of the error");
+      check.isEqualTo(seat, identity.error, "TypeError", "the class of the error");
       check.hasSuffix(
         seat,
         identity.where?.file,
@@ -71,7 +71,7 @@ describe("identity", () => {
       const err = new Error("bad");
       err.stack = "Error: bad\n    at node:internal/main:1:1";
 
-      check.equal(
+      check.isEqualTo(
         seat,
         ofError(err, FALLBACK),
         { error: "Error", where: FALLBACK },
@@ -96,7 +96,7 @@ describe("identity", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name} as the type of a raised value`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           ofError(tt.give, FALLBACK),
           { error: tt.want, where: FALLBACK },
@@ -111,14 +111,14 @@ describe("identity", () => {
       const a: Identity = { assertion: "equal", where: { ...WHERE } };
       const b: Identity = { assertion: "equal", where: { ...WHERE } };
 
-      check.equal(seat, keyOf(a), keyOf(b), "equal identities share a text");
+      check.isEqualTo(seat, keyOf(a), keyOf(b), "equal identities share a text");
     });
 
     it("returns two texts for identities of two lines", ({ seat }) => {
       const a: Identity = { assertion: "equal", where: WHERE };
       const b: Identity = { assertion: "equal", where: { ...WHERE, line: 13 } };
 
-      check.notEqual(seat, keyOf(a), keyOf(b), "the line is part of the identity");
+      check.isNotEqualTo(seat, keyOf(a), keyOf(b), "the line is part of the identity");
     });
   });
 
@@ -131,7 +131,12 @@ describe("identity", () => {
         where: WHERE,
       };
 
-      check.equal(seat, fromKey(keyOf(identity)), identity, "the identity comes back");
+      check.isEqualTo(
+        seat,
+        fromKey(keyOf(identity)),
+        identity,
+        "the identity comes back",
+      );
     });
 
     it("returns the identity of a record without a location", ({ seat }) => {
@@ -142,7 +147,12 @@ describe("identity", () => {
         where: undefined,
       };
 
-      check.equal(seat, fromKey(keyOf(identity)), identity, "the identity comes back");
+      check.isEqualTo(
+        seat,
+        fromKey(keyOf(identity)),
+        identity,
+        "the identity comes back",
+      );
     });
   });
 
@@ -172,7 +182,7 @@ describe("identity", () => {
     ];
     for (const tt of tests) {
       it(`returns the text of ${tt.name}`, ({ seat }) => {
-        check.equal(seat, textOf(tt.give), tt.want, "the text");
+        check.isEqualTo(seat, textOf(tt.give), tt.want, "the text");
       });
     }
   });
@@ -202,7 +212,7 @@ describe("identity", () => {
     ];
     for (const tt of tests) {
       it(`returns the entry's identity of ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           entryOf(tt.give),
           tt.want,

@@ -106,7 +106,7 @@ describe("campaign", () => {
     it("runs cases until its budget has passed", async ({ seat }) => {
       const [outcome, calls] = await explored(plain, ticks(25));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases, calls.length],
         ["passed", 25, 25],
@@ -122,13 +122,13 @@ describe("campaign", () => {
         WIDE[DECODE](new Case(new Generating(caseSource(SEED, BigInt(i))))),
       );
 
-      check.equal(seat, firsts(calls), want, "the random cases of seed 7");
+      check.isEqualTo(seat, firsts(calls), want, "the random cases of seed 7");
     });
 
     it("measures its budget on the platform clock by default", async ({ seat }) => {
       const [outcome, calls] = await explored(plain, { seed: SEED, budget: 0 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, calls.length],
         ["vacuous", 0],
@@ -146,7 +146,7 @@ describe("campaign", () => {
       });
       const [outcome, calls] = await explored(labelled, ticks(400));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, repeatedShare(firsts(calls)) > 0.3],
         ["passed", true],
@@ -200,7 +200,7 @@ describe("campaign", () => {
       });
       const [outcome] = await explored(mixed, ticks(2000));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases, outcome.rejected],
         ["passed", 2000, 0],
@@ -218,7 +218,7 @@ describe("campaign", () => {
         }),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [calls.map(([phase]) => phase), outcome.stored.length, outcome.cases],
         [["example", "example", "example", "stored", "random", "random"], 1, 6],
@@ -237,7 +237,7 @@ describe("campaign", () => {
         ticks(100, { concluded: (one) => concluded.push(one) }),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           outcome.kind,
@@ -271,7 +271,7 @@ describe("campaign", () => {
         (execution) => execution?.failure?.identity,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [new Set(identities).size === identities.length, [...reported].sort()],
         [true, ["high m", "high n", "zero n"]],
@@ -290,7 +290,7 @@ describe("campaign", () => {
         ticks(10, { stored: [integers(5n)] }),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.divergence?.what, outcome.stored.length],
         ["flaky", "verdict", 1],
@@ -309,7 +309,7 @@ describe("campaign", () => {
         ticks(10),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.cases],
         ["flaky", 2],
@@ -325,7 +325,7 @@ describe("campaign", () => {
         ticks(5, { examples: [new Values([HIGH + 9n])] }),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.valued, outcome.failing?.case.draws[0]?.value],
         ["counterexample", true, HIGH + 9n],
@@ -342,7 +342,7 @@ describe("campaign", () => {
         ticks(5),
       );
 
-      check.equal(seat, outcome.kind, "rejected", "every case rejected");
+      check.isEqualTo(seat, outcome.kind, "rejected", "every case rejected");
     });
 
     it("returns coverage-unmet for a label that no case counted", async ({ seat }) => {
@@ -351,7 +351,7 @@ describe("campaign", () => {
         ticks(5, { requirements: [{ label: "never", share: 0.5 }] }),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [outcome.kind, outcome.shortfall?.requirement.label],
         ["coverage-unmet", "never"],
@@ -369,7 +369,7 @@ describe("campaign", () => {
         ticks(50, { requirements: [{ label: "always", share: 0.5 }] }),
       );
 
-      check.equal(seat, outcome.kind, "passed", "every case counts the label");
+      check.isEqualTo(seat, outcome.kind, "passed", "every case counts the label");
     });
 
     it("throws a RangeError for settings of no case", async ({ seat }) => {

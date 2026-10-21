@@ -7,7 +7,16 @@
  * The list's order is the definition's: UTC first, so a zone shrinks to UTC.
  */
 
-import table from "../../conformance/spec/zones.json" with { type: "json" };
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { directoryOf } from "../../failure.js";
+
+/** The zone table of the vendored definition, which the build copies beside this module's directory. */
+const table = JSON.parse(
+  readFileSync(join(directoryOf(), "../../conformance/spec/zones.json"), "utf8"),
+) as {
+  readonly zones: readonly { name: string; changes: [number, number, number][] }[];
+};
 
 /** One offset change: its first second, and the offsets before and after it, in seconds east of UTC. */
 export interface Change {

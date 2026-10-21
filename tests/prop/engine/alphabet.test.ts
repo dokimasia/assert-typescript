@@ -21,7 +21,7 @@ const AFTER_SURROGATES = DEL + (0xd7ff - 0x7f + 1);
 describe("alphabet", () => {
   describe("SIZE", () => {
     it("counts every Unicode scalar value", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         SIZE,
         0x110000 - 0x800,
@@ -54,12 +54,12 @@ describe("alphabet", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, character(tt.give), tt.want, "the character");
+        check.isEqualTo(seat, character(tt.give), tt.want, "the character");
       });
     }
 
     it("throws a RangeError for an index below 0", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => character(-1)),
         "prop: index -1 is outside the default alphabet",
@@ -68,7 +68,7 @@ describe("alphabet", () => {
     });
 
     it("throws a RangeError for an index of SIZE", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => character(SIZE)),
         `prop: index ${SIZE} is outside the default alphabet`,
@@ -81,7 +81,7 @@ describe("alphabet", () => {
     it("returns the index of every character that character returns", ({ seat }) => {
       const sample = [0, 9, 61, 94, 95, 126, DEL, 55_000, AFTER_SURROGATES, SIZE - 1];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         sample.map((index) => indexOf(character(index))),
         sample,
@@ -96,13 +96,13 @@ describe("alphabet", () => {
 
   describe("indices", () => {
     it("returns one interval for the digits", ({ seat }) => {
-      check.equal(seat, indices(0x30, 0x39), [[0, 9]], "the digits");
+      check.isEqualTo(seat, indices(0x30, 0x39), [[0, 9]], "the digits");
     });
 
     it("returns the indices of a range across the printable characters and the controls", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         indices(0x1e, 0x21),
         [
@@ -114,7 +114,7 @@ describe("alphabet", () => {
     });
 
     it("leaves the surrogates out", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         indices(0xd7ff, 0xe000),
         [[AFTER_SURROGATES - 1, AFTER_SURROGATES]],
@@ -129,7 +129,7 @@ describe("alphabet", () => {
 
   describe("merge", () => {
     it("returns the sorted union of overlapping and touching intervals", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         merge([
           [10, 12],
@@ -147,7 +147,7 @@ describe("alphabet", () => {
     });
 
     it("keeps intervals apart that neither overlap nor touch", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         merge([
           [5, 6],

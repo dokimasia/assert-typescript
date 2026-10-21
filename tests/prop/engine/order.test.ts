@@ -13,7 +13,7 @@ import { test as it } from "../../../src/vitest.js";
 describe("order", () => {
   describe("choiceKey", () => {
     it("returns the rank of integers before the key of an integer", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         choiceKey(new IntegerBounds(-5n, 5n), -2n),
         [0n, 2n, 1n],
@@ -22,7 +22,7 @@ describe("order", () => {
     });
 
     it("returns the rank of floats before the key of a float", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         choiceKey(new FloatBounds(0, 1), 0.5),
         [1n, 1n, 1n, 1n, 0n],
@@ -31,7 +31,7 @@ describe("order", () => {
     });
 
     it("returns the key of a sequence with the rank of sequences first", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         choiceKey(new SequenceBounds(4), [3, 1]),
         [2n, 2, 3, 1],
@@ -86,7 +86,7 @@ describe("order", () => {
       it(`returns ${tt.name}`, ({ seat }) => {
         const [a, b] = tt.give as [bigint[][], bigint[][]];
 
-        check.equal(seat, Math.sign(compareSequences(a, b)), tt.want, "the order");
+        check.isEqualTo(seat, Math.sign(compareSequences(a, b)), tt.want, "the order");
       });
     }
   });

@@ -96,7 +96,7 @@ describe("case", () => {
       });
       const { failure, identity } = recordOf(thrown);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [failure.assertion, failure.contract, after],
         ["", "it broke", false],
@@ -115,7 +115,7 @@ describe("case", () => {
     }) => {
       const { c } = caseOn({ site: SITE, pinned: true });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recordOf(await ending(c, (one) => one.fail("it broke"))).failure.where,
         SITE,
@@ -134,7 +134,7 @@ describe("case", () => {
         after = true;
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recordOf(thrown).failure.contract, after],
         ["first", true],
@@ -147,7 +147,7 @@ describe("case", () => {
     }) => {
       const { c } = caseOn({ site: SITE, pinned: true });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recordOf(await ending(c, (one) => one.record("x"))).failure.where,
         SITE,
@@ -164,7 +164,7 @@ describe("case", () => {
         await Promise.resolve();
       });
 
-      check.equal(seat, recordOf(thrown).failure.where, SITE, "the call site");
+      check.isEqualTo(seat, recordOf(thrown).failure.where, SITE, "the call site");
     });
   });
 
@@ -183,7 +183,7 @@ describe("case", () => {
         after = true;
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recordOf(thrown).failure, after],
         [record, false],
@@ -200,7 +200,7 @@ describe("case", () => {
         after = true;
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recordOf(thrown).failure, after],
         [record, true],
@@ -220,7 +220,7 @@ describe("case", () => {
       );
       const { failure } = recordOf(await ending(c, (one) => one.report(record, true)));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [failure.assertion, failure.contract, failure.detail, failure.where],
         ["equal", "c", { want: 1 }, SITE],
@@ -253,7 +253,7 @@ describe("case", () => {
         drawn = one.draw(integer(0, 9), "x");
       });
 
-      check.equal(seat, [drawn, engine.draws[0]?.label], [7, "x"], "the draw");
+      check.isEqualTo(seat, [drawn, engine.draws[0]?.label], [7, "x"], "the draw");
     });
 
     it("raises the signal of a draw again at every later call", async ({ seat }) => {
@@ -291,7 +291,7 @@ describe("case", () => {
       });
       const thrown = await ending(c, (one) => one.draw(broken, "x"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recordOf(thrown).failure.contract,
         "the map refuses",
@@ -323,7 +323,7 @@ describe("case", () => {
       const { c, engine } = caseOn();
       await ending(c, (one) => one.classify("even"));
 
-      check.equal(seat, [...engine.labels], ["even"], "the label");
+      check.isEqualTo(seat, [...engine.labels], ["even"], "the label");
     });
   });
 
@@ -332,7 +332,7 @@ describe("case", () => {
       const { c, engine } = caseOn();
       await ending(c, (one) => one.note("saw 7"));
 
-      check.equal(seat, engine.notes, ["saw 7"], "the note");
+      check.isEqualTo(seat, engine.notes, ["saw 7"], "the note");
     });
   });
 
@@ -347,7 +347,7 @@ describe("case", () => {
         values = [next(), next()];
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [values, engine.choices.length],
         [[5n, 2n ** 64n - 1n], 2],
@@ -373,7 +373,7 @@ describe("case", () => {
       const { c, engine } = caseOn();
       await ending(c, (one) => one.observe(42n));
 
-      check.equal(seat, engine.fingerprints, [42n], "the fingerprint");
+      check.isEqualTo(seat, engine.fingerprints, [42n], "the fingerprint");
     });
   });
 
@@ -385,7 +385,7 @@ describe("case", () => {
         histories = [one.history(), one.history()];
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [histories[0] === histories[1], histories[0]?.events()],
         [true, []],
@@ -421,7 +421,12 @@ describe("case", () => {
         one.target("depth", 2);
       });
 
-      check.equal(seat, engine.targets, new Map([["depth", 3]]), "the higher score");
+      check.isEqualTo(
+        seat,
+        engine.targets,
+        new Map([["depth", 3]]),
+        "the higher score",
+      );
     });
   });
 
@@ -442,7 +447,7 @@ describe("case", () => {
         order.push("body");
       });
 
-      check.equal(seat, order, ["body", "second", "first"], "the order");
+      check.isEqualTo(seat, order, ["body", "second", "first"], "the order");
     });
 
     it("runs a cleanup that a cleanup registers before the case ends", async ({
@@ -459,7 +464,7 @@ describe("case", () => {
         });
       });
 
-      check.equal(seat, order, ["outer", "inner"], "the nested cleanup runs");
+      check.isEqualTo(seat, order, ["outer", "inner"], "the nested cleanup runs");
     });
 
     it("runs the remaining cleanups after a cleanup that fails the case", async ({
@@ -476,7 +481,7 @@ describe("case", () => {
         });
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recordOf(thrown).failure.contract, ran],
         ["the cleanup broke", true],
@@ -509,7 +514,7 @@ describe("case", () => {
     }) => {
       const c = caseOf(new Engine(new Replaying([])));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (await ending(c, (one) => one.fail("x"))) instanceof Failed,
         true,
@@ -527,15 +532,15 @@ describe("case", () => {
 
     it("throws the signal that ended the case", ({ seat }) => {
       const { c } = caseOn();
-      check.throws(seat, () => c.assume(false), "the case is rejected");
-      const err = check.throws(seat, () => onEngine(c, () => 1), "the signal again");
+      check.doesThrow(seat, () => c.assume(false), "the case is rejected");
+      const err = check.doesThrow(seat, () => onEngine(c, () => 1), "the signal again");
 
       check.errorIs(seat, err, Rejected, "the rejection");
     });
 
     it("ends the case with a signal that fn throws", ({ seat }) => {
       const { c } = caseOn();
-      check.throws(
+      check.doesThrow(
         seat,
         () =>
           onEngine(c, () => {
@@ -543,14 +548,14 @@ describe("case", () => {
           }),
         "the signal passes",
       );
-      const err = check.throws(seat, () => c.note("later"), "the signal again");
+      const err = check.doesThrow(seat, () => c.note("later"), "the signal again");
 
       check.errorIs(seat, err, Rejected, "the rejection");
     });
 
     it("leaves the case running after an error that is no signal", ({ seat }) => {
       const { c } = caseOn();
-      check.throws(
+      check.doesThrow(
         seat,
         () =>
           onEngine(c, () => {
@@ -580,7 +585,7 @@ describe("case", () => {
         }),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [failure.assertion, failure.contract, failure.detail["error"], identity.error],
         ["", "bad input", "TypeError", "TypeError"],
@@ -598,7 +603,7 @@ describe("case", () => {
       const { c } = caseOn();
       const thrown = await ending(c, () => Promise.reject(new RangeError("late")));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recordOf(thrown).failure.contract,
         "late",
@@ -616,7 +621,7 @@ describe("case", () => {
         }),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [failure.contract, failure.detail, identity],
         ["a string", { error: "string", stack: "" }, { error: "string", where: SITE }],
@@ -633,7 +638,7 @@ describe("case", () => {
         one.assume(false);
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recordOf(thrown).failure.contract,
         "first",

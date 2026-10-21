@@ -4,6 +4,7 @@ import { describe } from "vitest";
 import { check } from "../../src/index.js";
 import { integer } from "../../src/prop/generators.js";
 import {
+  around,
   cases,
   configure,
   draws,
@@ -24,10 +25,13 @@ import {
 import { test as it } from "../../src/vitest.js";
 import { thrown } from "../helpers.js";
 
+/** A wrapper that runs the body without an environment. */
+const PLAIN = (run: () => Promise<void>): Promise<void> => run();
+
 describe("option", () => {
   describe("cases", () => {
     it("returns the option of the number of valid cases", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         cases(5),
         { kind: "cases", value: 5 },
@@ -36,7 +40,7 @@ describe("option", () => {
     });
 
     it("throws a RangeError for a number below 1", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => cases(0)),
         "prop: cases(0) states no whole number of 1 or more",
@@ -45,7 +49,7 @@ describe("option", () => {
     });
 
     it("throws a RangeError for a number that is no whole number", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => cases(1.5)),
         "prop: cases(1.5) states no whole number of 1 or more",
@@ -56,7 +60,7 @@ describe("option", () => {
 
   describe("seed", () => {
     it("returns the option of a seed stated as a bigint", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         seed(2n ** 64n - 1n),
         { kind: "seed", value: 2n ** 64n - 1n },
@@ -65,11 +69,11 @@ describe("option", () => {
     });
 
     it("returns the option of a seed stated as a safe integer", ({ seat }) => {
-      check.equal(seat, seed(7), { kind: "seed", value: 7n }, "the seed 7");
+      check.isEqualTo(seat, seed(7), { kind: "seed", value: 7n }, "the seed 7");
     });
 
     it("throws a RangeError for a seed of 2^64", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => seed(2n ** 64n)),
         "prop: seed(18446744073709551616) states no integer in [0, 2^64)",
@@ -78,7 +82,7 @@ describe("option", () => {
     });
 
     it("throws a RangeError for a negative seed", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => seed(-1n)),
         "prop: seed(-1) states no integer in [0, 2^64)",
@@ -87,7 +91,7 @@ describe("option", () => {
     });
 
     it("throws a RangeError for a number that is no safe integer", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => seed(0.5)),
         "prop: seed(0.5) states no integer in [0, 2^64)",
@@ -98,7 +102,7 @@ describe("option", () => {
 
   describe("replay", () => {
     it("returns the option of the token to replay", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         replay("prop1:AA"),
         { kind: "replay", value: "prop1:AA" },
@@ -109,7 +113,7 @@ describe("option", () => {
 
   describe("require", () => {
     it("returns the option of a coverage requirement", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         require("even", 0.25),
         { kind: "require", value: { label: "even", share: 0.25 } },
@@ -118,7 +122,7 @@ describe("option", () => {
     });
 
     it("throws a RangeError for a share above 1", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => require("even", 1.5)),
         'prop: require("even", 1.5) states a share outside [0, 1]',
@@ -127,7 +131,7 @@ describe("option", () => {
     });
 
     it("throws a RangeError for a share of NaN", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => require("even", Number.NaN)),
         'prop: require("even", NaN) states a share outside [0, 1]',
@@ -138,11 +142,11 @@ describe("option", () => {
 
   describe("shrink", () => {
     it("returns an option of a budget of 0 that turns shrinking off", ({ seat }) => {
-      check.equal(seat, shrink(0), { kind: "shrink", value: 0 }, "the budget 0");
+      check.isEqualTo(seat, shrink(0), { kind: "shrink", value: 0 }, "the budget 0");
     });
 
     it("throws a RangeError for a negative budget", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => shrink(-1)),
         "prop: shrink(-1) states no whole number of 0 or more",
@@ -153,11 +157,16 @@ describe("option", () => {
 
   describe("shrinkTime", () => {
     it("returns the option of the time that shrinking may take", ({ seat }) => {
-      check.equal(seat, shrinkTime(250), { kind: "shrink-time", value: 250 }, "250 ms");
+      check.isEqualTo(
+        seat,
+        shrinkTime(250),
+        { kind: "shrink-time", value: 250 },
+        "250 ms",
+      );
     });
 
     it("throws a RangeError for a negative time", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => shrinkTime(-1)),
         "prop: shrinkTime(-1) states no time of 0 or more",
@@ -166,7 +175,7 @@ describe("option", () => {
     });
 
     it("throws a RangeError for an infinite time", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => shrinkTime(Number.POSITIVE_INFINITY)),
         "prop: shrinkTime(Infinity) states no time of 0 or more",
@@ -177,7 +186,7 @@ describe("option", () => {
 
   describe("maxChoices", () => {
     it("returns the option of the cap on choices", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         maxChoices(64),
         { kind: "max-choices", value: 64 },
@@ -186,7 +195,7 @@ describe("option", () => {
     });
 
     it("throws a RangeError for a cap below 1", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => maxChoices(0)),
         "prop: maxChoices(0) states no whole number of 1 or more",
@@ -197,13 +206,18 @@ describe("option", () => {
 
   describe("store", () => {
     it("returns the option of the store's directory", ({ seat }) => {
-      check.equal(seat, store(""), { kind: "store", value: "" }, "the empty directory");
+      check.isEqualTo(
+        seat,
+        store(""),
+        { kind: "store", value: "" },
+        "the empty directory",
+      );
     });
   });
 
   describe("explain", () => {
     it("returns the option that turns the explanation off", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         explain(false),
         { kind: "explain", value: false },
@@ -214,11 +228,11 @@ describe("option", () => {
 
   describe("workers", () => {
     it("returns the option of the number of workers", ({ seat }) => {
-      check.equal(seat, workers(4), { kind: "workers", value: 4 }, "four workers");
+      check.isEqualTo(seat, workers(4), { kind: "workers", value: 4 }, "four workers");
     });
 
     it("throws a RangeError for a number below 1", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => workers(0)),
         "prop: workers(0) states no whole number of 1 or more",
@@ -229,13 +243,24 @@ describe("option", () => {
 
   describe("hermetic", () => {
     it("returns the option that reads none of the variables", ({ seat }) => {
-      check.equal(seat, hermetic(), { kind: "hermetic" }, "the hermetic option");
+      check.isEqualTo(seat, hermetic(), { kind: "hermetic" }, "the hermetic option");
+    });
+  });
+
+  describe("around", () => {
+    it("returns the option of the wrapper of each run", ({ seat }) => {
+      check.isEqualTo(
+        seat,
+        around(PLAIN),
+        { kind: "around", value: PLAIN },
+        "the wrapper",
+      );
     });
   });
 
   describe("draws", () => {
     it("returns the option of the entries of a case", ({ seat }) => {
-      check.equal(seat, draws("[]"), { kind: "draws", value: "[]" }, "no entry");
+      check.isEqualTo(seat, draws("[]"), { kind: "draws", value: "[]" }, "no entry");
     });
   });
 
@@ -243,7 +268,7 @@ describe("option", () => {
     it("returns the option of the generator of a form's input", ({ seat }) => {
       const generator = integer(0, 9);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         using(generator),
         { kind: "using", value: generator },
@@ -254,7 +279,7 @@ describe("option", () => {
 
   describe("example", () => {
     it("returns the option of the values of one case", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         example(1, 2),
         { kind: "example", value: [1, 2] },
@@ -265,7 +290,7 @@ describe("option", () => {
 
   describe("examples", () => {
     it("returns the option of one case per value", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         examples(1, 2),
         { kind: "examples", value: [1, 2] },
@@ -276,7 +301,7 @@ describe("option", () => {
 
   describe("configure", () => {
     it("returns the defaults for no option", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         configure([]),
         {
@@ -290,6 +315,7 @@ describe("option", () => {
           store: undefined,
           explain: true,
           hermetic: false,
+          around: undefined,
           draws: undefined,
         },
         "the defaults",
@@ -297,7 +323,7 @@ describe("option", () => {
     });
 
     it("returns the setting of every option", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         configure([
           cases(5),
@@ -312,6 +338,7 @@ describe("option", () => {
           explain(false),
           workers(2),
           hermetic(),
+          around(PLAIN),
           draws("[]"),
         ]),
         {
@@ -328,6 +355,7 @@ describe("option", () => {
           store: "dir",
           explain: false,
           hermetic: true,
+          around: PLAIN,
           draws: "[]",
         },
         "each setting, with the requirements in order and the workers ignored",
@@ -335,11 +363,24 @@ describe("option", () => {
     });
 
     it("returns the setting of the later of two options of one kind", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         configure([cases(5), cases(6)]).cases,
         6,
         "the later option overrides the earlier",
+      );
+    });
+
+    it("returns the later of two wrappers", ({ seat }) => {
+      const later = async (run: () => Promise<void>): Promise<void> => {
+        await run();
+      };
+
+      check.isEqualTo(
+        seat,
+        configure([around(PLAIN), around(later)]).around,
+        later,
+        "the later wrapper applies",
       );
     });
   });

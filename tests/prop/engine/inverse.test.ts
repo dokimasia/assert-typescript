@@ -150,7 +150,7 @@ describe("inverse", () => {
     it("returns the refusal of a value", ({ seat }) => {
       const err = new CannotInvert("prop: int:10 is outside integer 0 9");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.name, err.message],
         ["CannotInvert", "prop: int:10 is outside integer 0 9"],
@@ -213,7 +213,7 @@ describe("inverse", () => {
       }) => {
         const [inverted, failed] = roundTrip(generator);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [inverted > CASES / 2, failed],
           [true, []],
@@ -284,7 +284,7 @@ describe("inverse", () => {
       }) => {
         const [inverted, failed] = roundTrip(read(shape), name === "set");
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [inverted > CASES / 2, failed],
           [true, []],
@@ -298,7 +298,7 @@ describe("inverse", () => {
     }) => {
       const either = new OneOf([DIGIT, new Integer(new IntegerBounds(5n, 15n))]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [valuesOf(invert(either, 7n)), valuesOf(invert(either, 12n))],
         [
@@ -310,7 +310,7 @@ describe("inverse", () => {
     });
 
     it("takes the first index of an equal value of a sampled-from", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         valuesOf(invert(new SampledFrom(["a", "b", "a"]), "a")),
         [0n],
@@ -319,7 +319,7 @@ describe("inverse", () => {
     });
 
     it("takes the smallest index at each swap of a permutation", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         valuesOf(invert(new Permutation([1n, 1n, 2n]), [1n, 2n, 1n])),
         [0n, 2n],
@@ -368,7 +368,7 @@ describe("inverse", () => {
       it(`takes ${tt.name}`, ({ seat }) => {
         const [text, value] = tt.give;
 
-        check.equal(
+        check.isEqualTo(
           seat,
           valuesOf(invert(new Matching(piece(text)), value)),
           tt.want,
@@ -380,7 +380,7 @@ describe("inverse", () => {
     it("takes absent for the absent value of an optional of an optional", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         valuesOf(invert(new Optional(new Optional(DIGIT)), undefined)),
         [0n],
@@ -389,7 +389,7 @@ describe("inverse", () => {
     });
 
     it("takes the elements of a set in shortlex order", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         valuesOf(invert(read({ shape: "set", of: UINT8 }), [5n, 2n])),
         [1n, 2n, 1n, 5n, 0n],
@@ -406,7 +406,7 @@ describe("inverse", () => {
         ]),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         valuesOf(choices),
         [1n, 1n, 9n, 1n, 4n, 0n, 0n],
@@ -427,7 +427,7 @@ describe("inverse", () => {
         ["zone", "Europe/Amsterdam"],
       ]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         valuesOf(invert(read({ shape: "zoned-date-time", unit: "s" }), value)),
         [1n, 0n, change?.at],
@@ -449,7 +449,7 @@ describe("inverse", () => {
         ["zone", "UTC"],
       ]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         valuesOf(invert(read({ shape: "wall-time", unit: "s" }), value)),
         [0n, 1n, 2n],
@@ -458,7 +458,7 @@ describe("inverse", () => {
     });
 
     it("takes the base before the extension of a recursive value", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         valuesOf(invert(tree(new List(DIGIT, new Sizes())), [])),
         [0n, 0n],
@@ -467,7 +467,7 @@ describe("inverse", () => {
     });
 
     it("runs a nested recursive value back through its positions", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         valuesOf(invert(tree(), [[3n]])),
         [1n, 1n, 1n, 1n, 0n, 3n, 0n, 0n],
@@ -476,7 +476,7 @@ describe("inverse", () => {
     });
 
     it("runs a one-of back through an alternative with an inverse", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         valuesOf(invert(new OneOf([IDENTITY, DIGIT]), 3n)),
         [1n, 3n],
@@ -485,7 +485,7 @@ describe("inverse", () => {
     });
 
     it("runs a filter back through the generator that it filters", ({ seat }) => {
-      check.equal(seat, valuesOf(invert(EVEN, 4n)), [4n], "4 is even");
+      check.isEqualTo(seat, valuesOf(invert(EVEN, 4n)), [4n], "4 is even");
     });
 
     it("passes over an alternative of a one-of that cannot produce the value", ({
@@ -503,7 +503,7 @@ describe("inverse", () => {
         [[EVEN, DIGIT], 3n],
       ];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         cases.map(
           ([alternatives, value]) => invert(new OneOf(alternatives), value)[0]?.value,
@@ -645,7 +645,7 @@ describe("inverse", () => {
       it(`throws a CannotInvert for ${name}`, ({ seat }) => {
         const [message, none] = refusal(generator, value);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [message.startsWith(want), none],
           [true, false],
@@ -744,7 +744,7 @@ describe("inverse", () => {
       it(`throws a CannotInvert for ${name}`, ({ seat }) => {
         const [message, none] = refusal(read(shape), value);
 
-        check.equal(seat, [message, none], [want, false], "the refusal");
+        check.isEqualTo(seat, [message, none], [want, false], "the refusal");
       });
     }
 
@@ -756,7 +756,7 @@ describe("inverse", () => {
         new Array<bigint>(9000).fill(0n),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [message.endsWith("decodes to no value"), none],
         [true, false],
@@ -776,7 +776,7 @@ describe("inverse", () => {
         ]);
       }
 
-      check.equal(
+      check.isEqualTo(
         seat,
         refusal(read(TREE_SHAPE), value)[0].endsWith(
           "is no value that the generator produces",
@@ -794,7 +794,7 @@ describe("inverse", () => {
         return BigInt(text);
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         refusal(parsed, "x"),
         ['prop: string:"x" is no value of the map: x is no digit', false],
@@ -807,7 +807,7 @@ describe("inverse", () => {
         throw new CannotInvert("prop: the map refuses it");
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         refusal(strict, "1"),
         ["prop: the map refuses it", false],
@@ -816,7 +816,7 @@ describe("inverse", () => {
     });
 
     it("throws a NoInverse for a map without an inverse", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         refusal(IDENTITY, 1n),
         ["prop: a map does not run backwards", true],
@@ -825,7 +825,7 @@ describe("inverse", () => {
     });
 
     it("throws a NoInverse for a generator without an emitter", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         refusal(new Composite(() => 1n), 1n),
         ["prop: a Composite does not run backwards", true],
@@ -853,7 +853,7 @@ describe("inverse", () => {
     it("throws a NoInverse for a one-of whose branch without an inverse might produce the value", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         refusal(new OneOf([DIGIT, IDENTITY]), 11n),
         ["prop: no alternative produces int:11, and one of them has no inverse", true],
@@ -864,7 +864,7 @@ describe("inverse", () => {
     it("throws a NoInverse for a recursive value whose base has no inverse", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         refusal(tree(IDENTITY), "x"),
         [
@@ -878,7 +878,7 @@ describe("inverse", () => {
     it("throws a CannotInvert that is no NoInverse for a value outside every branch with an inverse", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         refusal(new OneOf([DIGIT]), 11n)[1],
         false,
@@ -897,7 +897,7 @@ describe("inverse", () => {
 
       check.errorIs(
         seat,
-        check.throws(seat, () => invert(broken, 1n), "the map throws"),
+        check.doesThrow(seat, () => invert(broken, 1n), "the map throws"),
         TypeError,
         "the map's error",
       );
@@ -914,7 +914,11 @@ describe("inverse", () => {
 
       check.errorIs(
         seat,
-        check.throws(seat, () => invert(new OneOf([broken]), 1n), "the branch throws"),
+        check.doesThrow(
+          seat,
+          () => invert(new OneOf([broken]), 1n),
+          "the branch throws",
+        ),
         TypeError,
         "the branch's error",
       );
@@ -934,7 +938,7 @@ describe("inverse", () => {
 
       check.errorIs(
         seat,
-        check.throws(seat, () => invert(flaky, 1n), "the replay throws"),
+        check.doesThrow(seat, () => invert(flaky, 1n), "the replay throws"),
         RangeError,
         "the replay's error",
       );
@@ -943,7 +947,7 @@ describe("inverse", () => {
 
   describe("inverseOf", () => {
     it("returns the choices that decode to a value", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         inverseOf(DIGIT, 7n),
         [{ kind: "integer", value: 7n }],
@@ -972,7 +976,7 @@ describe("inverse", () => {
 
       check.errorIs(
         seat,
-        check.throws(seat, () => inverseOf(broken, 1n), "the map throws"),
+        check.doesThrow(seat, () => inverseOf(broken, 1n), "the map throws"),
         TypeError,
         "the map's error",
       );
@@ -985,7 +989,7 @@ describe("inverse", () => {
     }) => {
       const [steps, normal] = emit(read({ shape: "set", of: UINT8 }), [5n, 2n]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [steps.map((step) => step.value), normal],
         [

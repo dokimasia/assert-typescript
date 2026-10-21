@@ -13,7 +13,7 @@ describe("work", () => {
         return 7;
       }
 
-      check.equal(seat, await drive(nothing()), 7, "the work's result");
+      check.isEqualTo(seat, await drive(nothing()), 7, "the work's result");
     });
 
     it("passes what each yielded promise resolves to back into the work", async ({
@@ -25,7 +25,7 @@ describe("work", () => {
         return a + b;
       }
 
-      check.equal(seat, await drive(sum()), 5, "the sum of the two results");
+      check.isEqualTo(seat, await drive(sum()), 5, "the sum of the two results");
     });
 
     it("throws the error of a rejected promise into the work at its yield", async ({
@@ -40,7 +40,7 @@ describe("work", () => {
         }
       }
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await drive(recovers()),
         "refused",

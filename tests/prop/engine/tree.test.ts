@@ -53,7 +53,7 @@ function walkThrows(tree: Tree, steps: [Bounds, Value][]): unknown {
 describe("tree", () => {
   describe("NODE_LIMIT", () => {
     it("limits a tree to 2^20 nodes", ({ seat }) => {
-      check.equal(seat, NODE_LIMIT, 2 ** 20, "the limit");
+      check.isEqualTo(seat, NODE_LIMIT, 2 ** 20, "the limit");
     });
   });
 
@@ -61,7 +61,7 @@ describe("tree", () => {
     it("returns the signal of a repeated case", ({ seat }) => {
       const signal = new Repeated();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [signal.name, signal.message],
         ["Repeated", "prop: the case repeats a tested case"],
@@ -74,7 +74,7 @@ describe("tree", () => {
     it("returns the divergence at a position with both bounds", ({ seat }) => {
       const signal = new Diverged(2, DIGIT, undefined);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [signal.name, signal.message, signal.index, signal.recorded, signal.requested],
         ["Diverged", "prop: choice 2 diverges", 2, DIGIT, undefined],
@@ -121,7 +121,7 @@ describe("tree", () => {
       walk(tree, [[any, -0]]);
 
       check.errorIs(seat, repeated, Repeated, "a NaN of another sign repeats");
-      check.equal(seat, tree.root.children.size, 3, "NaN, +0 and -0");
+      check.isEqualTo(seat, tree.root.children.size, 3, "NaN, +0 and -0");
     });
 
     it("follows a sequence on the edge of its elements", ({ seat }) => {
@@ -149,7 +149,7 @@ describe("tree", () => {
       ]) as Diverged;
 
       check.errorIs(seat, err, Diverged, "the second request diverges");
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.index, err.recorded, err.requested],
         [1, DIGIT, BIT],
@@ -162,7 +162,7 @@ describe("tree", () => {
       walk(tree, []);
       const err = walkThrows(tree, [[DIGIT, 1n]]) as Diverged;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.index, err.recorded, err.requested],
         [0, undefined, DIGIT],
@@ -186,7 +186,12 @@ describe("tree", () => {
         [BIT, 1n],
       ]);
 
-      check.equal(seat, [tree.nodes, tree.full], [3, true], "the tree stopped growing");
+      check.isEqualTo(
+        seat,
+        [tree.nodes, tree.full],
+        [3, true],
+        "the tree stopped growing",
+      );
     });
   });
 
@@ -198,7 +203,7 @@ describe("tree", () => {
       walk(tree, [[DIGIT, 1n]]);
       const err = walkThrows(tree, []) as Diverged;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.index, err.recorded, err.requested],
         [0, DIGIT, undefined],
@@ -210,7 +215,7 @@ describe("tree", () => {
       const tree = new Tree();
       walk(tree, [[DIGIT, 3n]], "rejected");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         tree.root.children.get("3")?.ending,
         "rejected",
@@ -237,7 +242,7 @@ describe("tree", () => {
         return tree.exhausted;
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         seen,
         [false, false, false, true],
@@ -260,7 +265,7 @@ describe("tree", () => {
         [BIT, 1n],
       ]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [before, tree.exhausted],
         [false, true],
@@ -298,7 +303,7 @@ describe("tree", () => {
         return tree.exhausted;
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         seen,
         [false, false, false, false, false, false, true],
@@ -315,7 +320,7 @@ describe("tree", () => {
       const before = tree.exhausted;
       walk(tree, [[bounds, [1]]]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [before, tree.exhausted],
         [false, true],
@@ -337,7 +342,7 @@ describe("tree", () => {
       walk(tree, [[BIT, 0n]]);
       walk(tree, [[BIT, 1n]]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [tree.full, tree.exhausted],
         [true, false],

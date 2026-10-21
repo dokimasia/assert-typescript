@@ -14,6 +14,9 @@
  *
  * A run stops between two cases when the signal of its seat aborts, which
  * vitest does when the test times out, and then writes no store entry.
+ *
+ * A property with the option around runs each run of its body inside the
+ * option's wrapper.
  */
 
 import { join } from "node:path";
@@ -46,14 +49,17 @@ import {
 } from "./engine/runner.js";
 import * as token from "./engine/token.js";
 import { type Entry, isStep, TraceError } from "./engine/trace.js";
-import { drive, type Work } from "./engine/work.js";
+import { drive, pending, type Work } from "./engine/work.js";
 import { budgetOf, mutated, seedOf, tokenOf } from "./environment.js";
-import type { Config } from "./option.js";
+import type { Config, Wrapper } from "./option.js";
 import { close } from "./registry.js";
 import { differs, entryOf } from "./stored.js";
 
 /** The option that states the entries of a case, at the front of the location of a fault in them. */
 const DRAWS = "draws";
+
+/** The option that states the wrapper of each run, the location of the wrapper's faults. */
+const AROUND = "around";
 
 /** A property's body: a function of its case, which may return a promise. */
 export type PropertyBody = (c: Case) => unknown;
@@ -163,6 +169,41 @@ function replayOf(config: Config): Choice[] | undefined {
   }
 }
 
+/**
+ * Returns the work of a case that wrapper runs. The first call of run runs
+ * work to its end, and the case ends as work ended, after the wrapper
+ * settles. A second call of run runs nothing, and neither does a call after
+ * the wrapper settled.
+ *
+ * @throws Fault at around for a wrapper that throws, one that returns
+ *   without a call of run, and one that calls run a second time.
+ */
+function* wrapped(wrapper: Wrapper, work: Work<void>): Work<void> {
+  let calls = 0;
+  let settled = false;
+  let ended = Promise.resolve<{ readonly error: unknown } | undefined>(undefined);
+  const run = (): Promise<void> => {
+    calls += 1;
+    if (calls > 1 || settled) return Promise.resolve();
+    ended = drive(work).then(
+      () => undefined,
+      (error: unknown) => ({ error }),
+    );
+    return ended.then(() => undefined);
+  };
+  try {
+    const returned = pending(wrapper(run));
+    if (returned !== undefined) yield returned;
+  } catch (err) {
+    throw new Fault(AROUND, "the wrapper threw", err);
+  }
+  settled = true;
+  if (calls === 0) throw new Fault(AROUND, "the wrapper returned without calling run");
+  if (calls > 1) throw new Fault(AROUND, "the wrapper called run more than once");
+  const end = (yield ended) as { readonly error: unknown } | undefined;
+  if (end !== undefined) throw end.error;
+}
+
 /** Returns the observer that hands the calls of each case to slot, under the case's phase. */
 function observerOf(slot: Slot | undefined): Observer {
   return (phase, execution) => slot?.take(own(caseOf(execution.case)), phase);
@@ -187,6 +228,8 @@ export class Property {
   readonly #replay: readonly Choice[] | undefined;
   /** The directory of the store, or the empty string for a property without one. */
   readonly #dir: string;
+  /** The wrapper of each run of the body, or undefined. */
+  readonly #around: Wrapper | undefined;
 
   private constructor(
     call: Call,
@@ -195,6 +238,7 @@ export class Property {
     budget: number,
     replay: readonly Choice[] | undefined,
     dir: string,
+    around: Wrapper | undefined,
   ) {
     this.call = call;
     this.#settings = settings;
@@ -202,6 +246,7 @@ export class Property {
     this.#budget = budget;
     this.#replay = replay;
     this.#dir = dir;
+    this.#around = around;
   }
 
   /**
@@ -248,6 +293,7 @@ export class Property {
       budget,
       replayOf(config),
       storeOf(seat, config.store),
+      config.around,
     );
   }
 
@@ -390,16 +436,18 @@ export class Property {
     Property.fault(running, this.call, err);
   }
 
-  /** Returns the engine's body that runs body on a case of seat, and stops the run once the seat's signal aborts. */
+  /** Returns the engine's body that runs body on a case of seat inside the property's wrapper, and stops the run once the seat's signal aborts. */
   #adapt(seat: Seat, slot: Slot | undefined, body: PropertyBody): Body {
     const signal = signalOf(seat);
     const location: Location = {
       site: this.call.where,
       pinned: this.call.pinned === true,
     };
+    const around = this.#around;
     return (engine) => {
       if (signal.aborted) throw new Stopped(signal.reason);
-      return executeCase(new Case(engine, seat, slot, location), body);
+      const work = executeCase(new Case(engine, seat, slot, location), body);
+      return around === undefined ? work : wrapped(around, work);
     };
   }
 

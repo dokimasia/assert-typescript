@@ -28,13 +28,13 @@ function take(bounds: Bounds, edge?: bigint): Value[] {
 describe("edge", () => {
   describe("BOUNDARIES", () => {
     it("orders the edge cases from min to below", ({ seat }) => {
-      check.equal(seat, BOUNDARIES, ["min", "max", "above", "below"], "the order");
+      check.isEqualTo(seat, BOUNDARIES, ["min", "max", "above", "below"], "the order");
     });
   });
 
   describe("Edge.value", () => {
     it("gives an integer its bounds and the neighbours of its target", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         take(new IntegerBounds(-5n, 5n)),
         [-5n, 5n, 1n, -1n],
@@ -43,7 +43,7 @@ describe("edge", () => {
     });
 
     it("gives an integer its target for a neighbour outside the bounds", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         take(new IntegerBounds(0n, 10n)),
         [0n, 10n, 1n, 0n],
@@ -52,7 +52,7 @@ describe("edge", () => {
     });
 
     it("gives an integer of one value that value at every boundary", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         take(new IntegerBounds(3n, 3n)),
         [3n, 3n, 3n, 3n],
@@ -74,7 +74,7 @@ describe("edge", () => {
     it("gives a float its target for the next float below the bounds", ({ seat }) => {
       const [, , above, below] = take(new FloatBounds(0.5, 0.75)) as number[];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [below, (above as number) > 0.5],
         [0.5, true],
@@ -85,11 +85,11 @@ describe("edge", () => {
     it("gives a float of width 32 the next float of that width", ({ seat }) => {
       const [, , above] = take(new FloatBounds(-1, 1, false, 32)) as number[];
 
-      check.equal(seat, above, 2 ** -149, "the smallest subnormal of width 32");
+      check.isEqualTo(seat, above, 2 ** -149, "the smallest subnormal of width 32");
     });
 
     it("gives a sequence one element at the boundary", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         take(new SequenceBounds(256)),
         [[0], [255], [1], [0]],
@@ -98,7 +98,7 @@ describe("edge", () => {
     });
 
     it("gives a sequence minSize elements", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         take(new SequenceBounds(4, 3))[1],
         [3, 3, 3],
@@ -107,7 +107,7 @@ describe("edge", () => {
     });
 
     it("gives a sequence of at most 0 elements none", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         take(new SequenceBounds(4, 0, 0)),
         [[], [], [], []],
@@ -116,11 +116,11 @@ describe("edge", () => {
     });
 
     it("gives a sequence of one element value 0 above", ({ seat }) => {
-      check.equal(seat, take(new SequenceBounds(1))[2], [0], "1 is outside [0, 1)");
+      check.isEqualTo(seat, take(new SequenceBounds(1))[2], [0], "1 is outside [0, 1)");
     });
 
     it("gives a structure choice its edge at every boundary", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         take(new IntegerBounds(0n, 1n), 1n),
         [1n, 1n, 1n, 1n],
@@ -131,7 +131,7 @@ describe("edge", () => {
     it("gives a structure choice its target for an edge outside the bounds", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         take(new IntegerBounds(1n, 1n), 0n),
         [1n, 1n, 1n, 1n],

@@ -138,7 +138,7 @@ const above = body((c) => {
 describe("shrink", () => {
   describe("DEFAULT_BUDGET", () => {
     it("allows 2000 runs", ({ seat }) => {
-      check.equal(seat, DEFAULT_BUDGET, 2000, "the budget");
+      check.isEqualTo(seat, DEFAULT_BUDGET, 2000, "the budget");
     });
   });
 
@@ -146,7 +146,7 @@ describe("shrink", () => {
     it("returns the signal of a spent budget", ({ seat }) => {
       const signal = new Exhausted();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [signal.name, signal.message],
         ["Exhausted", "prop: the shrink budget is spent"],
@@ -160,7 +160,7 @@ describe("shrink", () => {
       const execution = await executed(above, integers(2000n));
       const [node] = nodesOf(execution.case);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [node?.choice, node?.request === execution.case.requests[0]],
         [{ kind: "integer", value: 2000n }, true],
@@ -173,7 +173,7 @@ describe("shrink", () => {
     it("returns the seed plus (draw + 1) × 2^32 plus the filling modulo 2^64", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           explainSeed(7n, 0, 0),
@@ -209,7 +209,7 @@ describe("shrink", () => {
         confirm(once, await executed(once, integers(5n)), MAX_CHOICES),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         divergence,
         { what: "verdict", index: 1, recorded: "once", replayed: undefined },
@@ -231,7 +231,7 @@ describe("shrink", () => {
         confirm(shifting, await executed(shifting, integers(5n)), MAX_CHOICES),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         divergence,
         {
@@ -259,7 +259,7 @@ describe("shrink", () => {
         confirm(shortening, await executed(shortening, integers(5n)), MAX_CHOICES),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         divergence,
         {
@@ -289,7 +289,7 @@ describe("shrink", () => {
         confirm(observing, await executed(observing, integers(5n)), MAX_CHOICES),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         divergence,
         {
@@ -318,7 +318,7 @@ describe("shrink", () => {
         confirm(once, await executed(once, integers(5n)), MAX_CHOICES),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         divergence,
         {
@@ -359,7 +359,7 @@ describe("shrink", () => {
         ),
       );
 
-      check.equal(seat, phases, ["replay"], "one replay");
+      check.isEqualTo(seat, phases, ["replay"], "one replay");
     });
   });
 
@@ -375,7 +375,7 @@ describe("shrink", () => {
       );
       const execution = await drive(shrinker.run(integers(5n), "explain"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [execution.status, shrinker.runs, phases],
         ["passed", 1, ["explain"]],
@@ -393,7 +393,11 @@ describe("shrink", () => {
 
       check.errorIs(
         seat,
-        check.throws(seat, () => shrinker.run(integers(5n)).next(), "no run is left"),
+        check.doesThrow(
+          seat,
+          () => shrinker.run(integers(5n)).next(),
+          "no run is left",
+        ),
         Exhausted,
         "the budget is spent",
       );
@@ -415,7 +419,7 @@ describe("shrink", () => {
 
       check.errorIs(
         seat,
-        check.throws(
+        check.doesThrow(
           seat,
           () => shrinker.run(integers(5n)).next(),
           "the time is spent",
@@ -769,7 +773,7 @@ describe("shrink", () => {
       it(`shrinks ${tt.name}`, async ({ seat }) => {
         const shrinker = await shrunk(...tt.give);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [drawn(shrinker.best.execution), shrinker.runs],
           tt.want,
@@ -877,7 +881,7 @@ describe("shrink", () => {
       it(`shrinks ${tt.name}`, async ({ seat }) => {
         const shrinker = await shrunk(...tt.give);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [drawn(shrinker.best.execution), shrinker.runs],
           tt.want,
@@ -896,7 +900,7 @@ describe("shrink", () => {
         integers(5000n),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [shrinker.best.execution.case.choices, shrinker.runs],
         [integers(1001n), 22],
@@ -916,7 +920,7 @@ describe("shrink", () => {
       });
       const shrinker = await shrunk(three, integers(150n, 150n));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           [...shrinker.failures].map(([identity, failure]) => [
@@ -949,7 +953,7 @@ describe("shrink", () => {
       });
       const shrinker = await shrunk(spots, integers(900n, 500n), 68);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [...shrinker.failures].map(([identity, failure]) => [
           identity,
@@ -974,7 +978,7 @@ describe("shrink", () => {
       });
       const shrinker = await shrunk(two, integers(78n));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           [...shrinker.failures.keys()],
@@ -989,7 +993,7 @@ describe("shrink", () => {
     it("stops at a spent budget with the smallest case found", async ({ seat }) => {
       const shrinker = await shrunk(above, integers(2000n), 10);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [shrinker.runs, (drawn(shrinker.best.execution)[0] as bigint) > 1001n],
         [10, true],
@@ -1058,7 +1062,7 @@ describe("shrink", () => {
         if (value > 1000n) c.fail("above");
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await explained(noisy, integers(1001n, 3n), 7n),
         [
@@ -1079,7 +1083,7 @@ describe("shrink", () => {
         if (value === 1000n) c.fail("limit");
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await explained(limit, integers(1001n), 7n),
         [[["n", 1001n, false, undefined]], 3],
@@ -1092,7 +1096,7 @@ describe("shrink", () => {
         if (c.draw(SIGNED, "v") === 0n) c.fail("zero");
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await explained(zero, integers(0n), 7n),
         [[["v", 0n, false, undefined]], 1],
@@ -1105,7 +1109,7 @@ describe("shrink", () => {
         if (c.draw(SIGNED, "v") < -4n) c.fail("low");
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await explained(low, integers(-5n), 7n),
         [[["v", -5n, false, -4n]], 3],
@@ -1121,7 +1125,7 @@ describe("shrink", () => {
         c.fail("always");
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await explained(always, integers(7n), 7n),
         [[["seven", 7n, undefined, undefined]], 0],
@@ -1135,7 +1139,7 @@ describe("shrink", () => {
         c.fail("always");
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await explained(always, integers(7n), 11n),
         [[["seven", 7n, true, undefined]], 1],
@@ -1149,7 +1153,7 @@ describe("shrink", () => {
         if (c.draw(WIDE, "n") > 1000n) c.fail("above");
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await explained(afterJust, integers(1001n), 7n),
         [
@@ -1172,7 +1176,7 @@ describe("shrink", () => {
       });
       const [explanation] = await explained(aboveWrapped, integers(1001n), 7n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (explanation[0] as unknown[]).slice(1),
         ["a1001b", false, "a1000b"],
@@ -1186,7 +1190,7 @@ describe("shrink", () => {
       });
       const [explanation] = await explained(big, [{ kind: "float", value: 3 }], 7n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (explanation[0] as unknown[])[3],
         undefined,
@@ -1201,7 +1205,7 @@ describe("shrink", () => {
         if (value > 1000n) c.fail("above");
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await explained(noisy, integers(1001n, 3n), 7n, 0),
         [
@@ -1235,7 +1239,7 @@ describe("shrink", () => {
 
       check.errorIs(
         seat,
-        check.throws(
+        check.doesThrow(
           seat,
           () => explain(shrinker, shrinker.best, 7n).next(),
           "the filling throws",

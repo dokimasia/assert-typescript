@@ -23,7 +23,7 @@ describe("literal", () => {
     it("returns the error of a literal", ({ seat }) => {
       const err = new LiteralError("prop: 1 is no typed literal");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.name, err.message],
         ["LiteralError", "prop: 1 is no typed literal"],
@@ -34,11 +34,11 @@ describe("literal", () => {
 
   describe("integer", () => {
     it("returns a safe JSON integer as a bigint", ({ seat }) => {
-      check.equal(seat, integer(-3), -3n, "-3");
+      check.isEqualTo(seat, integer(-3), -3n, "-3");
     });
 
     it("returns an integer beyond 2^53 − 1 stated as a decimal string", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [integer(String(SAFE + 1)), integer(`-${SAFE + 1}`)],
         [BigInt(SAFE) + 1n, -BigInt(SAFE) - 1n],
@@ -66,7 +66,7 @@ describe("literal", () => {
     ];
     for (const tt of tests) {
       it(`throws a LiteralError for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => integer(tt.give)),
           tt.want,
@@ -93,7 +93,7 @@ describe("literal", () => {
     it("throws a LiteralError for a name that the encoding does not define", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => number("Infinity")),
         'prop: "Infinity" is no float',
@@ -104,7 +104,7 @@ describe("literal", () => {
     it("throws a LiteralError for a value that is neither a number nor a name", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => number(true)),
         "prop: true is no float",
@@ -137,7 +137,7 @@ describe("literal", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, plain(tt.give), tt.want, "the JSON form");
+        check.isEqualTo(seat, plain(tt.give), tt.want, "the JSON form");
       });
     }
   });
@@ -220,7 +220,12 @@ describe("literal", () => {
     ];
     for (const tt of tests) {
       it(`decodes ${tt.name}`, ({ seat }) => {
-        check.equal(seat, canonical(decode(tt.give)), canonical(tt.want), "the value");
+        check.isEqualTo(
+          seat,
+          canonical(decode(tt.give)),
+          canonical(tt.want),
+          "the value",
+        );
       });
     }
 
@@ -238,7 +243,7 @@ describe("literal", () => {
         payload: { type: "null" },
       }) as Variant;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [bare.name, bare.hasPayload, absent.name, absent.hasPayload, absent.payload],
         ["pending", false, "note", true, undefined],
@@ -365,7 +370,11 @@ describe("literal", () => {
     ];
     for (const tt of refusals) {
       it(`throws a LiteralError for ${tt.name}`, ({ seat }) => {
-        const err = check.throws(seat, () => decode(tt.give), "the literal is refused");
+        const err = check.doesThrow(
+          seat,
+          () => decode(tt.give),
+          "the literal is refused",
+        );
 
         check.errorIs(seat, err, LiteralError, "the error is a LiteralError");
       });
@@ -476,7 +485,7 @@ describe("literal", () => {
     ];
     for (const tt of tests) {
       it(`encodes ${tt.name}`, ({ seat }) => {
-        check.equal(seat, encode(tt.give), tt.want, "the literal");
+        check.isEqualTo(seat, encode(tt.give), tt.want, "the literal");
       });
     }
 
@@ -499,7 +508,7 @@ describe("literal", () => {
         [new Variant("x"), new Variant("x", undefined)],
       ];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         values.map((value) => canonical(decode(encode(value)))),
         values.map(canonical),
@@ -510,7 +519,7 @@ describe("literal", () => {
     it("throws a TypeError for a value that no generator decodes", ({ seat }) => {
       check.errorIs(
         seat,
-        check.throws(seat, () => encode(Symbol("s")), "a symbol"),
+        check.doesThrow(seat, () => encode(Symbol("s")), "a symbol"),
         TypeError,
         "a symbol has no literal",
       );

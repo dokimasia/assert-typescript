@@ -94,7 +94,7 @@ describe("fuzz", () => {
         store(dir),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.failures[0]?.detail["outcome"], records(recorder)[1]?.["phase"]],
         ["counterexample", "stored"],
@@ -120,7 +120,7 @@ describe("fuzz", () => {
         store(""),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         records(recorder)
           .filter((one) => one["parent"] === undefined)
@@ -149,7 +149,7 @@ describe("fuzz", () => {
         "the target rejects",
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.message, (err as Error).message],
         [

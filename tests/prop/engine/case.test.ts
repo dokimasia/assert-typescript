@@ -73,7 +73,7 @@ const REFUSING: Decoder = {
 describe("case", () => {
   describe("MAX_CHOICES", () => {
     it("caps a case at 8192 choices", ({ seat }) => {
-      check.equal(seat, MAX_CHOICES, 8192, "the cap");
+      check.isEqualTo(seat, MAX_CHOICES, 8192, "the cap");
     });
   });
 
@@ -81,7 +81,7 @@ describe("case", () => {
     it("returns the signal of a rejected case", ({ seat }) => {
       const signal = new Rejected();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [signal.name, signal.message],
         ["Rejected", "prop: the case is rejected"],
@@ -100,7 +100,7 @@ describe("case", () => {
     it("returns the failure of an identity with its record", ({ seat }) => {
       const failed = new Failed("true@a.ts:1", { assertion: "true" });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [failed.name, failed.message, failed.identity, failed.record],
         [
@@ -120,7 +120,7 @@ describe("case", () => {
       const twin = new Source(3n);
       const got = Array.from({ length: 20 }, () => c.choose(digit()));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         got,
         got.map(() => draw.integer(twin, DIGIT)),
@@ -146,14 +146,14 @@ describe("case", () => {
         earlier.push(got);
       }
 
-      check.equal(seat, earlier, want, "41 reuse requests");
+      check.isEqualTo(seat, earlier, want, "41 reuse requests");
     });
 
     it("returns the pinned reuse requests of seed 42", ({ seat }) => {
       const c = new Case(new Generating(new Source(42n)));
       const wide = new IntegerBounds(INT64_MIN, INT64_MAX);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         Array.from({ length: 12 }, () => c.integer(wide, undefined, true)),
         [
@@ -181,7 +181,7 @@ describe("case", () => {
       const sevens = Array.from({ length: 3 }, () => c.integer(seven, undefined, true));
       const after = Array.from({ length: 5 }, () => c.integer(WIDE));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [sevens, after],
         [[7n, 7n, 7n], after.map(() => draw.integer(twin, WIDE))],
@@ -210,7 +210,7 @@ describe("case", () => {
       c.integer(DIGIT, undefined, true);
       draw.integer(twin, DIGIT);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.integer(DIGIT, 0n),
         draw.integer(twin, DIGIT),
@@ -232,7 +232,7 @@ describe("case", () => {
         return draw.integer(twin, WIDE);
       });
 
-      check.equal(seat, got, want, "no coin after the rewind for 50 seeds");
+      check.isEqualTo(seat, got, want, "no coin after the rewind for 50 seeds");
     });
 
     it("reuses no removed value of other bounds", ({ seat }) => {
@@ -252,7 +252,7 @@ describe("case", () => {
         return draw.integer(twin, WIDE);
       });
 
-      check.equal(seat, got, want, "no coin after the rewind for 50 seeds");
+      check.isEqualTo(seat, got, want, "no coin after the rewind for 50 seeds");
     });
   });
 
@@ -260,11 +260,16 @@ describe("case", () => {
     it("returns the recorded values that fit", ({ seat }) => {
       const c = new Case(new Replaying(integers(7n, 3n)));
 
-      check.equal(seat, [c.choose(digit()), c.choose(digit())], [7n, 3n], "the digits");
+      check.isEqualTo(
+        seat,
+        [c.choose(digit()), c.choose(digit())],
+        [7n, 3n],
+        "the digits",
+      );
     });
 
     it("returns the target for a recorded value outside the bounds", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         new Case(new Replaying(integers(12n))).choose(digit()),
         0n,
@@ -275,7 +280,7 @@ describe("case", () => {
     it("returns the target for a recorded value of another kind", ({ seat }) => {
       const c = new Case(new Replaying([{ kind: "sequence", value: [5] }]));
 
-      check.equal(seat, c.choose(digit()), 0n, "a sequence is no digit");
+      check.isEqualTo(seat, c.choose(digit()), 0n, "a sequence is no digit");
     });
 
     it("returns the target past the recorded choices", ({ seat }) => {
@@ -286,7 +291,7 @@ describe("case", () => {
         draw: (source: Source) => draw.integer(source, bounds),
       };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.choose(request), c.choose(request), c.choose(request)],
         [5n, 3n, 3n],
@@ -300,7 +305,7 @@ describe("case", () => {
       const c = new Case(new Valuing([5, "x"]));
       const drawn = [c.draw(DIGITS, "a"), c.draw(DIGITS, "b")];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [drawn, c.choices, c.spans, c.draws.map((one) => [one.label, one.value])],
         [
@@ -322,7 +327,7 @@ describe("case", () => {
       const c = new Case(new Valuing([5]));
       c.draw(DIGITS, "a");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.draw(DIGITS, "b"), c.choices],
         [0n, integers(0n)],
@@ -337,7 +342,7 @@ describe("case", () => {
       const request = digit();
       const value = c.choose(request);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.choices, c.requests[0] === request],
         [integers(value as bigint), true],
@@ -349,14 +354,14 @@ describe("case", () => {
       const c = new Case(new Replaying(integers(12n)));
       c.choose(digit());
 
-      check.equal(seat, c.choices, integers(0n), "what the body received");
+      check.isEqualTo(seat, c.choices, integers(0n), "what the body received");
     });
 
     it("allows exactly maxChoices choices", ({ seat }) => {
       const c = new Case(new Replaying([]), 3);
       for (let i = 0; i < 3; i += 1) c.choose(digit());
 
-      check.length(seat, c.choices, 3, "three choices");
+      check.hasLength(seat, c.choices, 3, "three choices");
     });
 
     it("throws an Overrun for a choice past the cap", ({ seat }) => {
@@ -365,7 +370,7 @@ describe("case", () => {
 
       check.errorIs(
         seat,
-        check.throws(seat, () => c.choose(digit()), "the fourth choice throws"),
+        check.doesThrow(seat, () => c.choose(digit()), "the fourth choice throws"),
         Overrun,
         "the error is an overrun",
       );
@@ -376,7 +381,7 @@ describe("case", () => {
       const recorded: Choice[] = [{ kind: "sequence", value: [1, 2, 3] }];
       new Case(new Replaying(recorded), 4).choose(sequenceOf(bounds));
 
-      const err = check.throws(
+      const err = check.doesThrow(
         seat,
         () => new Case(new Replaying(recorded), 3).choose(sequenceOf(bounds)),
         "a cap of 3 refuses four",
@@ -390,7 +395,7 @@ describe("case", () => {
     }) => {
       const source = new Source(7n);
       const twin = new Source(7n);
-      const err = check.throws(
+      const err = check.doesThrow(
         seat,
         () =>
           new Case(new Generating(source), 3).choose(
@@ -400,7 +405,7 @@ describe("case", () => {
       );
 
       check.errorIs(seat, err, Overrun, "the error is an overrun");
-      check.equal(seat, source.next(), twin.next(), "the stream is untouched");
+      check.isEqualTo(seat, source.next(), twin.next(), "the stream is untouched");
     });
 
     it("passes each choice to the observer", ({ seat }) => {
@@ -411,7 +416,7 @@ describe("case", () => {
       c.choose(digit());
       c.choose(digit());
 
-      check.equal(
+      check.isEqualTo(
         seat,
         seen,
         [
@@ -428,7 +433,7 @@ describe("case", () => {
       const c = new Case(new Replaying([]));
       c.integer(DIGIT, 1n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.requests[0]?.edge, c.requests[0]?.reuse],
         [1n, false],
@@ -442,7 +447,7 @@ describe("case", () => {
       const bounds = new SequenceBounds(256, 0, 8);
       const c = new Case(new Generating(new Source(4n)));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.sequence(bounds),
         draw.sequence(new Source(4n), bounds),
@@ -455,7 +460,7 @@ describe("case", () => {
     it("returns an integer over the whole unsigned 64-bit range", ({ seat }) => {
       const c = new Case(new Replaying(integers(UINT64_MAX)));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.random(), c.requests[0]?.bounds.id],
         [UINT64_MAX, `integer 0 ${UINT64_MAX}`],
@@ -473,7 +478,7 @@ describe("case", () => {
         c.choose(digit());
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.spans,
         [{ label: "pair", start: 1, end: 3, depth: 0, parent: undefined }],
@@ -488,7 +493,7 @@ describe("case", () => {
         c.span("second", () => c.choose(digit()));
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.spans,
         [
@@ -505,7 +510,7 @@ describe("case", () => {
       c.choose(digit());
       c.span("element", () => c.choose(digit()), 0);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.spans,
         [{ label: "element", start: 0, end: 2, depth: 0, parent: undefined }],
@@ -515,7 +520,7 @@ describe("case", () => {
 
     it("closes where its decoding throws", ({ seat }) => {
       const c = new Case(new Replaying([]));
-      const err = check.throws(
+      const err = check.doesThrow(
         seat,
         () =>
           c.span("list", () => {
@@ -526,7 +531,7 @@ describe("case", () => {
       );
 
       check.errorIs(seat, err, Rejected, "the error is the rejection");
-      check.equal(
+      check.isEqualTo(
         seat,
         c.spans,
         [{ label: "list", start: 0, end: 1, depth: 0, parent: undefined }],
@@ -546,7 +551,7 @@ describe("case", () => {
       close();
       c.choose(digit());
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.spans,
         [{ label: "step", start: 0, end: 2, depth: 0, parent: undefined }],
@@ -560,7 +565,7 @@ describe("case", () => {
       c.span("inner", () => c.choose(digit()));
       close();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.spans,
         [
@@ -588,7 +593,7 @@ describe("case", () => {
       c.span("attempt", () => c.draw(DIGITS, "removed"));
       c.rewind(mark);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.choices, c.requests.length, c.spans, c.draws.map((one) => one.label)],
         [integers(1n), 1, [], ["kept"]],
@@ -603,7 +608,7 @@ describe("case", () => {
       c.choose(digit());
       c.rewind(mark);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.choose(digit()),
         2n,
@@ -620,7 +625,7 @@ describe("case", () => {
 
       check.errorIs(
         seat,
-        check.throws(seat, () => c.choose(digit()), "a third choice passes the cap"),
+        check.doesThrow(seat, () => c.choose(digit()), "a third choice passes the cap"),
         Overrun,
         "the error is an overrun",
       );
@@ -637,7 +642,7 @@ describe("case", () => {
       c.rewind(mark);
       c.choose(digit());
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [values, c.choices.length],
         [[1n, 2n, 2n], 2],
@@ -652,7 +657,7 @@ describe("case", () => {
       c.draw(DIGITS, "v");
       c.rewind(mark);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.wheres,
         [{ label: undefined, place: undefined }],
@@ -677,7 +682,7 @@ describe("case", () => {
       };
       const c = new Case(provider);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [[c.draw(DIGITS, "a"), c.draw(DIGITS, "b")], heard],
         [
@@ -696,7 +701,7 @@ describe("case", () => {
       c.draw(DIGITS, "v");
       c.choose(digit());
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.wheres,
         [
@@ -711,7 +716,7 @@ describe("case", () => {
       const c = new Case(new Replaying([]));
       c.draw(OUTER, "outer");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.wheres.map((where) => where.label),
         ["outer", "inner"],
@@ -721,14 +726,14 @@ describe("case", () => {
 
     it("closes its label when the generator throws", ({ seat }) => {
       const c = new Case(new Replaying([]));
-      const err = check.throws(
+      const err = check.doesThrow(
         seat,
         () => c.draw(REFUSING, "v"),
         "the rejection passes",
       );
 
       check.errorIs(seat, err, Rejected, "the error is the rejection");
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.wheres, c.where()],
         [[{ label: "v", place: undefined }], { label: undefined, place: undefined }],
@@ -741,7 +746,7 @@ describe("case", () => {
       c.place = { part: "sequential", position: 2, action: "put" };
       c.draw(DIGITS, "v");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.wheres,
         [{ label: "v", place: { part: "sequential", position: 2, action: "put" } }],
@@ -758,7 +763,7 @@ describe("case", () => {
       c.span("before", () => undefined);
       c.draw(spanning, "v");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.draws.map((one) => [
           one.label,
@@ -779,7 +784,7 @@ describe("case", () => {
       c.draw(DIGITS, "v");
       c.step({ action: "get", client: 1 });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         c.steps,
         [
@@ -793,7 +798,7 @@ describe("case", () => {
 
   describe("Case.assume", () => {
     it("throws Rejected for a false condition", ({ seat }) => {
-      const err = check.throws(
+      const err = check.doesThrow(
         seat,
         () => new Case(new Replaying([])).assume(false),
         "the condition is false",
@@ -818,7 +823,7 @@ describe("case", () => {
       c.classify("even");
       c.classify("small");
 
-      check.equal(seat, [...c.labels], ["even", "small"], "two labels");
+      check.isEqualTo(seat, [...c.labels], ["even", "small"], "two labels");
     });
   });
 
@@ -828,7 +833,7 @@ describe("case", () => {
       c.note("first");
       c.note("second");
 
-      check.equal(seat, c.notes, ["first", "second"], "two notes");
+      check.isEqualTo(seat, c.notes, ["first", "second"], "two notes");
     });
   });
 
@@ -839,7 +844,7 @@ describe("case", () => {
       c.place = { part: "drain", position: 0, action: "flush" };
       c.observe(2n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.fingerprints, c.observed],
         [
@@ -865,7 +870,7 @@ describe("case", () => {
       c.target("depth", 5);
       c.target("width", -2);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [...c.targets],
         [
@@ -879,13 +884,13 @@ describe("case", () => {
 
   describe("Case.fail", () => {
     it("throws the failure of an identity", ({ seat }) => {
-      const err = check.throws(
+      const err = check.doesThrow(
         seat,
         () => new Case(new Replaying([])).fail("raises@a.ts:3", "the record"),
         "fail throws",
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [(err as Failed).identity, (err as Failed).record],
         ["raises@a.ts:3", "the record"],

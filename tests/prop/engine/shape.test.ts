@@ -99,7 +99,7 @@ describe("shape", () => {
     it("returns the error of a shape that does not read", ({ seat }) => {
       const err = new ShapeError("prop: [] is not a shape");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.name, err.message],
         ["ShapeError", "prop: [] is not a shape"],
@@ -110,7 +110,7 @@ describe("shape", () => {
 
   describe("halves", () => {
     it("returns the high and the low 64 bits of a 128-bit integer", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [halves(2n ** 64n + 3n), halves(-1n)],
         [
@@ -142,7 +142,7 @@ describe("shape", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           secondPart(tt.give, [1n, 10n], [9n, 20n], UINT64_MAX).id,
           tt.want,
@@ -156,7 +156,7 @@ describe("shape", () => {
     it("reads a shape without recursion as the generator that it maps to", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [read(INT8) instanceof Integer, read(TREE) instanceof Root],
         [true, true],
@@ -165,7 +165,7 @@ describe("shape", () => {
     });
 
     it("reads a bool as a boolean", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode({ shape: "bool" }, 1n)[0], decode({ shape: "bool" })[0]],
         [true, false],
@@ -174,7 +174,7 @@ describe("shape", () => {
     });
 
     it("reads an int over its width", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode(INT8, -128n)[0],
@@ -190,7 +190,7 @@ describe("shape", () => {
     it("reads the bounds of an int from its min and max", ({ seat }) => {
       const bounded = { ...INT8, min: 1, max: 99 };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode(bounded, 99n)[0], decode(bounded, 100n)[0]],
         [99n, 1n],
@@ -201,7 +201,7 @@ describe("shape", () => {
     it("reads a float without the infinities unless they are allowed", ({ seat }) => {
       const finite = { shape: "float", width: 64 };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode(finite, Number.POSITIVE_INFINITY)[0],
@@ -215,7 +215,7 @@ describe("shape", () => {
     it("reads a float of width 32 as a binary32 value", ({ seat }) => {
       const narrow = { shape: "float", width: 32 };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode(narrow, 0.1)[0], decode(narrow, 0.5)[0]],
         [0, 0.5],
@@ -241,7 +241,7 @@ describe("shape", () => {
     });
 
     it("reads a char as one character of its alphabet", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode({ shape: "char" }, [10])[0],
@@ -253,7 +253,7 @@ describe("shape", () => {
     });
 
     it("reads a string as a sequence of indices", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode({ shape: "string", min_size: 2, max_size: 3 }, [1])[0],
@@ -265,7 +265,7 @@ describe("shape", () => {
     });
 
     it("reads bytes as a sequence of byte values", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode({ shape: "bytes" }, [0, 255])[0],
         Uint8Array.of(0, 255),
@@ -274,7 +274,7 @@ describe("shape", () => {
     });
 
     it("reads a list or a fixed-list as a collection", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode({ shape: "list", of: UINT8 }, 1n, 7n, 1n, 8n, 0n)[0],
@@ -289,7 +289,7 @@ describe("shape", () => {
     });
 
     it("reads a set that discards a repeated element", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode({ shape: "set", of: UINT8 }, 1n, 7n, 1n, 7n, 0n)[0],
         [7n],
@@ -298,7 +298,7 @@ describe("shape", () => {
     });
 
     it("reads a map as a dict", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded({ shape: "map", key: UINT8, of: { shape: "bool" } }, 1n, 3n, 1n, 0n),
         canonical(new Pairs([[3n, true]])),
@@ -309,7 +309,7 @@ describe("shape", () => {
     it("reads a literal as one of its values", ({ seat }) => {
       const values = ["paid", "shipped"].map((value) => ({ type: "string", value }));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decode({ shape: "literal", values }, 1n)[0],
         "shipped",
@@ -320,7 +320,7 @@ describe("shape", () => {
     it("reads a uuid as 16 bytes", ({ seat }) => {
       const sixteen = Array.from({ length: 16 }, (_, i) => i);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decode({ shape: "uuid" }, sixteen)[0],
         Uint8Array.from(sixteen),
@@ -329,7 +329,7 @@ describe("shape", () => {
     });
 
     it("reads an address of one version as its bytes", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode({ shape: "ip-address", version: 4 }, [127, 0, 0, 1])[0],
@@ -345,7 +345,7 @@ describe("shape", () => {
     }) => {
       const money = { shape: "decimal", scale: 2, min: "0.005", max: "1.999" };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode(money, 0n)[0],
@@ -359,7 +359,7 @@ describe("shape", () => {
     });
 
     it("reads a decimal with a negative bound", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode({ shape: "decimal", scale: 1, min: "-0.25", max: "-0.05" }, 0n)[0],
         -1n,
@@ -370,7 +370,7 @@ describe("shape", () => {
     it("reads a date as its days since 1970-01-01", ({ seat }) => {
       const bounded = { shape: "date", min: "1970-01-02", max: "1970-01-31" };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode(bounded, 0n)[0], decode(bounded, 30n)[0]],
         [1n, 30n],
@@ -381,7 +381,7 @@ describe("shape", () => {
     it("reads a date between the years 1 and 9999 by default", ({ seat }) => {
       const date = { shape: "date" };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode(date, -719_162n)[0],
@@ -395,7 +395,7 @@ describe("shape", () => {
     });
 
     it("reads a date of a leap day", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode({ shape: "date", min: "2024-02-29", max: "2024-02-29" })[0],
         19_782n,
@@ -404,7 +404,7 @@ describe("shape", () => {
     });
 
     it("reads a date after February as its days since 1970", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode({ shape: "date", min: "2024-03-01", max: "2024-03-01" })[0],
         19_783n,
@@ -413,7 +413,7 @@ describe("shape", () => {
     });
 
     it("reads a time of day as its units since midnight", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode({ shape: "time-of-day", unit: "ms" }, 86_399_999n)[0],
@@ -425,7 +425,7 @@ describe("shape", () => {
     });
 
     it("reads the fraction of a time of day at its unit", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode({ shape: "time-of-day", unit: "ms", min: "00:00:01.25" }, 0n)[0],
         1250n,
@@ -434,7 +434,7 @@ describe("shape", () => {
     });
 
     it("reads a duration over a Go duration in its unit", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode({ shape: "duration", unit: "ns" }, INT64_MAX)[0],
@@ -447,7 +447,7 @@ describe("shape", () => {
     });
 
     it("reads an offset of at most 18 hours either way", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode({ shape: "offset" }, -64_800n)[0],
@@ -459,7 +459,7 @@ describe("shape", () => {
     });
 
     it("reads a zone as a name of the list with UTC first", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode({ shape: "zone" })[0], decode({ shape: "zone" }, 1n)[0]],
         ["UTC", "Europe/Amsterdam"],
@@ -468,7 +468,7 @@ describe("shape", () => {
     });
 
     it("reads a root that states its source", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(
           { ...UINT8, source: { language: "go", type: "example.com/x.Qty" } },
@@ -480,7 +480,7 @@ describe("shape", () => {
     });
 
     it("reads a ref to a definition without recursion as its name", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode(
           {
@@ -507,7 +507,7 @@ describe("shape", () => {
         new Map([["Ext", new Just("x")]]),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         external[DECODE](new Case(new Replaying([{ kind: "integer", value: 1n }]))),
         ["x"],
@@ -523,7 +523,7 @@ describe("shape", () => {
         new Map([["id", new Just("external")]]),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         defined[DECODE](new Case(new Replaying([{ kind: "integer", value: 7n }]))),
         7n,
@@ -543,7 +543,7 @@ describe("shape", () => {
         new Map([["Ext", new Just("x")]]),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         external[DECODE](new Case(new Replaying([{ kind: "integer", value: 1n }]))),
         ["x"],
@@ -559,7 +559,7 @@ describe("shape", () => {
         max: "2020-01-01T00:00:00Z",
       };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(one),
         canonical(instant(seconds(2020, 1, 1), 0n)),
@@ -575,7 +575,7 @@ describe("shape", () => {
         max: "2020-01-01T00:00:00.5Z",
       };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(inside),
         canonical(instant(seconds(2020, 1, 1), 100n)),
@@ -879,7 +879,7 @@ describe("shape", () => {
       it(`throws a ShapeError for ${tt.name}`, ({ seat }) => {
         const message = thrown(() => read(tt.give));
 
-        check.equal(seat, message, tt.want, "the refusal");
+        check.isEqualTo(seat, message, tt.want, "the refusal");
       });
     }
 
@@ -935,7 +935,7 @@ describe("shape", () => {
     ];
     for (const tt of endless) {
       it(`throws a ShapeError for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => read(tt.give)),
           `prop: definitions.${tt.want} has no finite value, because it refers back without an optional, a list, a set, a map or an enum that can exit`,
@@ -966,7 +966,7 @@ describe("shape", () => {
     const wide = { shape: "int", width: 128, signed: true };
 
     it("decodes its signed high half before its low half", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode(wide, -1n, UINT64_MAX)[0],
@@ -988,7 +988,7 @@ describe("shape", () => {
         max: String(2n ** 65n),
       };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decode(bounded, 1n, 3n)[0],
@@ -1005,7 +1005,7 @@ describe("shape", () => {
     it("decodes its seconds and its units", ({ seat }) => {
       const [value, c] = decode({ shape: "instant", unit: "s" }, 253_402_300_799n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decoded({ shape: "instant", unit: "ns" }, -1n, 999_999_999n),
@@ -1025,7 +1025,7 @@ describe("shape", () => {
       const start = seconds(2020, 1, 1);
       const bounded = { shape: "instant", unit: "ms", min: "2020-01-01T00:00:00.5Z" };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [decoded(bounded, start, 3n), decoded(bounded, start + 1n, 3n)],
         [canonical(instant(start, 500n)), canonical(instant(start + 1n, 3n))],
@@ -1034,7 +1034,7 @@ describe("shape", () => {
     });
 
     it("decodes from the first second of the year 1 by default", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded({ shape: "instant", unit: "s" }, -62_135_596_800n),
         canonical(instant(-62_135_596_800n, 0n)),
@@ -1056,7 +1056,7 @@ describe("shape", () => {
           ["time-of-day", time],
         ]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [decoded(bounded, 1n, 86_399n), decoded(bounded, 0n, 86_399n)],
         [canonical(local(1n, 0n)), canonical(local(0n, 86_399n))],
@@ -1067,7 +1067,7 @@ describe("shape", () => {
 
   describe("IpShape", () => {
     it("decodes the bytes of the version that an index chooses", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode({ shape: "ip-address" }, 1n, new Array<number>(16).fill(1))[0],
         new Uint8Array(16).fill(1),
@@ -1082,7 +1082,7 @@ describe("shape", () => {
     }) => {
       const [value, c] = decode({ shape: "zoned-date-time", unit: "s" }, 0n, 42n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [canonical(value), c.choices.length],
         [
@@ -1099,7 +1099,7 @@ describe("shape", () => {
     });
 
     it("decodes an instant one unit from a change", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded({ shape: "zoned-date-time", unit: "ns" }, 1n, 1n, 0n, -1n),
         canonical(
@@ -1113,7 +1113,7 @@ describe("shape", () => {
     });
 
     it("decodes an instant away from the changes over the whole range", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded({ shape: "zoned-date-time", unit: "ms" }, 1n, 0n, 7n, 8n),
         canonical(
@@ -1157,7 +1157,7 @@ describe("shape", () => {
       }) => {
         const [day, time] = divmod(CHANGE.at + offset, 86_400n);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           decoded({ shape: "wall-time", unit: "s" }, 1n, 1n, 0n, 0n, side),
           canonical(
@@ -1178,7 +1178,7 @@ describe("shape", () => {
     }
 
     it("decodes a wall time away from the changes over the whole range", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded({ shape: "wall-time", unit: "s" }, 1n, 0n, 5n, 6n),
         canonical(
@@ -1225,7 +1225,7 @@ describe("shape", () => {
     it("decodes a present value from the flag 1 alone", ({ seat }) => {
       const optional = { shape: "optional", of: UINT8 };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [decode(optional)[0], decode(optional, 1n, 5n)[0]],
         [undefined, 5n],
@@ -1248,7 +1248,7 @@ describe("shape", () => {
         },
       };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(linked, 1n, 1n, 2n),
         canonical(
@@ -1285,7 +1285,12 @@ describe("shape", () => {
         depth += 1;
       }
 
-      check.equal(seat, depth, BUDGET / 2, "each pair of definitions counts two nodes");
+      check.isEqualTo(
+        seat,
+        depth,
+        BUDGET / 2,
+        "each pair of definitions counts two nodes",
+      );
     });
   });
 
@@ -1299,7 +1304,7 @@ describe("shape", () => {
         ],
       };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(record, 4n, 1n),
         canonical(
@@ -1325,7 +1330,7 @@ describe("shape", () => {
     it("decodes the payload of the variant that an index chooses", ({ seat }) => {
       const bare = decode(optional)[0] as Variant;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [bare.name, bare.hasPayload, decoded(optional, 1n, 9n)],
         ["none", false, canonical(new Variant("some", 9n))],
@@ -1371,7 +1376,7 @@ describe("shape", () => {
 
   describe("Ref", () => {
     it("decodes a tree through its definition", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(TREE, 3n, 1n, 4n, 0n, 0n),
         canonical(
@@ -1404,7 +1409,7 @@ describe("shape", () => {
         );
       }
 
-      check.equal(seat, largest, BUDGET, "the largest tree");
+      check.isEqualTo(seat, largest, BUDGET, "the largest tree");
     });
   });
 
@@ -1436,7 +1441,7 @@ describe("shape", () => {
         );
       }
 
-      check.equal(seat, largest, BUDGET, "the largest map");
+      check.isEqualTo(seat, largest, BUDGET, "the largest map");
     });
   });
 });

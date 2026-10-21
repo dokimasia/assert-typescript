@@ -51,7 +51,7 @@ const ROWS: readonly Row[] = [
     name: "equal",
     assertion: "equal",
     passing: (s) =>
-      forms.equal(
+      forms.isEqualTo(
         s,
         (x: number) => x,
         (x) => x,
@@ -59,7 +59,7 @@ const ROWS: readonly Row[] = [
         ...DIGITS,
       ),
     failing: (s) =>
-      forms.equal(
+      forms.isEqualTo(
         s,
         (x: number) => x,
         () => 0,
@@ -67,7 +67,7 @@ const ROWS: readonly Row[] = [
         ...DIGITS,
       ),
     relaxed: (s) =>
-      forms.equal(
+      forms.isEqualTo(
         s,
         () => Number.NaN,
         () => Number.NaN,
@@ -80,7 +80,7 @@ const ROWS: readonly Row[] = [
     name: "notEqual",
     assertion: "not-equal",
     passing: (s) =>
-      forms.notEqual(
+      forms.isNotEqualTo(
         s,
         (x: number) => x,
         (x) => x + 1,
@@ -88,7 +88,7 @@ const ROWS: readonly Row[] = [
         ...DIGITS,
       ),
     failing: (s) =>
-      forms.notEqual(
+      forms.isNotEqualTo(
         s,
         (x: number) => x,
         (x) => x,
@@ -123,8 +123,8 @@ const ROWS: readonly Row[] = [
   {
     name: "length",
     assertion: "length",
-    passing: (s) => forms.length(s, (x: number) => [x], 1, MSG, ...DIGITS),
-    failing: (s) => forms.length(s, (x: number) => [x], 2, MSG, ...DIGITS),
+    passing: (s) => forms.hasLength(s, (x: number) => [x], 1, MSG, ...DIGITS),
+    failing: (s) => forms.hasLength(s, (x: number) => [x], 2, MSG, ...DIGITS),
   },
   {
     name: "isEmpty",
@@ -141,14 +141,14 @@ const ROWS: readonly Row[] = [
   {
     name: "contains",
     assertion: "contains",
-    passing: (s) => forms.contains(s, (x: number) => [x, 0], 0, MSG, ...DIGITS),
-    failing: (s) => forms.contains(s, (x: number) => [x], 10, MSG, ...DIGITS),
+    passing: (s) => forms.doesContain(s, (x: number) => [x, 0], 0, MSG, ...DIGITS),
+    failing: (s) => forms.doesContain(s, (x: number) => [x], 10, MSG, ...DIGITS),
   },
   {
     name: "notContains",
     assertion: "not-contains",
-    passing: (s) => forms.notContains(s, (x: number) => [x], 10, MSG, ...DIGITS),
-    failing: (s) => forms.notContains(s, (x: number) => [x], 0, MSG, ...DIGITS),
+    passing: (s) => forms.doesNotContain(s, (x: number) => [x], 10, MSG, ...DIGITS),
+    failing: (s) => forms.doesNotContain(s, (x: number) => [x], 0, MSG, ...DIGITS),
   },
   {
     name: "containsInOrder",
@@ -193,14 +193,15 @@ const ROWS: readonly Row[] = [
   {
     name: "matches",
     assertion: "matches",
-    passing: (s) => forms.matches(s, (x: number) => `${x}`, "^[0-9]$", MSG, ...DIGITS),
-    failing: (s) => forms.matches(s, (x: number) => `${x}`, "^a", MSG, ...DIGITS),
+    passing: (s) =>
+      forms.doesMatch(s, (x: number) => `${x}`, "^[0-9]$", MSG, ...DIGITS),
+    failing: (s) => forms.doesMatch(s, (x: number) => `${x}`, "^a", MSG, ...DIGITS),
   },
   {
     name: "closeTo",
     assertion: "close-to",
-    passing: (s) => forms.closeTo(s, (x: number) => x, 5, 5, MSG, ...DIGITS),
-    failing: (s) => forms.closeTo(s, (x: number) => x, 0, 0.5, MSG, ...DIGITS),
+    passing: (s) => forms.isCloseTo(s, (x: number) => x, 5, 5, MSG, ...DIGITS),
+    failing: (s) => forms.isCloseTo(s, (x: number) => x, 0, 0.5, MSG, ...DIGITS),
   },
   {
     name: "inRange",
@@ -269,7 +270,7 @@ const ROWS: readonly Row[] = [
     name: "throws",
     assertion: "throws",
     passing: (s) =>
-      forms.throws(
+      forms.doesThrow(
         s,
         () => {
           throw new Error("e");
@@ -277,7 +278,7 @@ const ROWS: readonly Row[] = [
         MSG,
         ...DIGITS,
       ),
-    failing: (s) => forms.throws(s, () => 1, MSG, ...DIGITS),
+    failing: (s) => forms.doesThrow(s, () => 1, MSG, ...DIGITS),
   },
   {
     name: "doesNotThrow",
@@ -459,7 +460,7 @@ const ROWS: readonly Row[] = [
 describe("forms", () => {
   describe("FORM_IDS", () => {
     it("lists the id of every form that the module exports", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         forms.FORM_IDS,
         ROWS.map((row) => `prop-${row.assertion}`),
@@ -484,7 +485,7 @@ describe("forms", () => {
         await row.failing(recorder);
         const [failure] = recorder.failures;
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [failure?.assertion, failure?.contract, failure?.caseFailure?.assertion],
           [`prop-${row.assertion}`, MSG, row.assertion],

@@ -32,7 +32,7 @@ describe("source", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, bitLength(tt.give), tt.want, "the bit length");
+        check.isEqualTo(seat, bitLength(tt.give), tt.want, "the bit length");
       });
     }
   });
@@ -44,7 +44,7 @@ describe("source", () => {
     ];
     for (const tt of tests) {
       it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => new Source(tt.give)),
           `prop: seed ${tt.give} is no unsigned 64-bit integer`,
@@ -62,7 +62,7 @@ describe("source", () => {
         return expected.map(() => String(source.next()));
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         got,
         outputs.map(([, expected]) => expected),
@@ -76,7 +76,7 @@ describe("source", () => {
       const source = new Source(7n);
       const twin = new Source(7n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [source.below(1n), source.next()],
         [0n, twin.next()],
@@ -100,14 +100,14 @@ describe("source", () => {
         });
       });
 
-      check.equal(seat, got, want, "200 draws for each n");
+      check.isEqualTo(seat, got, want, "200 draws for each n");
     });
 
     it("returns whole outputs for 2^64 values", ({ seat }) => {
       const source = new Source(3n);
       const twin = new Source(3n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         Array.from({ length: 10 }, () => source.below(MASK + 1n)),
         Array.from({ length: 10 }, () => twin.next()),
@@ -121,7 +121,7 @@ describe("source", () => {
     ];
     for (const tt of tests) {
       it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => new Source(1n).below(tt.give)),
           `prop: below(${tt.give}) needs 1 <= n <= 2^64`,
@@ -136,7 +136,7 @@ describe("source", () => {
       const source = new Source(9n);
       const twin = new Source(9n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         Array.from({ length: 100 }, () => source.coin(3n, 8n)),
         Array.from({ length: 100 }, () => twin.below(8n) < 3n),
@@ -153,7 +153,7 @@ describe("source", () => {
       it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
         const [num, den] = tt.give;
 
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => new Source(1n).coin(num, den)),
           `prop: coin(${num}, ${den}) needs 0 <= num <= den`,
@@ -165,7 +165,7 @@ describe("source", () => {
 
   describe("caseSource", () => {
     it("returns the stream of the seed plus the index", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         caseSource(40n, 2n).next(),
         new Source(42n).next(),
@@ -174,7 +174,7 @@ describe("source", () => {
     });
 
     it("wraps the seed of a case at 2^64", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         caseSource(MASK, 1n).next(),
         new Source(0n).next(),
@@ -185,13 +185,13 @@ describe("source", () => {
 
   describe("mix", () => {
     it("returns 0 for no bytes", ({ seat }) => {
-      check.equal(seat, mix(new Uint8Array()), 0n, "the fold starts at 0");
+      check.isEqualTo(seat, mix(new Uint8Array()), 0n, "the fold starts at 0");
     });
 
     it("folds each byte through the first output of a stream", ({ seat }) => {
       const first = new Source(BigInt("a".charCodeAt(0))).next();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         mix(new TextEncoder().encode("ab")),
         new Source(first ^ BigInt("b".charCodeAt(0))).next(),
@@ -200,7 +200,7 @@ describe("source", () => {
     });
 
     it("returns the pinned seed of a contract", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         mix(new TextEncoder().encode("decoding undoes encoding")),
         CONTRACT_SEED,

@@ -44,25 +44,25 @@ describe("environment", () => {
     it("returns default for an unset variable", ({ seat }) => {
       setVariable(PROFILE_VARIABLE, undefined);
 
-      check.equal(seat, profileOf(), "default", "the default profile");
+      check.isEqualTo(seat, profileOf(), "default", "the default profile");
     });
 
     it("returns default for an empty variable", ({ seat }) => {
       setVariable(PROFILE_VARIABLE, "");
 
-      check.equal(seat, profileOf(), "default", "the default profile");
+      check.isEqualTo(seat, profileOf(), "default", "the default profile");
     });
 
     it("returns the profile that the variable names", ({ seat }) => {
       setVariable(PROFILE_VARIABLE, "campaign");
 
-      check.equal(seat, profileOf(), "campaign", "the campaign profile");
+      check.isEqualTo(seat, profileOf(), "campaign", "the campaign profile");
     });
 
     it("throws a fault at the variable for an unknown profile", ({ seat }) => {
       setVariable(PROFILE_VARIABLE, "fast");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => profileOf()),
         'DOKIMI_ASSERT_PROP_PROFILE: "fast" names none of the default, ci and campaign profiles',
@@ -76,14 +76,14 @@ describe("environment", () => {
       setVariable(PROFILE_VARIABLE, undefined);
       setVariable(SEED_VARIABLE, "5");
 
-      check.equal(seat, seedOf("a contract", 9n, false), 9n, "the stated seed");
+      check.isEqualTo(seat, seedOf("a contract", 9n, false), 9n, "the stated seed");
     });
 
     it("returns the seed that the variable states", ({ seat }) => {
       setVariable(PROFILE_VARIABLE, undefined);
       setVariable(SEED_VARIABLE, "18446744073709551615");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         seedOf("a contract", undefined, false),
         2n ** 64n - 1n,
@@ -97,7 +97,7 @@ describe("environment", () => {
       setVariable(PROFILE_VARIABLE, undefined);
       setVariable(SEED_VARIABLE, "0x10");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => seedOf("a contract", undefined, false)),
         'DOKIMI_ASSERT_PROP_SEED: "0x10" is no decimal number below 2^64',
@@ -109,7 +109,7 @@ describe("environment", () => {
       setVariable(PROFILE_VARIABLE, undefined);
       setVariable(SEED_VARIABLE, "18446744073709551616");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => seedOf("a contract", undefined, false)),
         'DOKIMI_ASSERT_PROP_SEED: "18446744073709551616" is no decimal number below 2^64',
@@ -121,7 +121,7 @@ describe("environment", () => {
       setVariable(SEED_VARIABLE, undefined);
       setVariable(PROFILE_VARIABLE, "ci");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         seedOf("a contract", undefined, false),
         DERIVED,
@@ -135,7 +135,7 @@ describe("environment", () => {
       setVariable(SEED_VARIABLE, undefined);
       setVariable(MUTANT, "1");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         seedOf("a contract", undefined, true),
         DERIVED,
@@ -158,7 +158,7 @@ describe("environment", () => {
     }) => {
       setVariable(PROFILE_VARIABLE, "fast");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => seedOf("a contract", 9n, false)),
         'DOKIMI_ASSERT_PROP_PROFILE: "fast" names none of the default, ci and campaign profiles',
@@ -173,7 +173,7 @@ describe("environment", () => {
       setVariable(PROFILE_VARIABLE, "campaign");
       setVariable(BUDGET_VARIABLE, "5");
 
-      check.equal(seat, budgetOf(false), 5000, "five seconds");
+      check.isEqualTo(seat, budgetOf(false), 5000, "five seconds");
     });
 
     it("returns 0 under the default profile", ({ seat }) => {
@@ -181,20 +181,20 @@ describe("environment", () => {
       setVariable(PROFILE_VARIABLE, undefined);
       setVariable(BUDGET_VARIABLE, "5");
 
-      check.equal(seat, budgetOf(false), 0, "no campaign");
+      check.isEqualTo(seat, budgetOf(false), 0, "no campaign");
     });
 
     it("returns 0 for a hermetic run", ({ seat }) => {
       setVariable(PROFILE_VARIABLE, "campaign");
 
-      check.equal(seat, budgetOf(true), 0, "no campaign");
+      check.isEqualTo(seat, budgetOf(true), 0, "no campaign");
     });
 
     it("returns 0 in a process of a mutation run", ({ seat }) => {
       setVariable(MUTANT, "1");
       setVariable(PROFILE_VARIABLE, "campaign");
 
-      check.equal(seat, budgetOf(false), 0, "no campaign");
+      check.isEqualTo(seat, budgetOf(false), 0, "no campaign");
     });
 
     const tests = [
@@ -209,7 +209,7 @@ describe("environment", () => {
         setVariable(PROFILE_VARIABLE, "campaign");
         setVariable(BUDGET_VARIABLE, tt.give);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => budgetOf(false)),
           `DOKIMI_ASSERT_PROP_BUDGET: ${JSON.stringify(tt.give ?? "")} is no whole number of seconds above 0`,
@@ -223,7 +223,7 @@ describe("environment", () => {
     it("returns the stated token with the option as its source", ({ seat }) => {
       setVariable(REPLAY_VARIABLE, "prop1:AB");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         tokenOf("prop1:AA", false),
         { token: "prop1:AA", source: "replay" },
@@ -236,7 +236,7 @@ describe("environment", () => {
     }) => {
       setVariable(REPLAY_VARIABLE, "prop1:AB");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         tokenOf(undefined, false),
         { token: "prop1:AB", source: REPLAY_VARIABLE },

@@ -38,7 +38,7 @@ describe("forall", () => {
       await forAll(recorder, "every digit is below 5", belowFive, hermetic(), seed(1n));
       const [failure] = recorder.failures;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           recorder.failures.length,
@@ -72,7 +72,7 @@ describe("forall", () => {
         seed(1n),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (records(recorder)[0]?.["detail"] as { cases: number } | undefined)?.cases,
         settled,
@@ -87,7 +87,7 @@ describe("forall", () => {
       const recorder = new Recorder();
       await forAll(recorder, "c", belowFive);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.message,
         'prop.forAll: DOKIMI_ASSERT_PROP_SEED: "abc" is no decimal number below 2^64',
@@ -132,7 +132,7 @@ describe("forall", () => {
       const message = thrown(() => standard.flush());
       await dropped.catch(() => undefined);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         message,
         "1 assertion(s) were never awaited, so they asserted nothing:\n  - a dropped property\nAdd `await` to the call.",

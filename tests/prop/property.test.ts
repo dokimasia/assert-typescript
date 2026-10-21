@@ -17,6 +17,7 @@ import {
 } from "../../src/prop/environment.js";
 import { bytes, integer } from "../../src/prop/generators.js";
 import {
+  around,
   cases,
   configure,
   draws,
@@ -87,6 +88,19 @@ async function runOn(
 /** Returns the detail of the first failure that recorder received. */
 function detailOf(recorder: Recorder): Readonly<Record<string, unknown>> {
   return recorder.failures[0]?.detail ?? {};
+}
+
+/** Returns the value of the first draw of the counterexample that recorder received. */
+function drawnOf(recorder: Recorder): unknown {
+  return (detailOf(recorder)["counterexample"] as { value: unknown }[])[0]?.value;
+}
+
+/** Returns the option of a wrapper that awaits run and counts its own calls in count. */
+function counting(count: { calls: number }): Option {
+  return around(async (run) => {
+    count.calls += 1;
+    await run();
+  });
 }
 
 /** Returns the texts that console.warn receives until the test ends. */
@@ -205,7 +219,7 @@ describe("property", () => {
       await runOn(recorder, PASSES);
       const [call] = records(recorder);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           recorder.failures,
@@ -224,7 +238,7 @@ describe("property", () => {
       await runOn(recorder, BELOW_FIVE);
       const [failure] = recorder.failures;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           recorder.failures.length,
@@ -236,7 +250,7 @@ describe("property", () => {
         [1, FOR_ALL, "c", WHERE, "counterexample"],
         "one record of the counterexample",
       );
-      check.equal(
+      check.isEqualTo(
         seat,
         (detailOf(recorder)["counterexample"] as { value: unknown }[])[0]?.value,
         5,
@@ -251,13 +265,13 @@ describe("property", () => {
       await runOn(recorder, BELOW_FIVE, shrink(0));
       const calls = records(recorder).slice(1);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [...new Set(calls.map((one) => `${one["parent"]} ${one["assertion"]}`))],
         ["1 true"],
         "every call of a case is under the property's call",
       );
-      check.equal(
+      check.isEqualTo(
         seat,
         calls[0]?.["phase"],
         "simplest",
@@ -273,7 +287,7 @@ describe("property", () => {
       await runOn(kept, PASSES, store(dir));
       await runOn(kept, PASSES, store(dir));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         kept.message,
         `prop.forAll: ${dir}: two properties of the test have the contract "c", and would share their stored cases`,
@@ -286,7 +300,7 @@ describe("property", () => {
       const token = encode([{ kind: "integer", value: 7n }]);
       await runOn(recorder, BELOW_FIVE, replay(token));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           detailOf(recorder)["outcome"],
@@ -304,7 +318,7 @@ describe("property", () => {
       const recorder = new Recorder().withSignal(AbortSignal.abort());
       await runOn(recorder, PASSES);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.message,
         "prop.forAll: the run stopped between two cases, because the seat's signal aborted",
@@ -339,7 +353,7 @@ describe("property", () => {
       const second = new Recorder();
       await runOn(second, BELOW_FIVE, store(dir));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [entry["property"], entry["counterexample"], records(second)[1]?.["phase"]],
         ["c", [{ label: "x", value: { type: "int", value: 5 } }], "stored"],
@@ -363,7 +377,7 @@ describe("property", () => {
       const recorder = new Recorder();
       await runOn(recorder, PASSES, store(dir));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.message,
         `prop.forAll: ${dir}: the store has damaged files: a.json`,
@@ -395,7 +409,7 @@ describe("property", () => {
         store(dir),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         texts,
         [
@@ -416,7 +430,7 @@ describe("property", () => {
         await runOn(new Recorder(), BELOW_FIVE, store(dir));
         chmodSync(dir, 0o700);
 
-        check.equal(seat, texts.length, 1, "one note");
+        check.isEqualTo(seat, texts.length, 1, "one note");
         check.hasPrefix(
           seat,
           texts[0],
@@ -447,7 +461,7 @@ describe("property", () => {
       );
       await property.run(recorder, Running.begin(recorder, WHERE), BELOW_FIVE);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [detailOf(recorder)["outcome"], readdirSync(dir).length],
         ["counterexample", 1],
@@ -480,7 +494,7 @@ describe("property", () => {
           const recorder = new Recorder();
           await runOn(recorder, PASSES, draws(tt.give));
 
-          check.equal(seat, recorder.message, tt.want, "the fault");
+          check.isEqualTo(seat, recorder.message, tt.want, "the fault");
         });
       }
     }
@@ -497,7 +511,7 @@ describe("property", () => {
         draws('[{"step": "put", "client": 1, "drain": true}]'),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.message,
         'prop.forAll: draws[0].step: the machine cannot take the step "put" there',
@@ -514,12 +528,174 @@ describe("property", () => {
         shrink(0),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [records(recorder)[1]?.["phase"], detailOf(recorder)["cases"]],
         ["example", 0],
         "the example fails first",
       );
+    });
+
+    it("runs the body once in each call of the wrapper", async ({ seat }) => {
+      const recorder = new Recorder();
+      let runs = 0;
+      const ran: number[] = [];
+      await runOn(
+        recorder,
+        (c) => {
+          runs += 1;
+          BELOW_FIVE(c);
+        },
+        around(async (run) => {
+          const before = runs;
+          await run();
+          ran.push(runs - before);
+        }),
+      );
+
+      check.isEqualTo(
+        seat,
+        ran,
+        Array.from({ length: runs }, () => 1),
+        "each call of the wrapper runs the body once",
+      );
+      check.isEqualTo(
+        seat,
+        [
+          ...new Set(
+            records(recorder)
+              .slice(1)
+              .map((one) => one["phase"]),
+          ),
+        ].sort(),
+        ["explain", "random", "replay", "shrink", "simplest"],
+        "the wrapper runs the cases of every phase",
+      );
+    });
+
+    it("reports the counterexample of the body's records under a wrapper", async ({
+      seat,
+    }) => {
+      const recorder = new Recorder();
+      await runOn(recorder, BELOW_FIVE, counting({ calls: 0 }));
+
+      check.isEqualTo(
+        seat,
+        [detailOf(recorder)["outcome"], drawnOf(recorder)],
+        ["counterexample", 5],
+        "the counterexample shrinks to 5",
+      );
+    });
+
+    it("waits for the run of a wrapper that does not await it", async ({ seat }) => {
+      const recorder = new Recorder();
+      await runOn(
+        recorder,
+        async (c) => {
+          await Promise.resolve();
+          BELOW_FIVE(c);
+        },
+        around((run) => {
+          void run();
+        }),
+      );
+
+      check.isEqualTo(
+        seat,
+        [detailOf(recorder)["outcome"], drawnOf(recorder)],
+        ["counterexample", 5],
+        "the counterexample shrinks to 5",
+      );
+    });
+
+    it("ends the call with a fault for a wrapper that returns without calling run", async ({
+      seat,
+    }) => {
+      const recorder = new Recorder();
+      let runs = 0;
+      await runOn(
+        recorder,
+        () => {
+          runs += 1;
+        },
+        around(() => {}),
+      );
+
+      check.isEqualTo(
+        seat,
+        [recorder.message, runs],
+        ["prop.forAll: around: the wrapper returned without calling run", 0],
+        "the fault, without a run of the body",
+      );
+    });
+
+    it("ends the call with a fault for a wrapper that calls run twice", async ({
+      seat,
+    }) => {
+      const recorder = new Recorder();
+      let runs = 0;
+      await runOn(
+        recorder,
+        () => {
+          runs += 1;
+        },
+        around(async (run) => {
+          await run();
+          await run();
+        }),
+      );
+
+      check.isEqualTo(
+        seat,
+        [recorder.message, runs],
+        ["prop.forAll: around: the wrapper called run more than once", 1],
+        "the fault, after one run of the body",
+      );
+    });
+
+    {
+      const tests = [
+        {
+          name: "a wrapper that throws",
+          give: (): void => {
+            throw new Error("no environment");
+          },
+        },
+        {
+          name: "a wrapper whose promise rejects",
+          give: (): Promise<void> => Promise.reject(new Error("no environment")),
+        },
+      ];
+      for (const tt of tests) {
+        it(`ends the call with a fault for ${tt.name}`, async ({ seat }) => {
+          const recorder = new Recorder();
+          await runOn(recorder, PASSES, around(tt.give));
+
+          check.isEqualTo(
+            seat,
+            recorder.message,
+            "prop.forAll: around: the wrapper threw: no environment",
+            "the fault",
+          );
+        });
+      }
+    }
+
+    it("runs nothing at a call of run after the wrapper settled", async ({ seat }) => {
+      let late: (() => Promise<void>) | undefined;
+      let runs = 0;
+      await runOn(
+        new Recorder(),
+        () => {
+          runs += 1;
+        },
+        around((run) => {
+          late = run;
+        }),
+      );
+      await late?.();
+
+      check.isEqualTo(seat, runs, 0, "the late call runs nothing");
     });
   });
 
@@ -535,7 +711,7 @@ describe("property", () => {
         PASSES,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           recorder.failures,
@@ -572,13 +748,13 @@ describe("property", () => {
       );
       const [drawn] = detailOf(recorder)["counterexample"] as { value: unknown }[];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [detailOf(recorder)["outcome"], drawn?.value],
         ["counterexample", 6],
         "found, not shrunk",
       );
-      check.equal(seat, texts.length, 1, "the difference is noted");
+      check.isEqualTo(seat, texts.length, 1, "the difference is noted");
     });
 
     it("ends the call with a fault for a second claim", async ({ seat }) => {
@@ -619,6 +795,21 @@ describe("property", () => {
       );
     });
 
+    it("runs each stored case inside the wrapper", async ({ seat }) => {
+      setVariable(MUTANT, undefined);
+      const dir = temporary();
+      await runOn(new Recorder(), BELOW_FIVE, store(dir));
+      const count = { calls: 0 };
+      const recorder = new Recorder();
+      await propertyOf(recorder, store(dir), counting(count)).replayStored(
+        recorder,
+        Running.begin(recorder, WHERE),
+        PASSES,
+      );
+
+      check.isEqualTo(seat, count.calls, 1, "one call for the one stored case");
+    });
+
     it("ends the call with a fault for a run whose seat's signal aborted", async ({
       seat,
     }) => {
@@ -657,7 +848,7 @@ describe("property", () => {
         Uint8Array.of(1, 1),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (records(recorder)[0]?.["detail"] as Record<string, unknown> | undefined)?.[
           "cases"
@@ -665,6 +856,19 @@ describe("property", () => {
         1,
         "one valid case",
       );
+    });
+
+    it("runs the case of an input inside the wrapper", async ({ seat }) => {
+      const count = { calls: 0 };
+      const recorder = new Recorder();
+      await propertyOf(recorder, counting(count)).input(
+        recorder,
+        Running.begin(recorder, WHERE),
+        StartsWithSeven,
+        Uint8Array.of(1, 1),
+      );
+
+      check.isEqualTo(seat, count.calls, 1, "one call for the one input");
     });
 
     it("counts one rejected case of an input that the body rejects", async ({
@@ -678,7 +882,7 @@ describe("property", () => {
         Uint8Array.of(),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (records(recorder)[0]?.["detail"] as Record<string, unknown> | undefined)?.[
           "rejected"
@@ -699,7 +903,7 @@ describe("property", () => {
         Uint8Array.of(3, 7, 7, 7),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           detailOf(recorder)["outcome"],
@@ -748,7 +952,12 @@ describe("property", () => {
         Uint8Array.of(0, 0),
       );
 
-      check.equal(seat, detailOf(recorder)["outcome"], "flaky", "the replay passes");
+      check.isEqualTo(
+        seat,
+        detailOf(recorder)["outcome"],
+        "flaky",
+        "the replay passes",
+      );
     });
 
     it("ends the call with a fault for a run whose seat's signal aborted", async ({
@@ -776,7 +985,7 @@ describe("property", () => {
       const recorder = new Recorder();
       Property.fault(Running.begin(recorder, WHERE), CALL, new RangeError("bad"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.message, records(recorder)[0]?.["verdict"]],
         ["prop.forAll: bad", "error"],

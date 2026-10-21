@@ -51,7 +51,7 @@ function belowFive(
 describe("form", () => {
   describe("INPUT", () => {
     it("labels the one input of a form", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [...INPUT, ...PAIR, ...TRIPLE],
         ["input", "a", "b", "a", "b", "c"],
@@ -71,7 +71,7 @@ describe("form", () => {
         belowFive,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.failures, records(recorder)[0]?.["assertion"]],
         [[], "prop-below"],
@@ -92,7 +92,7 @@ describe("form", () => {
       );
       const [failure] = recorder.failures;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           failure?.assertion,
@@ -120,7 +120,7 @@ describe("form", () => {
         belowFive,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (
           recorder.failures[0]?.detail["counterexample"] as
@@ -148,7 +148,7 @@ describe("form", () => {
         },
       );
 
-      check.equal(seat, passed, relaxations, "the relaxations in order");
+      check.isEqualTo(seat, passed, relaxations, "the relaxations in order");
     });
 
     it("uses the later of two generators", async ({ seat }) => {
@@ -174,7 +174,7 @@ describe("form", () => {
         () => undefined,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (records(recorder)[0]?.["detail"] as { cases: number } | undefined)?.cases,
         7,
@@ -195,7 +195,7 @@ describe("form", () => {
         value: unknown;
       }[];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [records(recorder)[1]?.["phase"], drawn?.value],
         ["example", 5],
@@ -216,7 +216,7 @@ describe("form", () => {
         },
       );
 
-      check.equal(seat, seen.slice(0, 2), [3, 4], "the two examples first");
+      check.isEqualTo(seat, seen.slice(0, 2), [3, 4], "the two examples first");
     });
 
     it("reports a failing example of a generator without an inverse as found", async ({
@@ -233,7 +233,7 @@ describe("form", () => {
       );
       const detail = recorder.failures[0]?.detail ?? {};
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           (detail["counterexample"] as { value: unknown }[])[0]?.value,
@@ -317,7 +317,7 @@ describe("form", () => {
         belowFive,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.message,
         "prop.below: the map broke",

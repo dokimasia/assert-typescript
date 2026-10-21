@@ -35,7 +35,7 @@ interface WidthCase<W> {
 
 describe("float", () => {
   it("exports the canonical NaN and the end of the integral group", ({ seat }) => {
-    check.equal(
+    check.isEqualTo(
       seat,
       [NAN_BITS, INTEGRAL_LIMIT],
       [0x7ff8000000000000n, 2 ** 53],
@@ -45,7 +45,7 @@ describe("float", () => {
 
   describe("bitsOf", () => {
     it("returns the binary64 bits of a float", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [bitsOf(1), bitsOf(-0), bitsOf(Number.NaN)],
         [0x3ff0000000000000n, 1n << 63n, NAN_BITS],
@@ -56,7 +56,7 @@ describe("float", () => {
 
   describe("fromBits", () => {
     it("returns the float of binary64 bits", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [fromBits(0x3ff0000000000000n), fromBits(1n)],
         [1, Number.MIN_VALUE],
@@ -67,7 +67,7 @@ describe("float", () => {
 
   describe("fromBits32", () => {
     it("returns the float of binary32 bits", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [fromBits32(0x3f800000n), MIN_FLOAT32, MAX_FLOAT32],
         [1, 2 ** -149, (2 - 2 ** -23) * 2 ** 127],
@@ -90,7 +90,7 @@ describe("float", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, representable(...tt.give), tt.want, "the verdict");
+        check.isEqualTo(seat, representable(...tt.give), tt.want, "the verdict");
       });
     }
   });
@@ -202,7 +202,7 @@ describe("float", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, sameFloat(...tt.give), tt.want, "the verdict");
+        check.isEqualTo(seat, sameFloat(...tt.give), tt.want, "the verdict");
       });
     }
   });
@@ -261,7 +261,7 @@ describe("float", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, floatKey(tt.give), tt.want, "the key");
+        check.isEqualTo(seat, floatKey(tt.give), tt.want, "the key");
       });
     }
   });
@@ -300,7 +300,7 @@ describe("float", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, Math.sign(compareKeys(...tt.give)), tt.want, "the order");
+        check.isEqualTo(seat, Math.sign(compareKeys(...tt.give)), tt.want, "the order");
       });
     }
   });

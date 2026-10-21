@@ -12,7 +12,7 @@ import { thrown } from "../../helpers.js";
 describe("coverage", () => {
   describe("CHECKS", () => {
     it("checks at each power of two up to 8 times the cases", ({ seat }) => {
-      check.equal(seat, [...CHECKS], [1, 2, 4, 8], "the multiples of cases");
+      check.isEqualTo(seat, [...CHECKS], [1, 2, 4, 8], "the multiples of cases");
     });
   });
 
@@ -85,7 +85,7 @@ describe("coverage", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, verdict(...tt.give), tt.want, "the verdict");
+        check.isEqualTo(seat, verdict(...tt.give), tt.want, "the verdict");
       });
     }
 
@@ -98,7 +98,7 @@ describe("coverage", () => {
       it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
         const [k, n] = tt.give;
 
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => verdict(k, n, 0.5, false, false)),
           `prop: ${k} of ${n} is no share`,

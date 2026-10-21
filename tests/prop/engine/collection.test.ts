@@ -58,7 +58,7 @@ function repeat(count: number, ...values: bigint[]): bigint[] {
 
 describe("collection", () => {
   it("exports the labels of an element or an entry", ({ seat }) => {
-    check.equal(seat, [ELEMENT, ENTRY], ["element", "entry"], "the two labels");
+    check.isEqualTo(seat, [ELEMENT, ENTRY], ["element", "entry"], "the two labels");
   });
 
   describe("new Sizes", () => {
@@ -76,7 +76,7 @@ describe("collection", () => {
     ];
     for (const tt of tests) {
       it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => new Sizes(...tt.give)),
           tt.want,
@@ -88,7 +88,7 @@ describe("collection", () => {
 
   describe("Sizes.average", () => {
     it("returns the average length of the length rule", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [new Sizes().average, new Sizes(0, 1).average, new Sizes(10).average],
         [5, 1, 20],
@@ -103,7 +103,7 @@ describe("collection", () => {
       const sizes = new Sizes(1, 2);
       const decided = [0, 1, 2].map((count) => more(c, count, sizes));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           decided,
@@ -122,7 +122,7 @@ describe("collection", () => {
     it("stops a stopped collection as one at its maximum", ({ seat }) => {
       const c = replay(1n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [more(c, 3, new Sizes(), true), c.requests[0]?.bounds.id],
         [false, "integer 0 0"],
@@ -137,7 +137,7 @@ describe("collection", () => {
         more(c, count, new Sizes(0, 100), false, 30),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         got,
         got.map(() => twin.coin(30n, 31n)),
@@ -148,7 +148,7 @@ describe("collection", () => {
     it("gives the first flag the edge 1", ({ seat }) => {
       const c = new Case(new Edge("min"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [more(c, 0, new Sizes()), more(c, 1, new Sizes())],
         [true, false],
@@ -161,7 +161,7 @@ describe("collection", () => {
     it("opens the span of each element at its flag", ({ seat }) => {
       const c = replay(1n, 7n, 1n, 3n, 0n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [digits(c, new Sizes(), false), c.spans],
         [
@@ -176,7 +176,7 @@ describe("collection", () => {
     });
 
     it("keeps duplicates without a key", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         digits(replay(1n, 4n, 1n, 4n, 0n), new Sizes(), false),
         [4n, 4n],
@@ -185,7 +185,7 @@ describe("collection", () => {
     });
 
     it("discards an element whose key repeats", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         digits(replay(1n, 4n, 1n, 4n, 1n, 5n, 0n), new Sizes(), true),
         [4n, 5n],
@@ -196,7 +196,7 @@ describe("collection", () => {
     it("continues after one discard fewer than the limit", ({ seat }) => {
       const values = [1n, 4n, ...repeat(DISCARD_LIMIT - 1, 1n, 4n), 1n, 5n, 0n];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         digits(replay(...values), new Sizes(), true),
         [4n, 5n],
@@ -207,7 +207,7 @@ describe("collection", () => {
     it("stops at the limit of discards without another flag", ({ seat }) => {
       const c = replay(1n, 4n, ...repeat(DISCARD_LIMIT, 1n, 4n), 1n, 5n, 0n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [digits(c, new Sizes(), true), c.choices.length],
         [[4n], 2 + 2 * DISCARD_LIMIT],
@@ -229,7 +229,7 @@ describe("collection", () => {
         0n,
       ];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         digits(replay(...values), new Sizes(), true),
         [4n, 5n, 6n],
@@ -240,11 +240,11 @@ describe("collection", () => {
     it("keeps a collection that stops at its minimum", ({ seat }) => {
       const c = replay(1n, 4n, ...repeat(DISCARD_LIMIT, 1n, 4n));
 
-      check.equal(seat, digits(c, new Sizes(1), true), [4n], "the minimum of one");
+      check.isEqualTo(seat, digits(c, new Sizes(1), true), [4n], "the minimum of one");
     });
 
     it("throws Rejected for a collection that stops below its minimum", ({ seat }) => {
-      const err = check.throws(
+      const err = check.doesThrow(
         seat,
         () => digits(replay(), new Sizes(2), true),
         "the targets repeat",
@@ -256,7 +256,7 @@ describe("collection", () => {
     it("stops when stop returns true at the minimum", ({ seat }) => {
       const c = replay(1n, 4n, 1n, 5n, 1n, 6n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         digits(c, new Sizes(1), false, () => true),
         [4n],
@@ -272,7 +272,7 @@ describe("collection", () => {
         return false;
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         asked,
         [2, 4],

@@ -76,7 +76,7 @@ describe("pattern", () => {
     ];
     for (const tt of targets) {
       it(`decodes the simplest match of ${tt.give} from no choice`, ({ seat }) => {
-        check.equal(seat, decode(tt.give)[0], tt.want, "the target");
+        check.isEqualTo(seat, decode(tt.give)[0], tt.want, "the target");
       });
     }
 
@@ -97,14 +97,14 @@ describe("pattern", () => {
     it("throws a PatternError for a pattern outside the subset", ({ seat }) => {
       check.errorIs(
         seat,
-        check.throws(seat, () => piece("a**"), "a quantifier after a quantifier"),
+        check.doesThrow(seat, () => piece("a**"), "a quantifier after a quantifier"),
         PatternError,
         "the parser's refusal",
       );
     });
 
     it("throws a RangeError for a class without a member", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => piece("[^\u0000-\u{10ffff}]")),
         "prop: a class in the pattern has no member",
@@ -119,7 +119,7 @@ describe("pattern", () => {
       const c = new Case(new Replaying([]));
       new Literal("x").emit(c, out);
 
-      check.equal(seat, [out, c.choices], [["x"], []], "the character");
+      check.isEqualTo(seat, [out, c.choices], [["x"], []], "the character");
     });
   });
 
@@ -127,7 +127,7 @@ describe("pattern", () => {
     it("appends the member at the recorded index in the order of the default alphabet", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [0n, 1n, 2n].map((i) => decode("[A0a]", i)[0]),
         ["0", "a", "A"],
@@ -136,13 +136,18 @@ describe("pattern", () => {
     });
 
     it("skips the members of a negated class", ({ seat }) => {
-      check.equal(seat, decode("[^a]", 10n)[0], "b", "a is index 10 of the alphabet");
+      check.isEqualTo(
+        seat,
+        decode("[^a]", 10n)[0],
+        "b",
+        "a is index 10 of the alphabet",
+      );
     });
 
     it("chooses an index bounded by its size", ({ seat }) => {
       const [value, c] = decode("[a-c]", 2n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [value, c.requests[0]?.bounds.id],
         ["c", "integer 0 2"],
@@ -151,7 +156,7 @@ describe("pattern", () => {
     });
 
     it("appends a member of a later interval", ({ seat }) => {
-      check.equal(seat, decode("[0x]", 1n)[0], "x", "the second interval");
+      check.isEqualTo(seat, decode("[0x]", 1n)[0], "x", "the second interval");
     });
   });
 
@@ -174,7 +179,7 @@ describe("pattern", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, digitsAndX.offsetOf(tt.give), tt.want, "the offset");
+        check.isEqualTo(seat, digitsAndX.offsetOf(tt.give), tt.want, "the offset");
       });
     }
   });
@@ -183,7 +188,7 @@ describe("pattern", () => {
     it("contains every character of . but the five line terminators", ({ seat }) => {
       const dot = piece(".") as Class;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [dot.size, ["\n", "\r", "\u0085", " ", " "].map((char) => dot.offsetOf(char))],
         [SIZE - 5, [undefined, undefined, undefined, undefined, undefined]],
@@ -192,7 +197,7 @@ describe("pattern", () => {
     });
 
     it("contains the ASCII members of the digit and word shorthands", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [(piece("\\d") as Class).size, (piece("\\w") as Class).size],
         [10, 63],
@@ -201,7 +206,7 @@ describe("pattern", () => {
     });
 
     it("contains the five members of the space shorthand from space", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [0n, 1n, 2n, 3n, 4n].map((i) => decode("\\s", i)[0]),
         [" ", "\t", "\n", "\f", "\r"],
@@ -218,17 +223,17 @@ describe("pattern", () => {
         out,
       );
 
-      check.equal(seat, out, ["a", "b"], "two characters");
+      check.isEqualTo(seat, out, ["a", "b"], "two characters");
     });
   });
 
   describe("Alternation.emit", () => {
     it("appends the branch at the recorded index", ({ seat }) => {
-      check.equal(seat, decode("(foo|bar)", 1n)[0], "bar", "the second branch");
+      check.isEqualTo(seat, decode("(foo|bar)", 1n)[0], "bar", "the second branch");
     });
 
     it("bounds its index by its branches", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         new Alternation([new Literal("a"), new Literal("b"), new Literal("c")]).bounds
           .id,
@@ -240,7 +245,7 @@ describe("pattern", () => {
 
   describe("Repeat.emit", () => {
     it("appends its repetitions as a collection", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode("a*", 1n, 1n, 0n)[0],
         "aa",
@@ -249,7 +254,7 @@ describe("pattern", () => {
     });
 
     it("forces the flags of a fixed count", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         decode("(ab|c){2}", 0n, 1n, 0n, 0n, 1n)[0],
         "cab",
@@ -260,7 +265,7 @@ describe("pattern", () => {
     it("decodes in spans with the edges of its flags", ({ seat }) => {
       const [, c] = decode("(a|b)[cd]*", 1n, 1n, 1n, 0n);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [c.spans, c.requests.map((request) => request.edge)],
         [
@@ -280,7 +285,7 @@ describe("pattern", () => {
       const item = new Literal("a");
       const repeat = new Repeat(item, new Sizes(1, 2));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [repeat.item === item, repeat.sizes.minSize, repeat.sizes.maxSize],
         [true, 1, 2],

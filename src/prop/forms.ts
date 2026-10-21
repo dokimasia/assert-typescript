@@ -44,23 +44,23 @@ function form(
 
 /** The forms, by their TypeScript name: the assertion's id, and whether the assertion takes relaxations. */
 const FORMS = {
-  equal: form("equal", "equal", true),
-  notEqual: form("notEqual", "not-equal", true),
+  isEqualTo: form("isEqualTo", "equal", true),
+  isNotEqualTo: form("isNotEqualTo", "not-equal", true),
   isTrue: form("isTrue", "true", false),
   isFalse: form("isFalse", "false", false),
   isNil: form("isNil", "nil", false),
   isNotNil: form("isNotNil", "not-nil", false),
-  length: form("length", "length", false),
+  hasLength: form("hasLength", "length", false),
   isEmpty: form("isEmpty", "empty", false),
   isNotEmpty: form("isNotEmpty", "not-empty", false),
-  contains: form("contains", "contains", true),
-  notContains: form("notContains", "not-contains", true),
+  doesContain: form("doesContain", "contains", true),
+  doesNotContain: form("doesNotContain", "not-contains", true),
   containsInOrder: form("containsInOrder", "contains-in-order", false),
   isPermutation: form("isPermutation", "permutation", true),
   hasPrefix: form("hasPrefix", "has-prefix", false),
   hasSuffix: form("hasSuffix", "has-suffix", false),
-  matches: form("matches", "matches", false),
-  closeTo: form("closeTo", "close-to", false),
+  doesMatch: form("doesMatch", "matches", false),
+  isCloseTo: form("isCloseTo", "close-to", false),
   inRange: form("inRange", "in-range", false),
   pairwise: form("pairwise", "pairwise", false),
   noError: form("noError", "err-absent", false),
@@ -68,7 +68,7 @@ const FORMS = {
   errorIs: form("errorIs", "err-is", false),
   errorIsNot: form("errorIsNot", "err-is-not", false),
   errorAs: form("errorAs", "err-as", false),
-  throws: form("throws", "throws", false),
+  doesThrow: form("doesThrow", "throws", false),
   doesNotThrow: form("doesNotThrow", "not-throws", false),
   isPure: form("isPure", "pure", true),
   isNotPure: form("isNotPure", "not-pure", true),
@@ -89,8 +89,8 @@ export const FORM_IDS: readonly string[] = Object.values(FORMS).map(
 );
 
 /**
- * Runs equal on got(input) and want(input) for each generated input. It is
- * the form prop-equal, and takes the relaxations of equal.
+ * Runs isEqualTo on got(input) and want(input) for each generated input. It
+ * is the form prop-equal, and takes the relaxations of equal.
  *
  * @param seat - Where the failure is reported.
  * @param got - Returns the value that the code under test produces for the input.
@@ -99,24 +99,24 @@ export const FORM_IDS: readonly string[] = Object.values(FORMS).map(
  * @param options - The input's generator, the run's settings, examples and relaxations.
  * @returns A promise of the verdict.
  * @example
- * await prop.equal(seat, (xs: number[]) => sort(sort(xs)), (xs) => sort(xs),
+ * await prop.isEqualTo(seat, (xs: number[]) => sort(sort(xs)), (xs) => sort(xs),
  *   "sorting is idempotent", prop.using(prop.list(prop.integer(0, 9))));
  */
-export function equal<T, U>(
+export function isEqualTo<T, U>(
   seat: Seat,
   got: (input: T) => U,
   want: (input: T) => U,
   msg: string,
   ...options: FormOption[]
 ): Promise<void> {
-  return runForm(seat, FORMS.equal, msg, options, (c, [input], relaxations) =>
+  return runForm(seat, FORMS.isEqualTo, msg, options, (c, [input], relaxations) =>
     value.equal(c, MODE, got(input as T), want(input as T), msg, ...relaxations),
   );
 }
 
 /**
- * Runs notEqual on got(input) and want(input) for each generated input. It
- * is the form prop-not-equal, and takes the relaxations of not-equal.
+ * Runs isNotEqualTo on got(input) and want(input) for each generated input.
+ * It is the form prop-not-equal, and takes the relaxations of not-equal.
  *
  * @param seat - Where the failure is reported.
  * @param got - Returns the value that the code under test produces for the input.
@@ -125,17 +125,17 @@ export function equal<T, U>(
  * @param options - The input's generator, the run's settings, examples and relaxations.
  * @returns A promise of the verdict.
  * @example
- * await prop.notEqual(seat, (s: string) => hash(s), (s) => hash(`${s}!`),
+ * await prop.isNotEqualTo(seat, (s: string) => hash(s), (s) => hash(`${s}!`),
  *   "a suffix changes the hash", prop.using(prop.string()));
  */
-export function notEqual<T, U>(
+export function isNotEqualTo<T, U>(
   seat: Seat,
   got: (input: T) => U,
   want: (input: T) => U,
   msg: string,
   ...options: FormOption[]
 ): Promise<void> {
-  return runForm(seat, FORMS.notEqual, msg, options, (c, [input], relaxations) =>
+  return runForm(seat, FORMS.isNotEqualTo, msg, options, (c, [input], relaxations) =>
     value.notEqual(c, MODE, got(input as T), want(input as T), msg, ...relaxations),
   );
 }
@@ -237,7 +237,7 @@ export function isNotNil<T>(
 }
 
 /**
- * Runs length on got(input) and want for each generated input. It is the
+ * Runs hasLength on got(input) and want for each generated input. It is the
  * form prop-length.
  *
  * @param seat - Where the failure is reported.
@@ -247,17 +247,17 @@ export function isNotNil<T>(
  * @param options - The input's generator, the run's settings and examples.
  * @returns A promise of the verdict.
  * @example
- * await prop.length(seat, (b: Uint8Array) => digest(b), 32, "a digest has 32 bytes",
+ * await prop.hasLength(seat, (b: Uint8Array) => digest(b), 32, "a digest has 32 bytes",
  *   prop.using(prop.bytes()));
  */
-export function length<T>(
+export function hasLength<T>(
   seat: Seat,
   got: (input: T) => unknown,
   want: number,
   msg: string,
   ...options: FormOption[]
 ): Promise<void> {
-  return runForm(seat, FORMS.length, msg, options, (c, [input]) =>
+  return runForm(seat, FORMS.hasLength, msg, options, (c, [input]) =>
     value.length(c, MODE, got(input as T), want, msg),
   );
 }
@@ -311,7 +311,7 @@ export function isNotEmpty<T>(
 }
 
 /**
- * Runs contains on got(input) and needle for each generated input. It is
+ * Runs doesContain on got(input) and needle for each generated input. It is
  * the form prop-contains, and takes the relaxations of contains.
  *
  * @param seat - Where the failure is reported.
@@ -321,23 +321,23 @@ export function isNotEmpty<T>(
  * @param options - The input's generator, the run's settings, examples and relaxations.
  * @returns A promise of the verdict.
  * @example
- * await prop.contains(seat, (xs: number[]) => withSentinel(xs), -1, "the sentinel is added",
+ * await prop.doesContain(seat, (xs: number[]) => withSentinel(xs), -1, "the sentinel is added",
  *   prop.using(prop.list(prop.integer(0, 9))));
  */
-export function contains<T>(
+export function doesContain<T>(
   seat: Seat,
   got: (input: T) => unknown,
   needle: unknown,
   msg: string,
   ...options: FormOption[]
 ): Promise<void> {
-  return runForm(seat, FORMS.contains, msg, options, (c, [input], relaxations) =>
+  return runForm(seat, FORMS.doesContain, msg, options, (c, [input], relaxations) =>
     value.contains(c, MODE, got(input as T), needle, msg, ...relaxations),
   );
 }
 
 /**
- * Runs notContains on got(input) and needle for each generated input. It
+ * Runs doesNotContain on got(input) and needle for each generated input. It
  * is the form prop-not-contains, and takes the relaxations of not-contains.
  *
  * @param seat - Where the failure is reported.
@@ -347,17 +347,17 @@ export function contains<T>(
  * @param options - The input's generator, the run's settings, examples and relaxations.
  * @returns A promise of the verdict.
  * @example
- * await prop.notContains(seat, (s: string) => escape(s), "<", "escaping removes every <",
+ * await prop.doesNotContain(seat, (s: string) => escape(s), "<", "escaping removes every <",
  *   prop.using(prop.string()));
  */
-export function notContains<T>(
+export function doesNotContain<T>(
   seat: Seat,
   got: (input: T) => unknown,
   needle: unknown,
   msg: string,
   ...options: FormOption[]
 ): Promise<void> {
-  return runForm(seat, FORMS.notContains, msg, options, (c, [input], relaxations) =>
+  return runForm(seat, FORMS.doesNotContain, msg, options, (c, [input], relaxations) =>
     value.notContains(c, MODE, got(input as T), needle, msg, ...relaxations),
   );
 }
@@ -475,7 +475,7 @@ export function hasSuffix<T>(
 }
 
 /**
- * Runs matches on got(input) and pattern for each generated input. It is
+ * Runs doesMatch on got(input) and pattern for each generated input. It is
  * the form prop-matches.
  *
  * @param seat - Where the failure is reported.
@@ -485,23 +485,23 @@ export function hasSuffix<T>(
  * @param options - The input's generator, the run's settings and examples.
  * @returns A promise of the verdict.
  * @example
- * await prop.matches(seat, (n: number) => format(n), "^-?[0-9]+$", "a number formats as digits",
+ * await prop.doesMatch(seat, (n: number) => format(n), "^-?[0-9]+$", "a number formats as digits",
  *   prop.using(prop.integer(-1000, 1000)));
  */
-export function matches<T>(
+export function doesMatch<T>(
   seat: Seat,
   got: (input: T) => unknown,
   pattern: string,
   msg: string,
   ...options: FormOption[]
 ): Promise<void> {
-  return runForm(seat, FORMS.matches, msg, options, (c, [input]) =>
+  return runForm(seat, FORMS.doesMatch, msg, options, (c, [input]) =>
     value.matches(c, MODE, got(input as T), pattern, msg),
   );
 }
 
 /**
- * Runs closeTo on got(input), want and tolerance for each generated input.
+ * Runs isCloseTo on got(input), want and tolerance for each generated input.
  * It is the form prop-close-to.
  *
  * @param seat - Where the failure is reported.
@@ -512,10 +512,10 @@ export function matches<T>(
  * @param options - The input's generator, the run's settings and examples.
  * @returns A promise of the verdict.
  * @example
- * await prop.closeTo(seat, (x: number) => Math.sin(x) ** 2 + Math.cos(x) ** 2, 1, 1e-9,
+ * await prop.isCloseTo(seat, (x: number) => Math.sin(x) ** 2 + Math.cos(x) ** 2, 1, 1e-9,
  *   "sin² + cos² is 1", prop.using(prop.float(-10, 10)));
  */
-export function closeTo<T>(
+export function isCloseTo<T>(
   seat: Seat,
   got: (input: T) => unknown,
   want: number,
@@ -523,7 +523,7 @@ export function closeTo<T>(
   msg: string,
   ...options: FormOption[]
 ): Promise<void> {
-  return runForm(seat, FORMS.closeTo, msg, options, (c, [input]) =>
+  return runForm(seat, FORMS.isCloseTo, msg, options, (c, [input]) =>
     value.closeTo(c, MODE, got(input as T), want, tolerance, msg),
   );
 }
@@ -709,8 +709,8 @@ export function errorAs<T, E>(
 }
 
 /**
- * Runs throws on a call of fn with the input for each generated input. It
- * is the form prop-throws.
+ * Runs doesThrow on a call of fn with the input for each generated input.
+ * It is the form prop-throws.
  *
  * @param seat - Where the failure is reported.
  * @param fn - Called with the input. It must be synchronous.
@@ -718,16 +718,16 @@ export function errorAs<T, E>(
  * @param options - The input's generator, the run's settings and examples.
  * @returns A promise of the verdict.
  * @example
- * await prop.throws(seat, (s: string) => parse(`{${s}`), "an open brace is refused",
+ * await prop.doesThrow(seat, (s: string) => parse(`{${s}`), "an open brace is refused",
  *   prop.using(prop.string()));
  */
-export function throws<T>(
+export function doesThrow<T>(
   seat: Seat,
   fn: (input: T) => unknown,
   msg: string,
   ...options: FormOption[]
 ): Promise<void> {
-  return runForm(seat, FORMS.throws, msg, options, (c, [input]) => {
+  return runForm(seat, FORMS.doesThrow, msg, options, (c, [input]) => {
     raising.throws(c, MODE, () => fn(input as T), msg);
   });
 }

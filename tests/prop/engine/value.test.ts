@@ -16,7 +16,7 @@ function named(): number {
 describe("value", () => {
   describe("new Pairs", () => {
     it("keeps the entries in order", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         new Pairs([
           [1n, "a"],
@@ -33,7 +33,7 @@ describe("value", () => {
 
   describe("new Fields", () => {
     it("keeps the fields in order", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         new Fields([
           ["b", 1n],
@@ -52,7 +52,7 @@ describe("value", () => {
     it("returns a variant with a payload when one is given", ({ seat }) => {
       const variant = new Variant("note", undefined);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [variant.name, variant.hasPayload, variant.payload],
         ["note", true, undefined],
@@ -63,7 +63,7 @@ describe("value", () => {
     it("returns a variant without a payload when none is given", ({ seat }) => {
       const variant = new Variant("pending");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [variant.name, variant.hasPayload],
         ["pending", false],
@@ -152,7 +152,7 @@ describe("value", () => {
     ];
     for (const tt of equal) {
       it(`returns one text for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           canonical(tt.give[0]),
           canonical(tt.give[1]),
@@ -234,14 +234,19 @@ describe("value", () => {
     ];
     for (const tt of different) {
       it(`returns two texts for ${tt.name}`, ({ seat }) => {
-        check.notEqual(seat, canonical(tt.give[0]), canonical(tt.give[1]), "two texts");
+        check.isNotEqualTo(
+          seat,
+          canonical(tt.give[0]),
+          canonical(tt.give[1]),
+          "two texts",
+        );
       });
     }
 
     it("returns one text for an instance of a class and itself", ({ seat }) => {
       const widget = new Widget();
 
-      check.equal(seat, canonical(widget), canonical(widget), "the identity");
+      check.isEqualTo(seat, canonical(widget), canonical(widget), "the identity");
     });
 
     it("returns one text for a symbol without a registered key and itself", ({
@@ -249,7 +254,7 @@ describe("value", () => {
     }) => {
       const symbol = Symbol("dokimi");
 
-      check.equal(seat, canonical(symbol), canonical(symbol), "the identity");
+      check.isEqualTo(seat, canonical(symbol), canonical(symbol), "the identity");
     });
   });
 });

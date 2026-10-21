@@ -16,7 +16,7 @@
  * });
  * ```
  *
- * Each property form, such as {@link equal} or {@link roundTrip}, runs one
+ * Each property form, such as {@link isEqualTo} or {@link roundTrip}, runs one
  * assertion on every generated input, which the option {@link using}
  * generates. {@link fuzz} replays the stored cases of a property and
  * returns the target of a fuzzer. The registry names generators and shapes:
@@ -38,42 +38,42 @@ export { Generator } from "./engine/generator.js";
 export { forAll } from "./forall.js";
 export {
   accumulates,
-  closeTo,
-  contains,
   containsInOrder,
+  doesContain,
+  doesMatch,
+  doesNotContain,
   doesNotThrow,
-  equal,
+  doesThrow,
   errorAs,
   errorIs,
   errorIsNot,
   hasError,
+  hasLength,
   hasPrefix,
   hasSuffix,
   honoursCancellation,
   honoursDeadline,
   inRange,
   isAssociative,
+  isCloseTo,
   isCommutative,
   isDeterministic,
   isEmpty,
+  isEqualTo,
   isFalse,
   isIdempotent,
   isNil,
   isNotEmpty,
+  isNotEqualTo,
   isNotNil,
   isNotPure,
   isPermutation,
   isPure,
   isTrue,
-  length,
-  matches,
   noError,
-  notContains,
-  notEqual,
   nullHandleSafe,
   pairwise,
   roundTrip,
-  throws,
 } from "./forms.js";
 export { fuzz } from "./fuzz.js";
 export {
@@ -101,6 +101,7 @@ export {
   stringMatching,
 } from "./generators.js";
 export {
+  around,
   cases,
   draws,
   example,
@@ -117,6 +118,7 @@ export {
   shrinkTime,
   store,
   using,
+  type Wrapper,
   workers,
 } from "./option.js";
 export {

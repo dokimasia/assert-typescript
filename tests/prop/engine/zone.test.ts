@@ -8,7 +8,7 @@ import { test as it } from "../../../src/vitest.js";
 describe("zone", () => {
   describe("ZONES", () => {
     it("lists the sixteen zones of the definition with UTC first", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         ZONES.map((zone) => zone.name),
         [
@@ -38,7 +38,7 @@ describe("zone", () => {
     });
 
     it("converts each change to bigint seconds", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         ZONES[1]?.changes[0],
         { at: -1_740_355_200n, before: 0n, after: 3600n },
