@@ -14,6 +14,7 @@
     "test-framework",
     "conformance",
     "vitest",
+    "jest",
     "typescript"
   ],
   "homepage": "https://github.com/dokimasia/assert-typescript",
@@ -33,10 +34,20 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "require": "./dist/cjs/index.js",
       "import": "./dist/index.js"
     },
+    "./jest": {
+      "types": "./dist/jest.d.ts",
+      "require": "./dist/cjs/jest.js",
+      "import": "./dist/jest.js"
+    },
     "./vitest": {
-      "types": "./dist/vitest.d.ts",
+      "types": "./dist/vitest/vitest5.d.ts",
+      "import": "./dist/vitest.js"
+    },
+    "./vitest4": {
+      "types": "./dist/vitest/vitest4.d.ts",
       "import": "./dist/vitest.js"
     },
     "./conformance": {
@@ -45,7 +56,7 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc -p tsconfig.cjs.json && node tools/dist.ts",
     "check": "npm run lint && npm run lint-md && npm run types && npm run build && npm run coverage",
     "coverage": "vitest run --coverage",
     "fmt": "biome check --write src tests tools",
@@ -58,10 +69,23 @@
     "spec:sync": "./tools/spec-sync.sh src/conformance/spec typescript",
     "spec:check": "./tools/spec-check.sh src/conformance/spec"
   },
+  "peerDependencies": {
+    "jest": "^29.7.0 || ^30.5.2",
+    "vitest": "^4.1.11 || ^5.0.3"
+  },
+  "peerDependenciesMeta": {
+    "jest": {
+      "optional": true
+    },
+    "vitest": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
     "@types/node": "^26.4.0",
     "@vitest/coverage-v8": "^4.1.11",
+    "jest": "30.5.2",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
   }

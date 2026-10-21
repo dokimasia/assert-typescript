@@ -11,5 +11,7 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts"]
+  // tools/dist.ts copies the declarations of each vitest major beside the
+  // emitted ones.
+  "exclude": ["src/**/*.test.ts", "src/vitest/*.d.ts"]
 }

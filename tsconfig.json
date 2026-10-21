@@ -31,5 +31,9 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src", "tests", "tools", "*.config.ts"]
+  "include": ["src", "tests", "tools", "*.config.ts"],
+  // The development dependency is vitest 4, and a program can merge only
+  // one shape of vitest's Matchers. CI checks the declarations for vitest 5
+  // in a consumer project that installs vitest 5, from tools/consumer.
+  "exclude": ["src/vitest/vitest5.d.ts", "tools/consumer"]
 }

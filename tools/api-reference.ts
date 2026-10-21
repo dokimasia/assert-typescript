@@ -23,7 +23,7 @@ const END = "<!-- api-reference:end -->";
 
 /** The families, in the order a reader meets them, and what each states. */
 const FAMILIES: [string, string, string[]][] = [
-  ["Equality", "Structural, and strict about types.", ["equal", "notEqual"]],
+  ["Equality", "Structural, and strict about types.", ["isEqualTo", "isNotEqualTo"]],
   [
     "Truth and absence",
     "`isNil` accepts null and undefined both, which is what nullish means.",
@@ -32,15 +32,15 @@ const FAMILIES: [string, string, string[]][] = [
   [
     "Size",
     "A string, an array, a Map, a Set or a plain object.",
-    ["length", "isEmpty", "isNotEmpty"],
+    ["hasLength", "isEmpty", "isNotEmpty"],
   ],
   [
     "Containment",
     "What holding means follows the haystack.",
-    ["contains", "notContains", "containsInOrder"],
+    ["doesContain", "doesNotContain", "containsInOrder"],
   ],
-  ["Text", "Strings.", ["hasPrefix", "hasSuffix", "matches"]],
-  ["Numbers", "Where exact equality is the wrong question.", ["closeTo", "inRange"]],
+  ["Text", "Strings.", ["hasPrefix", "hasSuffix", "doesMatch"]],
+  ["Numbers", "Where exact equality is the wrong question.", ["isCloseTo", "inRange"]],
   [
     "Ordering",
     "Sorted, unique, and anything else that holds between neighbours.",
@@ -53,8 +53,8 @@ const FAMILIES: [string, string, string[]][] = [
   ],
   [
     "Throwing",
-    "`throws` refuses a callable that answers a promise, since an unawaited rejection is not a throw.",
-    ["throws", "doesNotThrow", "rejectsWith"],
+    "`doesThrow` refuses a callable that answers a promise, since an unawaited rejection is not a throw.",
+    ["doesThrow", "doesNotThrow", "rejectsWith"],
   ],
   [
     "Cancellation",
@@ -98,7 +98,7 @@ const FAMILIES: [string, string, string[]][] = [
   [
     "Testing an assertion",
     "On `check` only: `soft` cannot drive a check to failure, because it does not stop.",
-    ["rejects"],
+    ["doesReject"],
   ],
 ];
 
@@ -134,23 +134,23 @@ const PROP: [string, string, string[]][] = [
     "Property forms",
     "Each form states an assertion of a function of a generated input, and generates the input from the generator of `prop.using`.",
     [
-      "equal",
-      "notEqual",
+      "isEqualTo",
+      "isNotEqualTo",
       "isTrue",
       "isFalse",
       "isNil",
       "isNotNil",
-      "length",
+      "hasLength",
       "isEmpty",
       "isNotEmpty",
-      "contains",
-      "notContains",
+      "doesContain",
+      "doesNotContain",
       "containsInOrder",
       "isPermutation",
       "hasPrefix",
       "hasSuffix",
-      "matches",
-      "closeTo",
+      "doesMatch",
+      "isCloseTo",
       "inRange",
       "pairwise",
       "noError",
@@ -158,7 +158,7 @@ const PROP: [string, string, string[]][] = [
       "errorIs",
       "errorIsNot",
       "errorAs",
-      "throws",
+      "doesThrow",
       "doesNotThrow",
       "isPure",
       "isNotPure",
@@ -215,6 +215,7 @@ const PROP: [string, string, string[]][] = [
       "explain",
       "workers",
       "hermetic",
+      "around",
       "draws",
       "using",
       "example",
@@ -262,14 +263,22 @@ const STATEFUL = [
 function declarations(file: string): Map<string, string[]> {
   const path = join(ROOT, "dist", file);
   const found = new Map<string, string[]>();
+  const local = new Map<string, string[]>();
 
   for (const line of readFileSync(path, "utf8").split("\n")) {
-    const match = /^export declare function (\w+)(.*);$/.exec(line.trim());
-    if (match?.[1] !== undefined && match[2] !== undefined) {
+    const match = /^(export )?declare function (\w+)(.*);$/.exec(line.trim());
+    if (match?.[2] !== undefined && match[3] !== undefined) {
       // Almost every function returns void, so a reference that states it
       // on every line hides the few that return a value worth reading.
-      const signature = match[2].replace(/: void$/, "");
-      found.set(match[1], [...(found.get(match[1]) ?? []), signature]);
+      const signature = match[3].replace(/: void$/, "");
+      const into = match[1] === undefined ? local : found;
+      into.set(match[2], [...(into.get(match[2]) ?? []), signature]);
+    }
+    // A function whose name a module format reserves, such as require,
+    // has a local name and an export under its own name.
+    const alias = /^export \{ (\w+) as (\w+) \};$/.exec(line.trim());
+    if (alias?.[1] !== undefined && alias[2] !== undefined) {
+      found.set(alias[2], local.get(alias[1]) ?? []);
     }
   }
   return found;

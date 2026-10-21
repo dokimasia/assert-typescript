@@ -1,0 +1,18 @@
+{
+  // The CommonJS build of the entry points that a jest test file requires
+  // in jest's default mode. It emits no declarations: a consumer in either
+  // module format reads the declarations of the ES build.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "CommonJS",
+    "moduleResolution": "Bundler",
+    "verbatimModuleSyntax": false,
+    "sourceMap": true,
+    "outDir": "dist/cjs",
+    "rootDir": "src"
+  },
+  "include": [],
+  "exclude": [],
+  "files": ["src/index.ts", "src/jest.ts"]
+}
