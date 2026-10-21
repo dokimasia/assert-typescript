@@ -38,11 +38,21 @@ describe("clock", () => {
 
   describe("new Controlled", () => {
     it("returns a clock that reads its start", ({ seat }) => {
-      check.equal(seat, new Controlled(100).now(), 100, "a new clock reads its start");
+      check.isEqualTo(
+        seat,
+        new Controlled(100).now(),
+        100,
+        "a new clock reads its start",
+      );
     });
 
     it("returns a clock that reads 0 without a start", ({ seat }) => {
-      check.equal(seat, new Controlled().now(), 0, "a clock without a start reads 0");
+      check.isEqualTo(
+        seat,
+        new Controlled().now(),
+        0,
+        "a clock without a start reads 0",
+      );
     });
   });
 
@@ -51,7 +61,7 @@ describe("clock", () => {
       const clock = new Controlled(100);
       clock.advance(30);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         clock.now(),
         130,
@@ -64,7 +74,12 @@ describe("clock", () => {
       clock.advance(-30);
       clock.advance(0);
 
-      check.equal(seat, clock.now(), 100, "time on the clock does not move backwards");
+      check.isEqualTo(
+        seat,
+        clock.now(),
+        100,
+        "time on the clock does not move backwards",
+      );
     });
 
     it("resolves each sleep that the new instant passed", async ({ seat }) => {
@@ -74,7 +89,12 @@ describe("clock", () => {
       clock.advance(25);
       await Promise.all(sleeping.slice(0, 2));
 
-      check.equal(seat, woke, [10, 20], "the sleeps of 10 and 20 ms resolved at 25 ms");
+      check.isEqualTo(
+        seat,
+        woke,
+        [10, 20],
+        "the sleeps of 10 and 20 ms resolved at 25 ms",
+      );
     });
   });
 
@@ -98,7 +118,7 @@ describe("clock", () => {
       const clock = new Controlled(0);
       await clock.sleep(0);
 
-      check.equal(seat, clock.now(), 0, "the sleep resolved without an advance");
+      check.isEqualTo(seat, clock.now(), 0, "the sleep resolved without an advance");
     });
   });
 
@@ -107,7 +127,7 @@ describe("clock", () => {
       const clock = new Controlled(0);
       await wait(clock, 40);
 
-      check.equal(seat, clock.now(), 40, "the wait advanced the clock");
+      check.isEqualTo(seat, clock.now(), 40, "the wait advanced the clock");
     });
 
     it("sleeps on a clock other than a controlled one", async ({ seat }) => {

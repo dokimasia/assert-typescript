@@ -73,7 +73,7 @@ function updating(value: string | undefined): void {
 describe("golden", () => {
   describe("UPDATE_ENV", () => {
     it("contains the name DOKIMI_ASSERT_UPDATE_GOLDEN", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         golden.UPDATE_ENV,
         "DOKIMI_ASSERT_UPDATE_GOLDEN",
@@ -84,7 +84,12 @@ describe("golden", () => {
 
   describe("GOLDEN_DIR", () => {
     it("contains the directory testdata/golden", ({ seat }) => {
-      check.equal(seat, golden.GOLDEN_DIR, join("testdata", "golden"), "the directory");
+      check.isEqualTo(
+        seat,
+        golden.GOLDEN_DIR,
+        join("testdata", "golden"),
+        "the directory",
+      );
     });
   });
 
@@ -101,7 +106,7 @@ describe("golden", () => {
       it(tt.name, ({ seat }) => {
         updating(tt.give);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           golden.shouldUpdate(),
           tt.want,
@@ -113,7 +118,7 @@ describe("golden", () => {
 
   describe("scrubTimestamps", () => {
     it("replaces an ISO 8601 timestamp with SCRUBBED_TIMESTAMP", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         golden.scrubTimestamps()("started at 2026-08-30T11:22:33Z"),
         "started at SCRUBBED_TIMESTAMP",
@@ -124,7 +129,7 @@ describe("golden", () => {
 
   describe("scrubHashes", () => {
     it("replaces a hex digest with SCRUBBED_HASH", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         golden.scrubHashes()(`digest ${"a1b2c3d4".repeat(8)}`),
         "digest SCRUBBED_HASH",
@@ -135,7 +140,7 @@ describe("golden", () => {
 
   describe("scrubRunIds", () => {
     it("replaces an identifier of a run with SCRUBBED_RUN_ID", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         golden.scrubRunIds()("run run_0123456789abcdef finished"),
         "run SCRUBBED_RUN_ID finished",
@@ -146,7 +151,7 @@ describe("golden", () => {
 
   describe("scrubJsonFields", () => {
     it("replaces the value of each field that it was given", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         golden.scrubJsonFields("id")('{"id": "01J8XY", "name": "kept"}'),
         '{"id": "SCRUBBED", "name": "kept"}',
@@ -155,7 +160,7 @@ describe("golden", () => {
     });
 
     it("returns the text unchanged without a field", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         golden.scrubJsonFields()('{"id": "01J8XY"}'),
         '{"id": "01J8XY"}',
@@ -169,7 +174,7 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.matchAt(recorder, written("recorded output"), "recorded output", CHECKING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         records(recorder).map((r) => r["verdict"]),
         ["pass"],
@@ -182,7 +187,7 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.matchAt(recorder, path, "something else", CHECKING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         reported(recorder),
         [
@@ -200,7 +205,7 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.matchAt(recorder, absent(), "content", CHECKING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.failures[0]?.detail,
         { want: null, got: "content" },
@@ -225,7 +230,7 @@ describe("golden", () => {
       const path = absent();
       golden.matchAt(new Recorder(), path, "recorded output", UPDATING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         readFileSync(path, "utf8"),
         "recorded output",
@@ -244,7 +249,7 @@ describe("golden", () => {
       const path = written("old output");
       golden.matchAt(new Recorder(), path, "new output", UPDATING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         readFileSync(path, "utf8"),
         "new output",
@@ -258,14 +263,14 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.matchAt(recorder, path, "content", CHECKING);
 
-      check.equal(seat, recorder.failures, [], "a fault reports no failure");
-      check.contains(
+      check.isEqualTo(seat, recorder.failures, [], "a fault reports no failure");
+      check.doesContain(
         seat,
         recorder.message,
         "the golden file cannot be read",
         "the fault",
       );
-      check.equal(
+      check.isEqualTo(
         seat,
         records(recorder).map((r) => r["verdict"]),
         ["error"],
@@ -281,7 +286,7 @@ describe("golden", () => {
         const recorder = new Recorder();
         golden.matchAt(recorder, join(dir, "golden.txt"), "content", UPDATING);
 
-        check.contains(
+        check.doesContain(
           seat,
           recorder.message,
           "the golden file cannot be written",
@@ -296,7 +301,7 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.match(recorder, "absent-on-purpose.txt", "content", CHECKING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         reported(recorder).map(([assertion, contract]) => [assertion, contract]),
         [
@@ -344,7 +349,7 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.matchJsonField(recorder, path, "items", "[1, 2]", CHECKING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         reported(recorder),
         [
@@ -368,7 +373,7 @@ describe("golden", () => {
         CHECKING,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.failures[0]?.detail,
         { want: null, got: "[\n  1\n]", field: "absent" },
@@ -380,7 +385,7 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.matchJsonField(recorder, absent("g.json"), "items", "[1]", CHECKING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.failures[0]?.detail,
         { want: null, got: "[\n  1\n]", field: "items" },
@@ -392,7 +397,7 @@ describe("golden", () => {
       const path = written('{"other": 1}', "g.json");
       golden.matchJsonField(new Recorder(), path, "added", "[1, 2]", UPDATING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         JSON.parse(readFileSync(path, "utf8")),
         { other: 1, added: [1, 2] },
@@ -404,7 +409,7 @@ describe("golden", () => {
       const path = written('{"items": [1]}', "g.json");
       golden.matchJsonField(new Recorder(), path, "items", "[1, 2]", UPDATING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         JSON.parse(readFileSync(path, "utf8")),
         { items: [1, 2] },
@@ -416,7 +421,7 @@ describe("golden", () => {
       const path = absent("g.json");
       golden.matchJsonField(new Recorder(), path, "items", "[1]", UPDATING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         JSON.parse(readFileSync(path, "utf8")),
         { items: [1] },
@@ -430,7 +435,7 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.matchJsonField(recorder, path, "i", "[1]", CHECKING);
 
-      check.contains(
+      check.doesContain(
         seat,
         recorder.message,
         "the golden file cannot be read",
@@ -448,7 +453,7 @@ describe("golden", () => {
         CHECKING,
       );
 
-      check.contains(
+      check.doesContain(
         seat,
         recorder.message,
         "the golden file cannot be read as a JSON object",
@@ -466,7 +471,7 @@ describe("golden", () => {
         CHECKING,
       );
 
-      check.contains(
+      check.doesContain(
         seat,
         recorder.message,
         "the golden file cannot be read as a JSON object",
@@ -484,7 +489,7 @@ describe("golden", () => {
         CHECKING,
       );
 
-      check.contains(
+      check.doesContain(
         seat,
         recorder.message,
         'the value of the field "i" is no JSON',
@@ -501,7 +506,7 @@ describe("golden", () => {
         const recorder = new Recorder();
         golden.matchJsonField(recorder, join(inner, "g.json"), "i", "[1]", UPDATING);
 
-        check.contains(
+        check.doesContain(
           seat,
           recorder.message,
           "the golden file cannot be written",
@@ -523,7 +528,7 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.matchTree(recorder, "api", out, CHECKING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         records(recorder).map((r) => [r["assertion"], r["contract"], r["verdict"]]),
         [["golden-match-tree", API_CONTRACT, "pass"]],
@@ -542,7 +547,7 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.matchTree(recorder, "api", out, CHECKING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.failures[0]?.detail,
         {
@@ -552,7 +557,7 @@ describe("golden", () => {
         },
         "the record",
       );
-      check.contains(
+      check.doesContain(
         seat,
         recorder.failures[0]?.where?.file ?? "",
         "golden.test.ts",
@@ -566,7 +571,7 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.matchTree(recorder, "api", out, CHECKING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.failures[0]?.detail,
         {
@@ -644,7 +649,7 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.matchTree(recorder, "../api", files.workspace(seat, {}), CHECKING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.message, records(recorder).map((r) => r["verdict"])],
         ['golden.matchTree: the path "../api" has the name ".."', ["error"]],
@@ -673,7 +678,7 @@ describe("golden", () => {
       const recorder = new Recorder();
       golden.matchTree(recorder, "api", files.workspace(seat, {}), CHECKING);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.message,
         "golden.matchTree: the root of the tree is no directory",

@@ -79,7 +79,7 @@ describe("bench", () => {
       });
       contract.check();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         failures(recorder),
         [["bench-max-latency", { want: 5, got: 50 }]],
@@ -95,7 +95,7 @@ describe("bench", () => {
         ran += 1;
       });
 
-      check.equal(seat, ran, 5, "two warm-up and three measured iterations");
+      check.isEqualTo(seat, ran, 5, "two warm-up and three measured iterations");
     });
 
     it("builds and consumes one input for each warm-up iteration in measuring", async ({
@@ -113,7 +113,7 @@ describe("bench", () => {
         (input) => events.push(`body ${input}`),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         events,
         ["setup 1", "body 1", "setup 2", "setup 3", "body 2", "body 3"],
@@ -129,7 +129,7 @@ describe("bench", () => {
 
     for (const tt of refusals) {
       it(tt.name, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => new Contract(new Recorder(), "a get is quick").warmup(tt.give)),
           `bench: warmup(${tt.give}) states no whole number of 0 or more`,
@@ -142,7 +142,7 @@ describe("bench", () => {
       const contract = new Contract(new Recorder(), "a get is quick");
       await contract.loop(1, () => undefined);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => contract.warmup(1)),
         "bench: warmup after the contract has run its body",
@@ -158,7 +158,7 @@ describe("bench", () => {
         () => undefined,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => contract.warmup(1)),
         "bench: warmup after the contract has run its body",
@@ -180,7 +180,7 @@ describe("bench", () => {
       await contract.loop(2, () => clock.advance(5));
       contract.check();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         failures(recorder),
         [["bench-max-latency", { want: 4, got: 5 }]],
@@ -194,7 +194,7 @@ describe("bench", () => {
       await contract.loop(10, () => clock.advance(5));
       contract.check();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         records(recorder).map((r) => [r["assertion"], r["verdict"]]),
         [["bench-max-latency", "pass"]],
@@ -220,7 +220,7 @@ describe("bench", () => {
       });
       contract.check();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         failures(recorder),
         [["bench-max-mean", { want: 2, got: 3 }]],
@@ -260,7 +260,12 @@ describe("bench", () => {
         (input) => seen.push(input),
       );
 
-      check.equal(seat, seen, [7, 7, 7], "each body received the input of its setup");
+      check.isEqualTo(
+        seat,
+        seen,
+        [7, 7, 7],
+        "each body received the input of its setup",
+      );
     });
 
     it("returns the contract", async ({ seat }) => {
@@ -282,7 +287,7 @@ describe("bench", () => {
         ran += 1;
       });
 
-      check.equal(seat, ran, 7, "the body ran seven times");
+      check.isEqualTo(seat, ran, 7, "the body ran seven times");
     });
 
     it("awaits a body that returns a promise", async ({ seat }) => {
@@ -294,7 +299,7 @@ describe("bench", () => {
       });
       contract.check();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         failures(recorder).map(([assertion]) => assertion),
         ["bench-max-latency"],
@@ -308,7 +313,7 @@ describe("bench", () => {
       await contract.loop(1, () => new Promise((resolve) => setTimeout(resolve, 5)));
       contract.check();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         failures(recorder).map(([assertion]) => assertion),
         ["bench-max-latency"],
@@ -334,7 +339,7 @@ describe("bench", () => {
       const recorder = new Recorder();
       new Contract(recorder, "a get is quick").maxLatency(1).check();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.failures, recorder.message],
         [[], "a get is quick: nothing was measured"],
@@ -348,7 +353,7 @@ describe("bench", () => {
       await contract.loop(0, () => undefined);
       contract.check();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.failures, recorder.message],
         [[], "a get is quick: nothing was measured"],
@@ -368,7 +373,7 @@ describe("bench", () => {
       });
       contract.check();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         failures(recorder),
         [["bench-max-latency", { want: 2, got: 50 }]],
@@ -397,7 +402,7 @@ describe("bench", () => {
       await contract.loop(2, () => clock.advance(2));
       contract.check();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         failures(recorder).map(([assertion]) => assertion),
         ["bench-max-latency", "bench-max-mean"],

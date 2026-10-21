@@ -37,7 +37,7 @@ const MODULES: Record<string, unknown> = {
 
 /** The assertions that the recording surface does not export, with the reason. */
 const CHECK_ONLY: Record<string, string> = {
-  rejects: "drives a check to failure, which needs a seat that stops",
+  doesReject: "drives a check to failure, which needs a seat that stops",
 };
 
 /**
@@ -213,6 +213,36 @@ const DECLARED: Record<string, { file: string; text: string }> = {
   },
 };
 
+/**
+ * The declarations that give the chain of each runner's expect the
+ * standard's assertions. The surface id `assertion` names the type of the
+ * chain, which is the runner's own: vitest's Assertion, and jest's Matchers.
+ */
+const CHAINS: readonly { file: string; text: string }[] = [
+  {
+    file: "vitest/vitest5.d.ts",
+    text: "interface Matchers<R, T> extends StandardMatchers<R, T>",
+  },
+  {
+    file: "vitest/vitest4.d.ts",
+    text: "interface Matchers<T = any> extends StandardMatchers<void, T>",
+  },
+  {
+    file: "jest/types.d.ts",
+    text: "interface Matchers<R, T> extends StandardMatchers<R, T>",
+  },
+];
+
+/**
+ * The declarations of the entry points whose register gives the runner's
+ * expect the standard's assertions. The surface id `that` names that
+ * expect.
+ */
+const REGISTERS: readonly { file: string; text: string }[] = [
+  { file: "vitest.d.ts", text: "register" },
+  { file: "jest.d.ts", text: "export { register }" },
+];
+
 /** Returns the emitted declarations of a module. */
 function declarations(file: string): string {
   return readFileSync(join(import.meta.dirname, "../dist", file), "utf8");
@@ -228,6 +258,12 @@ function offers(sid: string, name: string): boolean {
   const declared = DECLARED[sid];
   if (declared !== undefined)
     return declarations(declared.file).includes(declared.text);
+  if (sid === "assertion") {
+    return CHAINS.every(({ file, text }) => declarations(file).includes(text));
+  }
+  if (sid === "that") {
+    return REGISTERS.every(({ file, text }) => declarations(file).includes(text));
+  }
   if (sid in SEATS) return typeof SEATS[sid] === "function";
   // A constructor, such as `new History()`, is the class of its row.
   if (name.startsWith("new "))
@@ -247,7 +283,7 @@ function offers(sid: string, name: string): boolean {
 
 describe("index", () => {
   it("exports the names of the entry point of the package", ({ seat }) => {
-    check.equal(
+    check.isEqualTo(
       seat,
       Object.keys(index).sort(),
       [
@@ -261,13 +297,13 @@ describe("index", () => {
         "bench",
         "byIdentity",
         "check",
+        "doesReject",
         "equateEmpty",
         "equateNans",
         "files",
         "golden",
         "history",
         "prop",
-        "rejects",
         "signalOf",
         "soft",
         "stateful",
@@ -277,7 +313,7 @@ describe("index", () => {
   });
 
   it("checks the 110 assertions of the definition", ({ seat }) => {
-    check.length(seat, Object.keys(ASSERTIONS), 110, "the definition states 110");
+    check.hasLength(seat, Object.keys(ASSERTIONS), 110, "the definition states 110");
   });
 
   for (const id of Object.keys(ASSERTIONS)
@@ -290,7 +326,7 @@ describe("index", () => {
     });
 
     it(`exports the assertion ${id} with the definition's arity`, ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         arityOf(id),
         ARITY_EXCUSED[id]?.arity ?? (ASSERTIONS[id]?.arity as number),
@@ -303,7 +339,7 @@ describe("index", () => {
     it(`excuses the arity of ${id} for a difference from the definition`, ({
       seat,
     }) => {
-      check.notEqual(
+      check.isNotEqualTo(
         seat,
         excuse.arity,
         ASSERTIONS[id]?.arity as number,
@@ -353,7 +389,7 @@ describe("index", () => {
         const length = (surface: object) =>
           (memberOf(surface, name) as (...args: never[]) => unknown).length;
 
-        check.equal(
+        check.isEqualTo(
           seat,
           length(soft),
           length(check),
@@ -363,8 +399,8 @@ describe("index", () => {
     }
   }
 
-  it("exports the same assertions on both surfaces besides rejects", ({ seat }) => {
-    check.equal(
+  it("exports the same assertions on both surfaces besides doesReject", ({ seat }) => {
+    check.isEqualTo(
       seat,
       Object.keys(check)
         .filter((name) => !(name in CHECK_ONLY))
@@ -388,7 +424,7 @@ describe("index", () => {
         `${id} is named or declined, and not both`,
       );
       if (name !== "") {
-        check.equal(
+        check.isEqualTo(
           seat,
           typeof (index as Record<string, unknown>)[name],
           "function",

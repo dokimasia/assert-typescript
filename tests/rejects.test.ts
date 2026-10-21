@@ -11,7 +11,7 @@ describe("rejects", () => {
   describe("rejects", () => {
     it("passes a check that fails", async ({ seat }) => {
       const recorder = new Recorder();
-      await check.rejects(recorder, "an empty name is refused", (inner) => {
+      await check.doesReject(recorder, "an empty name is refused", (inner) => {
         check.isNil(inner, "not empty", "it passes");
       });
 
@@ -19,7 +19,7 @@ describe("rejects", () => {
     });
 
     it("returns the failure records of the check", async ({ seat }) => {
-      const failures = await check.rejects(
+      const failures = await check.doesReject(
         new Recorder(),
         "an empty name is refused",
         (inner) => {
@@ -28,7 +28,7 @@ describe("rejects", () => {
       );
 
       check.isTrue(seat, failures[0] instanceof Failure, "the check returns records");
-      check.equal(
+      check.isEqualTo(
         seat,
         failures.map((f) => [f.assertion, f.contract, f.detail]),
         [["nil", "it passes", { got: "not empty" }]],
@@ -40,11 +40,11 @@ describe("rejects", () => {
       seat,
     }) => {
       const recorder = new Recorder();
-      await check.rejects(recorder, "an empty name is refused", (inner) => {
+      await check.doesReject(recorder, "an empty name is refused", (inner) => {
         check.isNil(inner, null, "it passes");
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.failures.map((f) => [f.assertion, f.contract, f.detail]),
         [["rejects", "an empty name is refused", {}]],
@@ -53,11 +53,15 @@ describe("rejects", () => {
     });
 
     it("returns no failure record for a check that passes", async ({ seat }) => {
-      const failures = await check.rejects(new Recorder(), "it is refused", (inner) => {
-        check.isNil(inner, null, "it passes");
-      });
+      const failures = await check.doesReject(
+        new Recorder(),
+        "it is refused",
+        (inner) => {
+          check.isNil(inner, null, "it passes");
+        },
+      );
 
-      check.equal(seat, failures, [], "a passing check has no record");
+      check.isEqualTo(seat, failures, [], "a passing check has no record");
     });
 
     it("throws AssertionFailed on a standard seat for a check that passes", async ({
@@ -66,7 +70,7 @@ describe("rejects", () => {
       const thrown = await check.rejectsWith(
         seat,
         () =>
-          check.rejects(new Standard(), "it is refused", (inner) => {
+          check.doesReject(new Standard(), "it is refused", (inner) => {
             check.isNil(inner, null, "it passes");
           }),
         "rejects throws on a standard seat",
@@ -81,7 +85,7 @@ describe("rejects", () => {
 
     it("ends the check at its first failure that stops", async ({ seat }) => {
       let reached = false;
-      const failures = await check.rejects(
+      const failures = await check.doesReject(
         new Recorder(),
         "the first failure ends it",
         (inner) => {
@@ -92,7 +96,7 @@ describe("rejects", () => {
       );
 
       check.isFalse(seat, reached, "the check stopped at its first failure");
-      check.equal(
+      check.isEqualTo(
         seat,
         failures.map((f) => f.contract),
         ["the first"],
@@ -103,7 +107,7 @@ describe("rejects", () => {
     it("ends the check at a message sent to fail of its seat", async ({ seat }) => {
       let reached = false;
       const recorder = new Recorder();
-      await check.rejects(recorder, "a bare failure ends it", (inner) => {
+      await check.doesReject(recorder, "a bare failure ends it", (inner) => {
         inner.fail("a message of the check's own");
         reached = true;
       });
@@ -113,12 +117,16 @@ describe("rejects", () => {
     });
 
     it("keeps every failure that the recording surface reports", async ({ seat }) => {
-      const failures = await check.rejects(new Recorder(), "both are kept", (inner) => {
-        soft.isNil(inner, 1, "the first");
-        soft.isNil(inner, 2, "the second");
-      });
+      const failures = await check.doesReject(
+        new Recorder(),
+        "both are kept",
+        (inner) => {
+          soft.isNil(inner, 1, "the first");
+          soft.isNil(inner, 2, "the second");
+        },
+      );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         failures.map((f) => f.contract),
         ["the first", "the second"],
@@ -130,7 +138,7 @@ describe("rejects", () => {
       seat,
     }) => {
       const recorder = new Recorder();
-      const failures = await check.rejects(
+      const failures = await check.doesReject(
         recorder,
         "a bare message fails the check",
         (inner) => {
@@ -139,11 +147,11 @@ describe("rejects", () => {
       );
 
       check.isFalse(seat, recorder.failed, "the message fails the check");
-      check.equal(seat, failures, [], "the message has no record");
+      check.isEqualTo(seat, failures, [], "the message has no record");
     });
 
     it("awaits a check that returns a promise", async ({ seat }) => {
-      const failures = await check.rejects(
+      const failures = await check.doesReject(
         new Recorder(),
         "an async check fails",
         async (inner) => {
@@ -152,7 +160,7 @@ describe("rejects", () => {
         },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         failures.map((f) => f.contract),
         ["it is true later"],
@@ -165,13 +173,13 @@ describe("rejects", () => {
       const thrown = await check.rejectsWith(
         seat,
         () =>
-          check.rejects(new Recorder(), "a broken check", () => {
+          check.doesReject(new Recorder(), "a broken check", () => {
             throw boom;
           }),
         "rejects rejects",
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown,
         boom,
@@ -183,7 +191,7 @@ describe("rejects", () => {
     it("hands the check a signal that aborts when the check ends", async ({ seat }) => {
       let held: AbortSignal | undefined;
       let open = false;
-      await check.rejects(new Recorder(), "the signal ends", (inner: Seat) => {
+      await check.doesReject(new Recorder(), "the signal ends", (inner: Seat) => {
         held = inner.signal;
         open = inner.signal?.aborted === false;
         check.isTrue(inner, false, "it fails");
@@ -199,12 +207,16 @@ describe("rejects", () => {
 
     it("records the calls of the check under the call of rejects", async ({ seat }) => {
       const recorder = new Recorder();
-      await check.rejects(recorder, "the calls of the check are recorded", (inner) => {
-        check.isTrue(inner, true, "it passes first");
-        check.isTrue(inner, false, "it fails then");
-      });
+      await check.doesReject(
+        recorder,
+        "the calls of the check are recorded",
+        (inner) => {
+          check.isTrue(inner, true, "it passes first");
+          check.isTrue(inner, false, "it fails then");
+        },
+      );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         records(recorder).map((r) => [
           r["seq"],
@@ -224,16 +236,16 @@ describe("rejects", () => {
 
     it("returns a promise that the forgotten-await guard tracks", ({ seat }) => {
       const standard = new Standard();
-      void check.rejects(standard, "nobody awaits this", (inner) => {
+      void check.doesReject(standard, "nobody awaits this", (inner) => {
         check.isTrue(inner, false, "it fails");
       });
-      const thrown = check.throws(
+      const thrown = check.doesThrow(
         seat,
         () => standard.flush(),
         "flush reports the check",
       );
 
-      check.contains(
+      check.doesContain(
         seat,
         (thrown as Error).message,
         "nobody awaits this",

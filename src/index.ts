@@ -9,8 +9,8 @@
  * import { check, soft } from "@dokimi/assert";
  *
  * test("reply", ({ seat }) => {
- *   check.equal(seat, reply.status, 200, "the request succeeds");
- *   soft.length(seat, reply.items, 3, "every item comes back");
+ *   check.isEqualTo(seat, reply.status, 200, "the request succeeds");
+ *   soft.hasLength(seat, reply.items, 3, "every item comes back");
  * });
  * ```
  *
@@ -29,7 +29,7 @@ export * as golden from "./golden.js";
 export * as history from "./history/index.js";
 export { byIdentity, equateEmpty, equateNans, type Option } from "./option.js";
 export * as prop from "./prop/index.js";
-export { rejects } from "./rejects.js";
+export { doesReject } from "./rejects.js";
 export {
   AssertionFailed,
   type Cleanups,

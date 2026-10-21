@@ -9,7 +9,7 @@ import { test as it } from "../src/vitest.js";
 
 describe("option", () => {
   it("re-exports the relaxations of the matcher", ({ seat }) => {
-    check.equal(
+    check.isEqualTo(
       seat,
       [
         equateEmpty === matcher.equateEmpty,
@@ -24,10 +24,16 @@ describe("option", () => {
   describe("equateEmpty", () => {
     it("relaxes the call that it is passed to alone", ({ seat }) => {
       const recorder = new Recorder();
-      check.equal(recorder, null as unknown, [] as unknown, "relaxed", equateEmpty());
-      check.equal(recorder, null as unknown, [] as unknown, "strict");
+      check.isEqualTo(
+        recorder,
+        null as unknown,
+        [] as unknown,
+        "relaxed",
+        equateEmpty(),
+      );
+      check.isEqualTo(recorder, null as unknown, [] as unknown, "strict");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.failures.map((f) => f.contract),
         ["strict"],
@@ -39,10 +45,10 @@ describe("option", () => {
   describe("equateNans", () => {
     it("relaxes the call that it is passed to alone", ({ seat }) => {
       const recorder = new Recorder();
-      check.equal(recorder, Number.NaN, Number.NaN, "relaxed", equateNans());
-      check.equal(recorder, Number.NaN, Number.NaN, "strict");
+      check.isEqualTo(recorder, Number.NaN, Number.NaN, "relaxed", equateNans());
+      check.isEqualTo(recorder, Number.NaN, Number.NaN, "strict");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.failures.map((f) => f.contract),
         ["strict"],
@@ -54,10 +60,10 @@ describe("option", () => {
   describe("byIdentity", () => {
     it("narrows the call that it is passed to alone", ({ seat }) => {
       const recorder = new Recorder();
-      check.equal(recorder, { n: 1 }, { n: 1 }, "by identity", byIdentity());
-      check.equal(recorder, { n: 1 }, { n: 1 }, "by structure");
+      check.isEqualTo(recorder, { n: 1 }, { n: 1 }, "by identity", byIdentity());
+      check.isEqualTo(recorder, { n: 1 }, { n: 1 }, "by structure");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.failures.map((f) => f.contract),
         ["by identity"],

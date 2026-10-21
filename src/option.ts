@@ -7,7 +7,7 @@
  * things by the same assertion.
  *
  * ```ts
- * check.equal(seat, reply.items, [], "no items came back", equateEmpty());
+ * check.isEqualTo(seat, reply.items, [], "no items came back", equateEmpty());
  * ```
  */
 

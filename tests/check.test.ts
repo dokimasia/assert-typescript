@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import * as check from "../src/check.js";
 import { Controlled } from "../src/clock.js";
 import { dropped } from "../src/matcher/pending.js";
-import { rejects } from "../src/rejects.js";
+import { doesReject } from "../src/rejects.js";
 import { Recorder } from "../src/seat.js";
 import { FAILING, type Failing, TRACKED } from "./helpers.js";
 
@@ -22,16 +22,16 @@ function seated(): [Recorder, Controlled] {
 }
 
 describe("check", () => {
-  it("exports an assertion for each failing call of the shared table besides rejects", () => {
+  it("exports an assertion for each failing call of the shared table besides doesReject", () => {
     expect(
       Object.keys(check)
-        .filter((name) => name !== "rejects")
+        .filter((name) => name !== "doesReject")
         .sort(),
     ).toEqual(Object.keys(FAILING).sort());
   });
 
-  it("exports the rejects of the module rejects", () => {
-    expect(check.rejects).toBe(rejects);
+  it("exports the doesReject of the module rejects", () => {
+    expect(check.doesReject).toBe(doesReject);
   });
 
   for (const [name, call] of Object.entries(FAILING) as [string, Failing][]) {

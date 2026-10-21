@@ -228,7 +228,7 @@ export async function ignores(): Promise<string> {
 }
 
 /** The assertions that `check` and `soft` both export. */
-export type Surface = Omit<typeof check, "rejects">;
+export type Surface = Omit<typeof check, "doesReject">;
 
 /**
  * One failing call of an assertion on surface: on seat, with arguments
@@ -252,23 +252,23 @@ export type Failing = (
  * seat reads.
  */
 export const FAILING: Readonly<Record<keyof Surface, Failing>> = {
-  equal: (s, seat, _clock, msg) => s.equal(seat, 1, 2, msg),
-  notEqual: (s, seat, _clock, msg) => s.notEqual(seat, 1, 1, msg),
+  isEqualTo: (s, seat, _clock, msg) => s.isEqualTo(seat, 1, 2, msg),
+  isNotEqualTo: (s, seat, _clock, msg) => s.isNotEqualTo(seat, 1, 1, msg),
   isTrue: (s, seat, _clock, msg) => s.isTrue(seat, false, msg),
   isFalse: (s, seat, _clock, msg) => s.isFalse(seat, true, msg),
   isNil: (s, seat, _clock, msg) => s.isNil(seat, 0, msg),
   isNotNil: (s, seat, _clock, msg) => s.isNotNil(seat, null, msg),
-  length: (s, seat, _clock, msg) => s.length(seat, [1], 2, msg),
+  hasLength: (s, seat, _clock, msg) => s.hasLength(seat, [1], 2, msg),
   isEmpty: (s, seat, _clock, msg) => s.isEmpty(seat, [1], msg),
   isNotEmpty: (s, seat, _clock, msg) => s.isNotEmpty(seat, [], msg),
-  contains: (s, seat, _clock, msg) => s.contains(seat, [1], 2, msg),
-  notContains: (s, seat, _clock, msg) => s.notContains(seat, [1], 1, msg),
+  doesContain: (s, seat, _clock, msg) => s.doesContain(seat, [1], 2, msg),
+  doesNotContain: (s, seat, _clock, msg) => s.doesNotContain(seat, [1], 1, msg),
   containsInOrder: (s, seat, _clock, msg) =>
     s.containsInOrder(seat, "ab", ["b", "a"], msg),
   hasPrefix: (s, seat, _clock, msg) => s.hasPrefix(seat, "ab", "b", msg),
   hasSuffix: (s, seat, _clock, msg) => s.hasSuffix(seat, "ab", "a", msg),
-  matches: (s, seat, _clock, msg) => s.matches(seat, "ab", "^b", msg),
-  closeTo: (s, seat, _clock, msg) => s.closeTo(seat, 1, 2, 0.5, msg),
+  doesMatch: (s, seat, _clock, msg) => s.doesMatch(seat, "ab", "^b", msg),
+  isCloseTo: (s, seat, _clock, msg) => s.isCloseTo(seat, 1, 2, 0.5, msg),
   inRange: (s, seat, _clock, msg) => s.inRange(seat, 5, 0, 1, msg),
   pairwise: (s, seat, _clock, msg) => s.pairwise(seat, [2, 1], (a, b) => a < b, msg),
   noError: (s, seat, _clock, msg) => s.noError(seat, new Error("boom"), msg),
@@ -279,7 +279,7 @@ export const FAILING: Readonly<Record<keyof Surface, Failing>> = {
     return s.errorIsNot(seat, err, err, msg);
   },
   errorAs: (s, seat, _clock, msg) => s.errorAs(seat, new Error("boom"), TypeError, msg),
-  throws: (s, seat, _clock, msg) => s.throws(seat, () => 1, msg),
+  doesThrow: (s, seat, _clock, msg) => s.doesThrow(seat, () => 1, msg),
   doesNotThrow: (s, seat, _clock, msg) =>
     s.doesNotThrow(
       seat,

@@ -10,7 +10,7 @@
  * import { check } from "@dokimi/assert";
  *
  * test("get", ({ seat }) => {
- *   check.equal(seat, store.get(id), item, "get answers the stored item");
+ *   check.isEqualTo(seat, store.get(id), item, "get returns the stored item");
  * });
  * ```
  *
@@ -32,7 +32,7 @@ import { Mode, type Seat } from "./matcher/seat.js";
 import * as value from "./matcher/value.js";
 import * as waiting from "./matcher/waiting.js";
 
-export { rejects } from "./rejects.js";
+export { doesReject } from "./rejects.js";
 
 /** Every failure on this surface stops the test. */
 const MODE = Mode.Fatal;
@@ -52,13 +52,13 @@ const MODE = Mode.Fatal;
  * @param msg The contract under test.
  * @param options Relaxations for this call alone.
  * @example
- * check.equal(seat, store.get(id), item, "get answers the stored item");
+ * check.isEqualTo(seat, store.get(id), item, "get returns the stored item");
  *
  * `want` is held to the type of `got`. Comparing across types is
  * almost always a mistake, and the few deliberate cases say so with
- * a cast: `check.equal(seat, got as unknown, want as unknown, msg)`.
+ * a cast: `check.isEqualTo(seat, got as unknown, want as unknown, msg)`.
  */
-export function equal<T>(
+export function isEqualTo<T>(
   seat: Seat,
   got: T,
   want: NoInfer<T>,
@@ -72,7 +72,7 @@ export function equal<T>(
 /**
  * Fail when got and want are equal.
  *
- * Comparison follows the rules of {@link equal}. The failure shows the
+ * Comparison follows the rules of {@link isEqualTo}. The failure shows the
  * value the two shared, since printing one says everything.
  *
  * @param seat Where the failure is reported.
@@ -81,13 +81,13 @@ export function equal<T>(
  * @param msg The contract under test.
  * @param options Relaxations for this call alone.
  * @example
- * check.notEqual(seat, token, previous, "refresh issues a new token");
+ * check.isNotEqualTo(seat, token, previous, "refresh issues a new token");
  *
  * `want` is held to the type of `got`. Comparing across types is
  * almost always a mistake, and the few deliberate cases say so with
- * a cast: `check.equal(seat, got as unknown, want as unknown, msg)`.
+ * a cast: `check.isEqualTo(seat, got as unknown, want as unknown, msg)`.
  */
-export function notEqual<T>(
+export function isNotEqualTo<T>(
   seat: Seat,
   got: T,
   want: NoInfer<T>,
@@ -179,7 +179,7 @@ export function isNotNil(seat: Seat, got: unknown, msg: string): void {
  * @example
  * check.length(seat, reply.items, 3, "every item comes back");
  */
-export function length(seat: Seat, got: unknown, want: number, msg: string): void {
+export function hasLength(seat: Seat, got: unknown, want: number, msg: string): void {
   seat.helper();
   value.length(seat, MODE, got, want, msg);
 }
@@ -220,7 +220,7 @@ export function isNotEmpty(seat: Seat, got: unknown, msg: string): void {
  *
  * What holding means follows the haystack. A string holds a substring,
  * a `Map` or plain object holds a key, and an array or `Set` holds an
- * element compared by the rules of {@link equal}.
+ * element compared by the rules of {@link isEqualTo}.
  *
  * @param seat Where the failure is reported.
  * @param haystack The container or text to search.
@@ -228,9 +228,9 @@ export function isNotEmpty(seat: Seat, got: unknown, msg: string): void {
  * @param msg The contract under test.
  * @param options Relaxations for this call alone.
  * @example
- * check.contains(seat, reply.headers, "etag", "the reply is cacheable");
+ * check.doesContain(seat, reply.headers, "etag", "the reply is cacheable");
  */
-export function contains(
+export function doesContain(
   seat: Seat,
   haystack: unknown,
   needle: unknown,
@@ -244,7 +244,7 @@ export function contains(
 /**
  * Fail when haystack holds needle.
  *
- * Containment follows the rules of {@link contains}.
+ * Containment follows the rules of {@link doesContain}.
  *
  * @param seat Where the failure is reported.
  * @param haystack The container or text to search.
@@ -252,9 +252,9 @@ export function contains(
  * @param msg The contract under test.
  * @param options Relaxations for this call alone.
  * @example
- * check.notContains(seat, body, "password", "no secret leaks");
+ * check.doesNotContain(seat, body, "password", "no secret leaks");
  */
-export function notContains(
+export function doesNotContain(
   seat: Seat,
   haystack: unknown,
   needle: unknown,
@@ -332,9 +332,14 @@ export function hasSuffix(seat: Seat, got: unknown, suffix: string, msg: string)
  * @param pattern A regular expression source string.
  * @param msg The contract under test.
  * @example
- * check.matches(seat, id, "^req_[0-9a-f]{16}$", "the id is well formed");
+ * check.doesMatch(seat, id, "^req_[0-9a-f]{16}$", "the id is well formed");
  */
-export function matches(seat: Seat, got: unknown, pattern: string, msg: string): void {
+export function doesMatch(
+  seat: Seat,
+  got: unknown,
+  pattern: string,
+  msg: string,
+): void {
   seat.helper();
   value.matches(seat, MODE, got, pattern, msg);
 }
@@ -353,9 +358,9 @@ export function matches(seat: Seat, got: unknown, pattern: string, msg: string):
  * @param tolerance The largest acceptable absolute difference.
  * @param msg The contract under test.
  * @example
- * check.closeTo(seat, elapsed, 1000, 50, "it waited about a second");
+ * check.isCloseTo(seat, elapsed, 1000, 50, "it waited about a second");
  */
-export function closeTo(
+export function isCloseTo(
   seat: Seat,
   got: unknown,
   want: number,
@@ -420,7 +425,7 @@ export function pairwise<T>(
  * Fail when an error is present.
  *
  * For code that hands an error back rather than throwing it. Where the
- * code throws, use {@link throws} or {@link doesNotThrow}.
+ * code throws, use {@link doesThrow} or {@link doesNotThrow}.
  *
  * @param seat Where the failure is reported.
  * @param err The error value, or null when there was none.
@@ -520,9 +525,9 @@ export function errorAs<E>(
  * @param msg The contract under test.
  * @returns What fn threw, or undefined when it returned.
  * @example
- * const err = check.throws(seat, () => parse("{"), "a cut body is refused");
+ * const err = check.doesThrow(seat, () => parse("{"), "a cut body is refused");
  */
-export function throws(seat: Seat, fn: () => unknown, msg: string): unknown {
+export function doesThrow(seat: Seat, fn: () => unknown, msg: string): unknown {
   seat.helper();
   return raising.throws(seat, MODE, fn, msg);
 }
@@ -544,7 +549,7 @@ export function doesNotThrow(seat: Seat, fn: () => unknown, msg: string): void {
 /**
  * Fail when awaiting fn does not reject.
  *
- * The asynchronous counterpart of {@link throws}.
+ * The asynchronous counterpart of {@link doesThrow}.
  *
  * @param seat Where the failure is reported.
  * @param fn Called with no arguments; its promise is awaited.
@@ -656,7 +661,7 @@ export function nullHandleSafe(
  * Fail when fn changes what observe reads.
  *
  * observe is read before and after fn, and the two readings must be
- * equal by the rules of {@link equal}. What observe answers defines
+ * equal by the rules of {@link isEqualTo}. What observe answers defines
  * what nothing means: whatever it leaves out, fn may change. Answer a
  * copy, because a projection sharing memory with the subject reads the
  * same object twice and passes whatever fn did.
@@ -1142,7 +1147,7 @@ export function isPoisoned(
  * Fail when got does not contain the elements of want, each as often.
  *
  * The order does not count. Elements compare by the rules of
- * {@link equal}, and each element of want takes a partner of its own in
+ * {@link isEqualTo}, and each element of want takes a partner of its own in
  * got.
  *
  * @param seat Where the failure is reported.

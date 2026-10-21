@@ -147,9 +147,6 @@ export function render(failure: Failure): string {
   return `${failure.contract}: ${parts.join(", ")}`;
 }
 
-/** The directory of this library's modules, whose frames are not the caller's. */
-const LIBRARY = dirname(fileURLToPath(import.meta.url)) + sep;
-
 /**
  * The location of a frame of a V8 stack, in parentheses or after `at`: a
  * file, then its line and its column. A frame without a line, such as that
@@ -166,9 +163,90 @@ function pathOf(file: string): string {
   return normalize(file.startsWith("file://") ? fileURLToPath(file) : file);
 }
 
+/** A frame of V8's structured stack, as `Error.prepareStackTrace` receives it. */
+interface Site {
+  getFileName(): string | null | undefined;
+}
+
 /**
- * Returns the innermost frame of a V8 stack whose file is outside this
- * library's directory and is no internal module of the runtime.
+ * Returns the directory of the module that calls it. A module calls it as
+ * it loads, in an ES module and in a CommonJS module. It reads the file of
+ * the caller's frame from V8's structured stack, which no source map
+ * rewrites. A test runner such as jest maps the text of a stack to the
+ * sources that a source map names, and the package does not ship them.
+ *
+ * @returns The directory, or `.` for a caller whose frame has no file.
+ */
+export function directoryOf(): string {
+  const prepare = Error.prepareStackTrace;
+  const limit = Error.stackTraceLimit;
+  Error.prepareStackTrace = (_error, sites) => sites;
+  Error.stackTraceLimit = 2;
+  try {
+    const sites = new Error("read the caller's file")
+      .stack as unknown as readonly Site[];
+    return dirname(pathOf(sites[1]?.getFileName() ?? ""));
+  } finally {
+    Error.prepareStackTrace = prepare;
+    Error.stackTraceLimit = limit;
+  }
+}
+
+/**
+ * Returns the path of the file of a frame of a V8 stack. A frame without a
+ * file gives the path `undefined`, which names no module of this library.
+ */
+function fileOf(frame: string): string {
+  return pathOf(String(FRAME.exec(frame.trim())?.groups?.["file"]));
+}
+
+/**
+ * The directories of this library's modules, whose frames are not the
+ * caller's. The first contains the files that run. A test runner that maps
+ * the text of a stack through source maps puts the frames of this library
+ * under the directory of the sources, which is the second.
+ */
+const LIBRARY = [
+  directoryOf(),
+  dirname(
+    fileOf(String(new Error("read this module's file").stack).split("\n")[1] as string),
+  ),
+].map((dir) => dir + sep);
+
+/** The directory of the installed packages, whose frames are not the caller's either. */
+const PACKAGES = `${sep}node_modules${sep}`;
+
+/**
+ * The least number of frames that a stack of {@link stackOf} has. A test
+ * runner's frames and this library's frames between a test and the code
+ * that reads the stack exceed V8's default limit of 10.
+ */
+const FRAMES = 100;
+
+/**
+ * Returns the stack of a new error of message. The stack has at least
+ * {@link FRAMES} frames, whatever limit `Error.stackTraceLimit` sets, and
+ * the limit is the same after the call.
+ *
+ * @param message - The message of the error.
+ * @returns The text of the stack.
+ */
+export function stackOf(message: string): string {
+  const limit = Error.stackTraceLimit;
+  Error.stackTraceLimit = Math.max(limit, FRAMES);
+  try {
+    return String(new Error(message).stack);
+  } finally {
+    Error.stackTraceLimit = limit;
+  }
+}
+
+/**
+ * Returns the innermost frame of a V8 stack whose file is the caller's. The
+ * file of such a frame is outside the directories of this library and
+ * outside `node_modules`, and it is no internal module of the runtime. A
+ * test runner's frames between an assertion and the test are in
+ * `node_modules`.
  *
  * @param stack - The text of a stack, as an error's `stack` states it.
  * @returns The frame's file and line, or undefined when no frame of the
@@ -181,7 +259,8 @@ export function siteIn(stack: string): Where | undefined {
     const { file, line: at } = frame.groups as { file: string; line: string };
     if (file.startsWith("node:")) continue;
     const path = pathOf(file);
-    if (path.startsWith(LIBRARY)) continue;
+    if (LIBRARY.some((dir) => path.startsWith(dir)) || path.includes(PACKAGES))
+      continue;
     return { file: path, line: Number(at) };
   }
   return undefined;
@@ -189,12 +268,11 @@ export function siteIn(stack: string): Where | undefined {
 
 /**
  * Reads the call site the assertion was written on: the innermost frame
- * whose file is outside this library's directory and is no internal
- * module of the runtime.
+ * whose file is the caller's, as {@link siteIn} reads it.
  *
  * @returns Where the assertion was called, or undefined when no frame of
  *   the stack has such a file.
  */
 export function callSite(): Where | undefined {
-  return siteIn(String(new Error("read the call site").stack));
+  return siteIn(stackOf("read the call site"));
 }

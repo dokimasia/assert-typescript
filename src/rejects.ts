@@ -79,11 +79,11 @@ async function drive(
  * @param body - The check, which may return a promise; expected to fail.
  * @returns The failure records of the check, in call order.
  * @example
- * const failures = await check.rejects(seat, "an empty name is refused", (inner) => {
+ * const failures = await check.doesReject(seat, "an empty name is refused", (inner) => {
  *   check.isNil(inner, validate(""), "it passes");
  * });
  */
-export function rejects(
+export function doesReject(
   seat: Seat,
   msg: string,
   body: (check: Seat) => unknown,

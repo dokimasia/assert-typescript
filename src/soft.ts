@@ -10,7 +10,7 @@
  *
  * test("reply", ({ seat }) => {
  *   soft.hasPrefix(seat, reply.body, "{", "the body is JSON");
- *   soft.length(seat, reply.items, 3, "every item comes back");
+ *   soft.hasLength(seat, reply.items, 3, "every item comes back");
  * });
  * ```
  *
@@ -42,13 +42,13 @@ const MODE = Mode.Soft;
  *
  * The test carries on either way, and everything recorded is
  * reported when the test body ends. The signature and the
- * comparison rules are those of {@link check.equal}.
+ * comparison rules are those of {@link check.isEqualTo}.
  *
  * `want` is held to the type of `got`. Comparing across types is
  * almost always a mistake, and the few deliberate cases say so with
- * a cast: `check.equal(seat, got as unknown, want as unknown, msg)`.
+ * a cast: `check.isEqualTo(seat, got as unknown, want as unknown, msg)`.
  */
-export function equal<T>(
+export function isEqualTo<T>(
   seat: Seat,
   got: T,
   want: NoInfer<T>,
@@ -64,13 +64,13 @@ export function equal<T>(
  *
  * The test carries on either way, and everything recorded is
  * reported when the test body ends. The signature and the
- * comparison rules are those of {@link check.notEqual}.
+ * comparison rules are those of {@link check.isNotEqualTo}.
  *
  * `want` is held to the type of `got`. Comparing across types is
  * almost always a mistake, and the few deliberate cases say so with
- * a cast: `check.equal(seat, got as unknown, want as unknown, msg)`.
+ * a cast: `check.isEqualTo(seat, got as unknown, want as unknown, msg)`.
  */
-export function notEqual<T>(
+export function isNotEqualTo<T>(
   seat: Seat,
   got: T,
   want: NoInfer<T>,
@@ -134,9 +134,9 @@ export function isNotNil(seat: Seat, got: unknown, msg: string): void {
  *
  * The test carries on either way, and everything recorded is
  * reported when the test body ends. The signature and the
- * comparison rules are those of {@link check.length}.
+ * comparison rules are those of {@link check.hasLength}.
  */
-export function length(seat: Seat, got: unknown, want: number, msg: string): void {
+export function hasLength(seat: Seat, got: unknown, want: number, msg: string): void {
   seat.helper();
   value.length(seat, MODE, got, want, msg);
 }
@@ -170,9 +170,9 @@ export function isNotEmpty(seat: Seat, got: unknown, msg: string): void {
  *
  * The test carries on either way, and everything recorded is
  * reported when the test body ends. The signature and the
- * comparison rules are those of {@link check.contains}.
+ * comparison rules are those of {@link check.doesContain}.
  */
-export function contains(
+export function doesContain(
   seat: Seat,
   haystack: unknown,
   needle: unknown,
@@ -188,9 +188,9 @@ export function contains(
  *
  * The test carries on either way, and everything recorded is
  * reported when the test body ends. The signature and the
- * comparison rules are those of {@link check.notContains}.
+ * comparison rules are those of {@link check.doesNotContain}.
  */
-export function notContains(
+export function doesNotContain(
   seat: Seat,
   haystack: unknown,
   needle: unknown,
@@ -247,9 +247,14 @@ export function hasSuffix(seat: Seat, got: unknown, suffix: string, msg: string)
  *
  * The test carries on either way, and everything recorded is
  * reported when the test body ends. The signature and the
- * comparison rules are those of {@link check.matches}.
+ * comparison rules are those of {@link check.doesMatch}.
  */
-export function matches(seat: Seat, got: unknown, pattern: string, msg: string): void {
+export function doesMatch(
+  seat: Seat,
+  got: unknown,
+  pattern: string,
+  msg: string,
+): void {
   seat.helper();
   value.matches(seat, MODE, got, pattern, msg);
 }
@@ -259,9 +264,9 @@ export function matches(seat: Seat, got: unknown, pattern: string, msg: string):
  *
  * The test carries on either way, and everything recorded is
  * reported when the test body ends. The signature and the
- * comparison rules are those of {@link check.closeTo}.
+ * comparison rules are those of {@link check.isCloseTo}.
  */
-export function closeTo(
+export function isCloseTo(
   seat: Seat,
   got: unknown,
   want: number,
@@ -384,11 +389,11 @@ export function errorAs<E>(
  *
  * The test carries on either way, and everything recorded is
  * reported when the test body ends. The signature and the
- * comparison rules are those of {@link check.throws}.
+ * comparison rules are those of {@link check.doesThrow}.
  *
  * @returns What fn threw, or undefined when it returned.
  */
-export function throws(seat: Seat, fn: () => unknown, msg: string): unknown {
+export function doesThrow(seat: Seat, fn: () => unknown, msg: string): unknown {
   seat.helper();
   return raising.throws(seat, MODE, fn, msg);
 }
