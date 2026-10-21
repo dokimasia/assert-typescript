@@ -49,7 +49,7 @@ describe("detail", () => {
     ];
     for (const tt of tests) {
       it(`writes ${tt.name}`, ({ seat }) => {
-        check.equal(seat, stepLiteral(tt.give), tt.want, "the corpus form");
+        check.isEqualTo(seat, stepLiteral(tt.give), tt.want, "the corpus form");
       });
     }
   });
@@ -63,7 +63,7 @@ describe("detail", () => {
         10,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         detail(passed),
         {
@@ -93,7 +93,7 @@ describe("detail", () => {
       );
       const written = detail(counterexample);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           written["outcome"],
@@ -139,7 +139,7 @@ describe("detail", () => {
       );
       const [other] = detail(counterexample)["others"] as Record<string, unknown>[];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [other?.["failure"], other?.["counterexample"], typeof other?.["choices"]],
         [
@@ -168,7 +168,7 @@ describe("detail", () => {
         failure: { identity: "five" },
       } as unknown as NonNullable<Outcome["failing"]>;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         detail({ ...tally.outcome("counterexample", { failing }), valued: true })[
           "counterexample"
@@ -240,7 +240,7 @@ describe("detail", () => {
       it(`writes the divergence of ${tt.name}`, ({ seat }) => {
         const flaky = new Tally(SEED).outcome("flaky", { divergence: tt.give });
 
-        check.equal(seat, detail(flaky)["divergence"], tt.want, "the divergence");
+        check.isEqualTo(seat, detail(flaky)["divergence"], tt.want, "the divergence");
       });
     }
 
@@ -255,7 +255,7 @@ describe("detail", () => {
       );
       const written = detail(flaky);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           written["outcome"],
@@ -279,7 +279,7 @@ describe("detail", () => {
         },
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         detail(unmet)["coverage"],
         { label: "even", share: 0.5, counted: 2, valid: 10, verdict: "refuted" },
@@ -290,7 +290,7 @@ describe("detail", () => {
     it("writes null choices for a counterexample without a token", ({ seat }) => {
       const tally = new Tally(SEED);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         detail(tally.outcome("counterexample"))["choices"],
         null,

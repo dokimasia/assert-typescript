@@ -51,7 +51,7 @@ describe("generator", () => {
     it("returns the error of a spec", ({ seat }) => {
       const err = new SpecError("prop: 1 is no generator spec");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.name, err.message],
         ["SpecError", "prop: 1 is no generator spec"],
@@ -155,7 +155,7 @@ describe("generator", () => {
       it(`builds ${tt.name}`, ({ seat }) => {
         const [type, value] = tt.want;
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [build(tt.give) instanceof type, canonical(decoded(tt.give))],
           [true, canonical(value)],
@@ -165,7 +165,7 @@ describe("generator", () => {
     }
 
     it("builds a boolean of p in lowest terms", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         (build({ gen: "boolean", p: [2, 6] }) as Bool).p,
         { num: 1n, den: 3n },
@@ -174,7 +174,7 @@ describe("generator", () => {
     });
 
     it("builds a boolean of one half without p", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         (build({ gen: "boolean", p: null }) as Bool).p,
         { num: 1n, den: 2n },
@@ -187,7 +187,7 @@ describe("generator", () => {
         build({ gen: "float", min: 0, max: 1, width: 32, allow_nan: true }) as Float
       ).bounds;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [bounds.width, bounds.allowNan],
         [32, true],
@@ -196,14 +196,19 @@ describe("generator", () => {
     });
 
     it("binds each self of an extension to its recursive generator", ({ seat }) => {
-      check.equal(seat, decoded(TREE, 1n, 1n, 0n, 5n, 0n), [5n], "a list of one leaf");
+      check.isEqualTo(
+        seat,
+        decoded(TREE, 1n, 1n, 0n, 5n, 0n),
+        [5n],
+        "a list of one leaf",
+      );
     });
 
     it("binds a nested self to the innermost recursive generator", ({ seat }) => {
       const inner = { ...TREE, max_leaves: 1 };
       const outer = { gen: "recursive", base: inner, extend: TREE.extend };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         decoded(outer, 0n, 1n, 1n, 0n, 5n, 1n, 1n, 7n, 0n),
         [5n, 7n],
@@ -346,7 +351,7 @@ describe("generator", () => {
     ];
     for (const tt of refusals) {
       it(`throws for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => build(tt.give)),
           tt.want,

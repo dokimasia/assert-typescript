@@ -127,11 +127,11 @@ function subject<K extends keyof Subject>(
 const DRIVERS: ReadonlyMap<string, Driver> = new Map<string, Driver>([
   [
     "prop-equal",
-    (seat, r) => prop.equal(seat, fn(r, 0), fn(r, 1), CONTRACT, ...r.options),
+    (seat, r) => prop.isEqualTo(seat, fn(r, 0), fn(r, 1), CONTRACT, ...r.options),
   ],
   [
     "prop-not-equal",
-    (seat, r) => prop.notEqual(seat, fn(r, 0), fn(r, 1), CONTRACT, ...r.options),
+    (seat, r) => prop.isNotEqualTo(seat, fn(r, 0), fn(r, 1), CONTRACT, ...r.options),
   ],
   [
     "prop-true",
@@ -158,7 +158,7 @@ const DRIVERS: ReadonlyMap<string, Driver> = new Map<string, Driver>([
   [
     "prop-length",
     (seat, r) =>
-      prop.length(seat, fn(r, 0), r.args[0] as number, CONTRACT, ...r.options),
+      prop.hasLength(seat, fn(r, 0), r.args[0] as number, CONTRACT, ...r.options),
   ],
   ["prop-empty", (seat, r) => prop.isEmpty(seat, fn(r, 0), CONTRACT, ...r.options)],
   [
@@ -167,11 +167,11 @@ const DRIVERS: ReadonlyMap<string, Driver> = new Map<string, Driver>([
   ],
   [
     "prop-contains",
-    (seat, r) => prop.contains(seat, fn(r, 0), r.args[0], CONTRACT, ...r.options),
+    (seat, r) => prop.doesContain(seat, fn(r, 0), r.args[0], CONTRACT, ...r.options),
   ],
   [
     "prop-not-contains",
-    (seat, r) => prop.notContains(seat, fn(r, 0), r.args[0], CONTRACT, ...r.options),
+    (seat, r) => prop.doesNotContain(seat, fn(r, 0), r.args[0], CONTRACT, ...r.options),
   ],
   [
     "prop-contains-in-order",
@@ -208,12 +208,12 @@ const DRIVERS: ReadonlyMap<string, Driver> = new Map<string, Driver>([
   [
     "prop-matches",
     (seat, r) =>
-      prop.matches(seat, fn(r, 0), r.args[0] as string, CONTRACT, ...r.options),
+      prop.doesMatch(seat, fn(r, 0), r.args[0] as string, CONTRACT, ...r.options),
   ],
   [
     "prop-close-to",
     (seat, r) =>
-      prop.closeTo(
+      prop.isCloseTo(
         seat,
         fn(r, 0),
         r.args[0] as number,
@@ -268,7 +268,7 @@ const DRIVERS: ReadonlyMap<string, Driver> = new Map<string, Driver>([
   ],
   [
     "prop-throws",
-    (seat, r) => prop.throws(seat, kind(RAISES, r, 0), CONTRACT, ...r.options),
+    (seat, r) => prop.doesThrow(seat, kind(RAISES, r, 0), CONTRACT, ...r.options),
   ],
   [
     "prop-not-throws",

@@ -64,7 +64,7 @@ describe("subject", () => {
     }) => {
       const subject = build("returns-ok");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await (subject.signalled as (signal: AbortSignal) => Promise<unknown>)(
           aborted(),
@@ -77,7 +77,7 @@ describe("subject", () => {
     it("builds a returns-ok subject whose shapes return", ({ seat }) => {
       const subject = build("returns-ok");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           (subject.bare as () => unknown)(),
@@ -117,7 +117,7 @@ describe("subject", () => {
         signal?: AbortSignal,
       ) => Promise<unknown>;
 
-      check.equal(seat, await read(), "did the work", "no signal stops it");
+      check.isEqualTo(seat, await read(), "did the work", "no signal stops it");
     });
 
     it("builds an ignores-handle subject that resolves with an aborted signal", async ({
@@ -127,7 +127,7 @@ describe("subject", () => {
         signal: AbortSignal,
       ) => Promise<unknown>;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await read(aborted()),
         "did the work",
@@ -136,7 +136,7 @@ describe("subject", () => {
     });
 
     it("builds a raises subject whose bare shape throws a SubjectError", ({ seat }) => {
-      const thrown = check.throws(
+      const thrown = check.doesThrow(
         seat,
         build("raises").bare as () => unknown,
         "the subject raises",
@@ -158,14 +158,14 @@ describe("subject", () => {
       seat,
     }) => {
       const subject = build("fails-otherwise");
-      const thrown = check.throws(
+      const thrown = check.doesThrow(
         seat,
         () => (subject.call as (input: unknown) => unknown)(1),
         "the call fails",
       );
 
       check.isTrue(seat, thrown instanceof SubjectError, "the error is a SubjectError");
-      check.equal(seat, subject.domain, [1, 2, 3], "the domain");
+      check.isEqualTo(seat, subject.domain, [1, 2, 3], "the domain");
     });
 
     it("builds a dereferences-handle subject that rejects without a signal", async ({
@@ -178,25 +178,35 @@ describe("subject", () => {
     });
 
     it("builds a never-settles subject whose every attempt fails", ({ seat }) => {
-      check.equal(seat, failedAttempts(build("never-settles"), 4), 4, "four failures");
+      check.isEqualTo(
+        seat,
+        failedAttempts(build("never-settles"), 4),
+        4,
+        "four failures",
+      );
     });
 
     it("builds a never-settles subject whose every reading throws", ({ seat }) => {
       const subject = build("never-settles");
       (subject.induce as () => void)();
 
-      check.equal(seat, failedReadings(subject, 4), 4, "four failed readings");
+      check.isEqualTo(seat, failedReadings(subject, 4), 4, "four failed readings");
     });
 
     it("builds a settles-after subject whose first two attempts fail", ({ seat }) => {
-      check.equal(seat, failedAttempts(build("settles-after"), 4), 2, "two failures");
+      check.isEqualTo(
+        seat,
+        failedAttempts(build("settles-after"), 4),
+        2,
+        "two failures",
+      );
     });
 
     it("builds a settles-after subject whose first two readings throw", ({ seat }) => {
       const subject = build("settles-after");
       (subject.induce as () => void)();
 
-      check.equal(seat, failedReadings(subject, 4), 2, "two failed readings");
+      check.isEqualTo(seat, failedReadings(subject, 4), 2, "two failed readings");
     });
 
     it("builds an accumulates subject whose call and advance raise the count", ({
@@ -204,7 +214,7 @@ describe("subject", () => {
     }) => {
       const subject = build("accumulates");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [countAfter(subject), subject.steps],
         [2, 5],
@@ -215,7 +225,12 @@ describe("subject", () => {
     it("builds a leaves-state-alone subject whose count is 0 after its calls", ({
       seat,
     }) => {
-      check.equal(seat, countAfter(build("leaves-state-alone")), 0, "the count is 0");
+      check.isEqualTo(
+        seat,
+        countAfter(build("leaves-state-alone")),
+        0,
+        "the count is 0",
+      );
     });
 
     it("builds a sets-value subject whose call sets the cell to its input", ({
@@ -224,7 +239,7 @@ describe("subject", () => {
       const subject = build("sets-value");
       (subject.call as (input: unknown) => unknown)(subject.input);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (subject.observe as () => number)(),
         7,
@@ -237,26 +252,31 @@ describe("subject", () => {
     }) => {
       const compute = build("counts-calls").compute as (input: unknown) => unknown;
 
-      check.equal(seat, [compute(1), compute(1)], [1, 2], "the calls count from 1");
+      check.isEqualTo(seat, [compute(1), compute(1)], [1, 2], "the calls count from 1");
     });
 
     it("builds an adds subject that adds its operands", ({ seat }) => {
       const subject = build("adds");
       const combine = subject.combine as (a: unknown, b: unknown) => unknown;
 
-      check.equal(seat, [combine(2, 3), subject.operands], [5, [2, 3, 5]], "the sum");
+      check.isEqualTo(
+        seat,
+        [combine(2, 3), subject.operands],
+        [5, [2, 3, 5]],
+        "the sum",
+      );
     });
 
     it("builds a subtracts subject that subtracts its second operand", ({ seat }) => {
       const combine = build("subtracts").combine as (a: unknown, b: unknown) => unknown;
 
-      check.equal(seat, combine(2, 3), -1, "the difference");
+      check.isEqualTo(seat, combine(2, 3), -1, "the difference");
     });
 
     it("builds a renders-decimal subject that renders its input", ({ seat }) => {
       const subject = build("renders-decimal");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (subject.render as (input: unknown) => string)(subject.input),
         "-42",
@@ -269,7 +289,7 @@ describe("subject", () => {
     }) => {
       const subject = build("drops-the-sign");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (subject.render as (input: unknown) => string)(subject.input),
         "42",
@@ -282,7 +302,7 @@ describe("subject", () => {
     }) => {
       const iterate = build("rotates").iterate as () => readonly unknown[];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [iterate(), iterate()],
         [
@@ -296,13 +316,13 @@ describe("subject", () => {
     it("builds a repeats-an-element subject that yields 2 twice", ({ seat }) => {
       const iterate = build("repeats-an-element").iterate as () => readonly unknown[];
 
-      check.equal(seat, iterate(), [1, 2, 2, 3], "the iteration");
+      check.isEqualTo(seat, iterate(), [1, 2, 2, 3], "the iteration");
     });
 
     it("builds a yields-in-order subject that yields one order", ({ seat }) => {
       const iterate = build("yields-in-order").iterate as () => readonly unknown[];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [iterate(), iterate()],
         [
@@ -318,7 +338,12 @@ describe("subject", () => {
       const advance = subject.advance as () => void;
       for (let i = 0; i < 4; i += 1) advance();
 
-      check.equal(seat, (subject.observe as () => number)(), 0, "the count wrapped");
+      check.isEqualTo(
+        seat,
+        (subject.observe as () => number)(),
+        0,
+        "the count wrapped",
+      );
     });
 
     it("builds a refuses-after-close subject whose call throws its sentinel after close", ({
@@ -328,7 +353,7 @@ describe("subject", () => {
       const use = subject.use as () => unknown;
       check.doesNotThrow(seat, use, "the open subject serves");
       (subject.close as () => void)();
-      const thrown = check.throws(seat, use, "the closed subject refuses");
+      const thrown = check.doesThrow(seat, use, "the closed subject refuses");
 
       check.isTrue(seat, thrown === subject.sentinel, "the refusal is the sentinel");
     });
@@ -364,7 +389,7 @@ describe("subject", () => {
       )();
 
       check.isTrue(seat, first !== second, "two objects");
-      check.equal(seat, first, second, "of one value");
+      check.isEqualTo(seat, first, second, "of one value");
     });
 
     it.skipIf(UNENFORCED)(
@@ -374,7 +399,7 @@ describe("subject", () => {
           "docs/a.md": files.text("a").withMode(0o000),
         });
 
-        check.throws(
+        check.doesThrow(
           seat,
           () => touch("leaves-files-alone", dir),
           "the unreadable file is read",
@@ -403,7 +428,7 @@ describe("subject", () => {
           "docs/a.md": files.text("a").withMode(0o400),
         });
 
-        check.throws(
+        check.doesThrow(
           seat,
           () => touch("rewrites-files", dir),
           "the read-only file is written",

@@ -290,7 +290,7 @@ const NAMES: readonly { name: string; initial: unknown; undefined: Operation }[]
 describe("specs", () => {
   describe("SPECS", () => {
     it("states the six named specs of the definition", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [...SPECS.keys()].sort(),
         ["cas-register", "key-value", "lossy-register", "queue", "register", "set"],
@@ -300,13 +300,13 @@ describe("specs", () => {
 
     for (const { name, initial, undefined: op } of NAMES) {
       it(`starts the ${name} spec at its initial state`, ({ seat }) => {
-        check.equal(seat, spec(name).initial(), initial, "the initial state");
+        check.isEqualTo(seat, spec(name).initial(), initial, "the initial state");
       });
 
       it(`throws for an operation that the ${name} spec does not define`, ({
         seat,
       }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => spec(name).next(initial, op)),
           `conformance: the ${name} spec has no operation ${JSON.stringify(op.name)}`,
@@ -316,7 +316,7 @@ describe("specs", () => {
 
       for (const tt of STEPS[name] ?? []) {
         it(`${tt.name} in the ${name} spec`, ({ seat }) => {
-          check.equal(
+          check.isEqualTo(
             seat,
             spec(name).next(...tt.give),
             tt.want,
@@ -331,7 +331,7 @@ describe("specs", () => {
       const equal = set.equal as NonNullable<typeof set.equal>;
       const key = set.key as NonNullable<typeof set.key>;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           equal([1, 2], [2, 1]),

@@ -42,7 +42,7 @@ async function outcomeOf(name: string, setup: Setup): Promise<[unknown, unknown]
 describe("subjects", () => {
   describe("SUBJECTS", () => {
     it("states the seven machine subjects of the definition", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [...SUBJECTS.keys()].sort(),
         [
@@ -99,7 +99,7 @@ describe("subjects", () => {
       it(`maps ${tt.name} to a subject whose run ends as its vectors state`, async ({
         seat,
       }) => {
-        check.equal(seat, await outcomeOf(...tt.give), tt.want, "the outcome");
+        check.isEqualTo(seat, await outcomeOf(...tt.give), tt.want, "the outcome");
       });
     }
   });

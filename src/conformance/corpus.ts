@@ -10,6 +10,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as check from "../check.js";
+import { type Matcher, matchers, NAMES, SUBJECTS } from "../expect/matchers.js";
 import type { Option } from "../matcher/option.js";
 import * as option from "../option.js";
 import { DEFINITION } from "../record/call.js";
@@ -59,9 +60,33 @@ export interface Case {
   readonly skip: Readonly<Record<string, string>>;
 }
 
-/** Both surfaces, so every case is driven through each. */
+/**
+ * Returns the matchers of the expect chain, each called as the function
+ * form of its assertion is called: with a seat, then its arguments. A
+ * call reports to that seat. The function form of noTaskLeaks takes no
+ * subject, so the chain has no member of that name here.
+ */
+function chained(): Record<string, Invoker> {
+  return Object.fromEntries(
+    NAMES.filter((name) => name !== "noTaskLeaks").map((name) => [
+      name,
+      (seat: Recorder, ...args: unknown[]) => {
+        const at = SUBJECTS[name] ?? 0;
+        const table = matchers({ seat: () => seat, start: () => undefined });
+        const matcher = table[name] as Matcher;
+        return matcher.call({}, args[at], ...args.slice(0, at), ...args.slice(at + 1));
+      },
+    ]),
+  );
+}
+
+/**
+ * The surfaces, so every case is driven through each: check, soft, and
+ * the matchers of the expect chain, whose calls report as check's do.
+ */
 export const SURFACES: Record<string, Record<string, Invoker>> = {
   check: check as unknown as Record<string, Invoker>,
+  expect: chained(),
   soft: soft as unknown as Record<string, Invoker>,
 };
 

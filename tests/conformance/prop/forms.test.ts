@@ -38,7 +38,7 @@ describe("forms", () => {
       it(`returns the detail that the vector ${id} states`, async ({ seat }) => {
         const raw = vector(id);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           (await formsOf(raw))["detail"],
           raw["detail"],
@@ -53,7 +53,7 @@ describe("forms", () => {
       const raw = vector("prop-true/fails-for-a-negative-input");
       const passing = { ...raw, subjects: ["returns-null"] };
 
-      check.notEqual(
+      check.isNotEqualTo(
         seat,
         (await formsOf(passing))["detail"],
         raw["detail"],
@@ -121,7 +121,7 @@ describe("forms", () => {
     ];
     for (const tt of tests) {
       it(`rejects with a fault for ${tt.name}`, async ({ seat }) => {
-        check.equal(seat, await fault(tt.give), tt.want, "the fault");
+        check.isEqualTo(seat, await fault(tt.give), tt.want, "the fault");
       });
     }
 
@@ -130,7 +130,7 @@ describe("forms", () => {
     }) => {
       const raw = { ...vector("prop-true/fails-for-a-negative-input"), subjects: [5] };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await fault(raw),
         ["subjects[0]", "5 is no subject that the form takes"],
@@ -143,7 +143,7 @@ describe("forms", () => {
     }) => {
       const { subjects: _, ...raw } = vector("prop-true/fails-for-a-negative-input");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         await fault(raw),
         ["subjects[0]", "undefined is no subject that the form takes"],
@@ -164,7 +164,7 @@ describe("forms", () => {
         unknown
       >;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         got["failure"],
         { assertion: "true", detail: {} },
@@ -187,7 +187,7 @@ describe("forms", () => {
         unknown
       >;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         (got["counterexample"] as Record<string, unknown>[])[0]?.["value"],
         { type: "int", value: -1 },
@@ -205,7 +205,7 @@ describe("forms", () => {
         unknown
       >;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         got["outcome"],
         "passed",

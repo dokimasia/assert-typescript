@@ -21,13 +21,13 @@ import { test as it } from "../../src/vitest.js";
 describe("definition", () => {
   describe("LANGUAGE", () => {
     it("contains the column typescript of the naming table", ({ seat }) => {
-      check.equal(seat, LANGUAGE, "typescript", "the language");
+      check.isEqualTo(seat, LANGUAGE, "typescript", "the language");
     });
   });
 
   describe("assertions", () => {
     it("returns the 110 assertions of the vendored definition", ({ seat }) => {
-      check.length(seat, assertions(), 110, "the definition states 110 assertions");
+      check.hasLength(seat, assertions(), 110, "the definition states 110 assertions");
     });
   });
 
@@ -35,7 +35,7 @@ describe("definition", () => {
     it("returns a TypeScript name for every assertion", ({ seat }) => {
       const named = names();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         Object.keys(assertions()).filter((id) => typeof named[id] !== "string"),
         [],
@@ -51,13 +51,13 @@ describe("definition", () => {
         "utf8",
       );
 
-      check.equal(seat, version(), vendored.trim(), "the version");
+      check.isEqualTo(seat, version(), vendored.trim(), "the version");
     });
   });
 
   describe("overlay", () => {
     it("returns an overlay that extends the vendored version", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         overlay().extends,
         `spec://assertions@${version()}`,
@@ -66,7 +66,12 @@ describe("definition", () => {
     });
 
     it("returns the overlay of TypeScript", ({ seat }) => {
-      check.equal(seat, overlay().language, LANGUAGE, "the language of the overlay");
+      check.isEqualTo(
+        seat,
+        overlay().language,
+        LANGUAGE,
+        "the language of the overlay",
+      );
     });
 
     it("returns a stance with a reason for each divergence", ({ seat }) => {
@@ -88,7 +93,7 @@ describe("definition", () => {
     it("returns the TypeScript name of each relaxation of the definition", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         relaxationNames(),
         {
@@ -103,7 +108,7 @@ describe("definition", () => {
 
   describe("surfaceNames", () => {
     it("returns the TypeScript name of a surface id", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         surfaceNames()["recorder-seat"],
         "Recorder",
@@ -114,7 +119,7 @@ describe("definition", () => {
     it("returns the empty string for a surface id that TypeScript does not name", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         surfaceNames()["steps.repeat"],
         "",

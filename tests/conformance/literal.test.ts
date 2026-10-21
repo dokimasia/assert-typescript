@@ -159,7 +159,13 @@ describe("literal", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(seat, decode(tt.give), tt.want, "the decoded value", equateNans());
+        check.isEqualTo(
+          seat,
+          decode(tt.give),
+          tt.want,
+          "the decoded value",
+          equateNans(),
+        );
       });
     }
   });
@@ -265,7 +271,7 @@ describe("literal", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.contains(
+        check.doesContain(
           seat,
           refusal(tt.give),
           tt.want,
@@ -286,7 +292,7 @@ describe("literal", () => {
 
       const first = objects.decode(literal);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         objects.decode(literal),
         first,
@@ -364,7 +370,7 @@ describe("literal", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           canonical(tt.give[0]) === canonical(tt.give[1]),
           tt.want,
@@ -400,7 +406,7 @@ describe("literal", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(seat, canonical(tt.give), tt.want, "the canonical text");
+        check.isEqualTo(seat, canonical(tt.give), tt.want, "the canonical text");
       });
     }
   });
@@ -437,7 +443,7 @@ describe("literal", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(seat, sameJson(tt.give[0], tt.give[1]), tt.want, "the verdict");
+        check.isEqualTo(seat, sameJson(tt.give[0], tt.give[1]), tt.want, "the verdict");
       });
     }
   });

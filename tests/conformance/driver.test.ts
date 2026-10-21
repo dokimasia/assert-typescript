@@ -42,8 +42,8 @@ describe("driver", () => {
     it("returns false for a surface that it does not know", async ({ seat }) => {
       check.isFalse(
         seat,
-        await runSubject("expect", "throws", "raises", new Recorder(), "a case"),
-        "the library has no surface expect",
+        await runSubject("assert", "throws", "raises", new Recorder(), "a case"),
+        "the library has no surface assert",
       );
     });
 

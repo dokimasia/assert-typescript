@@ -6,10 +6,11 @@
  * it is called here, so the corpus runner does not know all of them.
  */
 
-import { check, soft } from "../index.js";
+import type { check } from "../index.js";
 import type { Option } from "../matcher/option.js";
 import type { Seat } from "../matcher/seat.js";
 import { Recorder } from "../seat.js";
+import { SURFACES as CORPUS_SURFACES } from "./corpus.js";
 import { SUBJECTS, type Subject } from "./subject.js";
 
 /** How long a retrying assertion is given, against a controlled clock. */
@@ -62,7 +63,7 @@ const shapes = {
 
 /** How each subject-taking assertion is called, by canonical id. */
 const DRIVERS: Record<string, Driver> = {
-  throws: (s, seat, held, msg) => s.throws(seat, shapes.bare(held), msg),
+  throws: (s, seat, held, msg) => s.doesThrow(seat, shapes.bare(held), msg),
   "not-throws": (s, seat, held, msg) => s.doesNotThrow(seat, shapes.bare(held), msg),
   "honours-cancellation": (s, seat, held, msg) =>
     s.honoursCancellation(seat, shapes.signalled(held), msg),
@@ -146,8 +147,8 @@ const DRIVERS: Record<string, Driver> = {
     s.isPoisoned(seat, held.induce as () => void, held.read as () => unknown, msg),
 };
 
-/** Both surfaces a subject case is driven through. */
-const SURFACES: Record<string, Surface> = { check, soft: soft as unknown as Surface };
+/** The surfaces that a subject case is driven through, which the corpus states. */
+const SURFACES = CORPUS_SURFACES as unknown as Record<string, Surface>;
 
 /**
  * Drive one subject case, answering whether this language could.

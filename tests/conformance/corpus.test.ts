@@ -119,8 +119,28 @@ describe("corpus", () => {
   });
 
   describe("SURFACES", () => {
-    it("contains the two surfaces", () => {
-      expect(Object.keys(SURFACES).sort()).toEqual(["check", "soft"]);
+    it("contains the three surfaces", () => {
+      expect(Object.keys(SURFACES).sort()).toEqual(["check", "expect", "soft"]);
+    });
+
+    it("contains a member of the chain for each assertion besides noTaskLeaks", () => {
+      expect(Object.keys(SURFACES["expect"] ?? {})).toEqual(
+        Object.keys(check)
+          .filter((name) => name !== "noTaskLeaks")
+          .sort(),
+      );
+    });
+
+    it("hands the chain the subject in its place among the arguments", async () => {
+      const seat = new Recorder().withClock(new Controlled(0));
+      await SURFACES["expect"]?.["completesWithin"]?.(
+        seat,
+        1000,
+        () => undefined,
+        "in time",
+      );
+
+      expect([seat.failed, seat.records.length]).toEqual([false, 1]);
     });
   });
 
@@ -138,7 +158,7 @@ describe("corpus", () => {
 
   describe("memberFor", () => {
     it("returns the TypeScript name of the assertion of the case", () => {
-      expect(memberFor({ ...PASSING, assertion: "not-equal" })).toBe("notEqual");
+      expect(memberFor({ ...PASSING, assertion: "not-equal" })).toBe("isNotEqualTo");
     });
 
     it("returns undefined for an assertion without a name", () => {
@@ -219,14 +239,14 @@ describe("corpus", () => {
 
     it("returns a call record of the other surface", () => {
       const seat = new Recorder();
-      check.equal(seat, 1, 2, "equal/x");
+      check.isEqualTo(seat, 1, 2, "equal/x");
 
       expect(mismatch(FAILING, seat, false)).toContain("the call record is ");
     });
 
     it("returns a field of the failure of a call whose value differs from the case", () => {
       const seat = new Recorder();
-      check.equal(seat, 1, 2, "equal/x");
+      check.isEqualTo(seat, 1, 2, "equal/x");
 
       expect(mismatch({ ...FAILING, detail: { want: 3 } }, seat, true)).toBe(
         'detail "want" is number:2, want number:3',
@@ -235,14 +255,14 @@ describe("corpus", () => {
 
     it("returns undefined for a failure that matches the case", () => {
       const seat = new Recorder();
-      check.equal(seat, 1, 2, "equal/x");
+      check.isEqualTo(seat, 1, 2, "equal/x");
 
       expect(mismatch(FAILING, seat, true)).toBeUndefined();
     });
 
     it("returns undefined for a pass that matches the case", () => {
       const seat = new Recorder();
-      check.equal(seat, 1, 1, "equal/x");
+      check.isEqualTo(seat, 1, 1, "equal/x");
 
       expect(mismatch(PASSING, seat, true)).toBeUndefined();
     });
@@ -295,7 +315,7 @@ describe("corpus", () => {
         run(`returns undefined for case ${one.id} on ${surface}`, async () => {
           const seat = await drive(surface, one);
 
-          expect(mismatch(one, seat, surface === "check")).toBeUndefined();
+          expect(mismatch(one, seat, surface !== "soft")).toBeUndefined();
           checkWhere(one, seat);
         });
       }

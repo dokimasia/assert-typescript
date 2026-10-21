@@ -232,7 +232,7 @@ describe("predicate", () => {
       it(`returns a predicate that is ${tt.want} for ${tt.name}`, ({ seat }) => {
         const [spec, value] = tt.give;
 
-        check.equal(seat, predicate(spec)(value), tt.want, "the verdict");
+        check.isEqualTo(seat, predicate(spec)(value), tt.want, "the verdict");
       });
     }
 
@@ -251,7 +251,7 @@ describe("predicate", () => {
     ];
     for (const tt of refusals) {
       it(`throws for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => predicate(tt.give)),
           tt.want,

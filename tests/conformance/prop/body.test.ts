@@ -38,7 +38,7 @@ const DIGIT_BODY = buildBody({
 describe("body", () => {
   describe("DRAWN", () => {
     it("labels a body's one draw value", ({ seat }) => {
-      check.equal(seat, DRAWN, "value", "the label");
+      check.isEqualTo(seat, DRAWN, "value", "the label");
     });
   });
 
@@ -46,7 +46,7 @@ describe("body", () => {
     it("returns a body that requests no input for draws-nothing", async ({ seat }) => {
       const execution = await executed(buildBody({ kind: "draws-nothing" }));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [execution.status, execution.case.choices.length],
         ["passed", 0],
@@ -61,7 +61,7 @@ describe("body", () => {
       const first = await executed(body);
       const second = await executed(body);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [first.case.requests[0]?.bounds.id, second.case.requests[0]?.bounds.id],
         ["integer 0 9", "integer 0 1"],
@@ -77,7 +77,7 @@ describe("body", () => {
         await executed(body, 3000n),
       ];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         runs.map((run) => run.status),
         ["passed", "failed", "passed"],
@@ -111,7 +111,7 @@ describe("body", () => {
       it(`returns a body that ${tt.name}`, async ({ seat }) => {
         const execution = await executed(DIGIT_BODY, tt.give);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [
             execution.status,
@@ -127,7 +127,7 @@ describe("body", () => {
     it("returns a body that draws its value under the label value", async ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         (await executed(DIGIT_BODY, 4n)).case.draws[0]?.label,
         "value",
@@ -141,7 +141,7 @@ describe("body", () => {
         3n,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [execution.status, execution.case.labels.size],
         ["passed", 0],
@@ -181,7 +181,7 @@ describe("body", () => {
     ];
     for (const tt of refusals) {
       it(`throws for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => buildBody(tt.give)),
           tt.want,

@@ -51,7 +51,7 @@ describe("choices", () => {
     ];
     for (const tt of tests) {
       it(`writes ${tt.name}`, ({ seat }) => {
-        check.equal(seat, choiceLiteral(tt.give), tt.want, "the corpus form");
+        check.isEqualTo(seat, choiceLiteral(tt.give), tt.want, "the corpus form");
       });
     }
   });
@@ -102,7 +102,7 @@ describe("choices", () => {
     ];
     for (const tt of refusals) {
       it(`throws for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => parseChoice(tt.give)),
           tt.want,
@@ -114,7 +114,7 @@ describe("choices", () => {
 
   describe("parseChoices", () => {
     it("reads a list of choices", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         parseChoices([1, { sequence: [] }]),
         [
@@ -126,7 +126,7 @@ describe("choices", () => {
     });
 
     it("throws for a value that is no list", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => parseChoices(1)),
         "prop: 1 is no list of choices",
@@ -137,7 +137,7 @@ describe("choices", () => {
 
   describe("seedOf", () => {
     it("reads a decimal string", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         seedOf("18446744073709551615"),
         2n ** 64n - 1n,
@@ -152,7 +152,7 @@ describe("choices", () => {
     ];
     for (const tt of refusals) {
       it(`throws for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => seedOf(tt.give)),
           `prop: the seed ${JSON.stringify(tt.give)} is no decimal string`,
@@ -187,7 +187,7 @@ describe("choices", () => {
     ];
     for (const tt of tests) {
       it(`writes ${tt.name}`, ({ seat }) => {
-        check.equal(seat, boundsLiteral(tt.give), tt.want, "the corpus form");
+        check.isEqualTo(seat, boundsLiteral(tt.give), tt.want, "the corpus form");
       });
     }
   });

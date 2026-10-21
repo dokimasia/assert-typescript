@@ -13,7 +13,7 @@ function of(kind: string): (x: unknown) => unknown {
 describe("function", () => {
   describe("FUNCTIONS", () => {
     it("states the functions of seven subject kinds", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [...FUNCTIONS.keys()],
         [
@@ -85,7 +85,7 @@ describe("function", () => {
       it(`states that ${tt.name}`, ({ seat }) => {
         const [kind, input] = tt.give;
 
-        check.equal(seat, of(kind)(input), tt.want, "the function's value");
+        check.isEqualTo(seat, of(kind)(input), tt.want, "the function's value");
       });
     }
 
@@ -93,7 +93,7 @@ describe("function", () => {
       const input = [2n, 1n];
       of("sorts")(input);
 
-      check.equal(seat, input, [2n, 1n], "the input");
+      check.isEqualTo(seat, input, [2n, 1n], "the input");
     });
   });
 });

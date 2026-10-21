@@ -7,7 +7,7 @@ import { test as it } from "../../src/vitest.js";
 
 describe("index", () => {
   it("exports the names of the conformance entry point", ({ seat }) => {
-    check.equal(
+    check.isEqualTo(
       seat,
       Object.keys(conformance).sort(),
       [
