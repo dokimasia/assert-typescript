@@ -25,7 +25,7 @@ export interface Operation {
   /**
    * Reports whether the call may have returned value. A call that is not
    * known may have taken effect with any output, so it reports true for it.
-   * For a known call, it reports whether output equals value as check.equal
+   * For a known call, it reports whether output equals value as check.isEqualTo
    * compares them, without an option.
    *
    * @param value - A value that the spec's state states.
@@ -74,7 +74,7 @@ export class CallOperation implements Operation {
  * sequential object, and the search calls next once per state. equal and key
  * are optional:
  *
- * - Without equal, two states compare as check.equal compares them,
+ * - Without equal, two states compare as check.isEqualTo compares them,
  *   without an option.
  * - Without key, a state's key is a canonical text that every state equal
  *   to it under that comparison shares, for a state without a cycle.
@@ -185,7 +185,7 @@ function keyAt(value: unknown, depth: number, seen: Set<object>): string {
 
 /**
  * Returns the default key of a state: a canonical text that every state
- * that check.equal reports equal to it shares, for a state without a cycle.
+ * that check.isEqualTo reports equal to it shares, for a state without a cycle.
  * A function and a symbol have the key of their type alone.
  *
  * @param state - The state.
@@ -196,7 +196,7 @@ export function stateKey(state: unknown): string {
 }
 
 /**
- * Reports whether two states are equal as check.equal compares them,
+ * Reports whether two states are equal as check.isEqualTo compares them,
  * without an option.
  *
  * @param a - A state.

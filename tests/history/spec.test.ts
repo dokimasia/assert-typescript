@@ -66,7 +66,7 @@ describe("spec", () => {
     it("returns the operation of a call", ({ seat }) => {
       const op = new CallOperation("write", [1], true, null);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [op.name, op.args, op.known, op.output],
         ["write", [1], true, null],
@@ -109,7 +109,7 @@ describe("spec", () => {
       it(`returns ${tt.want} for ${tt.name}`, ({ seat }) => {
         const [op, value] = tt.give;
 
-        check.equal(
+        check.isEqualTo(
           seat,
           op.returned(value),
           tt.want,
@@ -191,7 +191,7 @@ describe("spec", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.want ? "one key" : "two keys"} for ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           stateKey(tt.give[0]) === stateKey(tt.give[1]),
           tt.want,
@@ -209,7 +209,7 @@ describe("spec", () => {
         return value;
       };
 
-      check.equal(
+      check.isEqualTo(
         seat,
         stateKey(nested(1)),
         stateKey(nested(2)),
@@ -221,7 +221,7 @@ describe("spec", () => {
       const cyclic: unknown[] = [];
       cyclic.push(cyclic);
 
-      check.equal(seat, stateKey(cyclic), "[cycle]", "the cycle ends the walk");
+      check.isEqualTo(seat, stateKey(cyclic), "[cycle]", "the cycle ends the walk");
     });
   });
 
@@ -242,7 +242,7 @@ describe("spec", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.want} for ${tt.name}`, ({ seat }) => {
-        check.equal(seat, sameState(...tt.give), tt.want, "the comparison");
+        check.isEqualTo(seat, sameState(...tt.give), tt.want, "the comparison");
       });
     }
   });
@@ -251,7 +251,7 @@ describe("spec", () => {
     it("starts with no applied call", ({ seat }) => {
       const [factory] = counters();
 
-      check.equal(seat, specFrom(factory).initial(), [], "no call");
+      check.isEqualTo(seat, specFrom(factory).initial(), [], "no call");
     });
 
     it("steps a state by a replay of its calls on a fresh subject", ({ seat }) => {
@@ -260,7 +260,7 @@ describe("spec", () => {
       const state = [unknown("add", [1]), unknown("add", [2])];
       const next = spec.next(state, known("add", [4], 7));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [next, counted],
         [[[...state, new CallOperation("add", [4], false)]], { built: 1, applied: 3 }],
@@ -282,7 +282,7 @@ describe("spec", () => {
       const [factory, counted] = counters();
       const next = specFrom(factory).next([], unknown("add", [1]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [next, counted.applied],
         [[[new CallOperation("add", [1], false)]], 1],
@@ -297,7 +297,7 @@ describe("spec", () => {
       const b = unknown("add", [2]);
       const equal = spec.equal as NonNullable<typeof spec.equal>;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           equal([a, b], [unknown("add", [1]), b]),
@@ -316,7 +316,7 @@ describe("spec", () => {
         ReturnType<typeof specFrom>["key"]
       >;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         key([unknown("add", [1])]),
         key([unknown("add", [1])]),
@@ -332,7 +332,7 @@ describe("spec", () => {
       const [factory] = counters();
       const spec = specFrom(factory) as Costed<readonly Operation[]>;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [spec[COST]([]), spec[COST]([unknown("add", [1]), unknown("add", [2])])],
         [1, 3],

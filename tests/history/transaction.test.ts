@@ -32,14 +32,14 @@ function refusal(history: History): string {
 
 describe("transaction", () => {
   it("names the operation and the functions of the workload", ({ seat }) => {
-    check.equal(seat, [TXN, APPEND, READ], ["txn", "append", "read"], "the names");
+    check.isEqualTo(seat, [TXN, APPEND, READ], ["txn", "append", "read"], "the names");
   });
 
   describe("new TransactionError", () => {
     it("returns an error of its message", ({ seat }) => {
       const err = new TransactionError("call 0 is no transaction");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.name, err.message],
         ["TransactionError", "call 0 is no transaction"],
@@ -50,7 +50,7 @@ describe("transaction", () => {
 
   describe("identity", () => {
     it("returns the identity of a value", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         identity(0, "x"),
         '{"type":"string","value":"x"}',
@@ -61,7 +61,7 @@ describe("transaction", () => {
     it("throws a TransactionError for a value that no typed literal states", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => identity(3, Symbol.for("v"))),
         "call 3 states Symbol(v), which no typed literal states",
@@ -77,7 +77,7 @@ describe("transaction", () => {
       runTxn(history, 1, readOf("x", []));
       pending.fail("aborted");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         transactions(history.events()).map((txn) => [
           txn.call,
@@ -98,7 +98,7 @@ describe("transaction", () => {
       const history = new History();
       runTxn(history, 0, append("x", 1), readOf("x", [1]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         transactions(history.events())[0]?.mops,
         [
@@ -115,7 +115,7 @@ describe("transaction", () => {
       const history = new History();
       invokeTxn(history, 0, readOf("x", null)).unknown("timed out");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         transactions(history.events())[0]?.mops,
         [{ fn: "read", key: "x", value: undefined }],
@@ -127,7 +127,7 @@ describe("transaction", () => {
       const history = new History();
       invokeTxn(history, 0, readOf("x", null)).ok([readOf("x", null)]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         transactions(history.events())[0]?.mops[0]?.value,
         [],
@@ -139,7 +139,7 @@ describe("transaction", () => {
       const history = new History();
       runTxn(history, 0, append("x", 1), append("y", 1));
 
-      check.equal(seat, refusal(history), "", "no refusal");
+      check.isEqualTo(seat, refusal(history), "", "no refusal");
     });
 
     const tests: { name: string; give: (history: History) => void; want: string }[] = [
@@ -216,7 +216,7 @@ describe("transaction", () => {
         const history = new History();
         tt.give(history);
 
-        check.equal(seat, refusal(history), tt.want, "the refusal");
+        check.isEqualTo(seat, refusal(history), tt.want, "the refusal");
       });
     }
   });
@@ -229,7 +229,7 @@ describe("transaction", () => {
       runTxn(history, 0, readOf("x", [9]));
       const [txn] = transactions(history.events());
 
-      check.equal(
+      check.isEqualTo(
         seat,
         transactionJson(txn as NonNullable<typeof txn>),
         {
@@ -272,7 +272,7 @@ describe("transaction", () => {
       invokeTxn(history, 0, append("x", 1));
       const [txn] = transactions(history.events());
 
-      check.equal(
+      check.isEqualTo(
         seat,
         Object.keys(transactionJson(txn as NonNullable<typeof txn>)),
         ["call", "process", "args"],
@@ -287,7 +287,7 @@ describe("transaction", () => {
       invokeTxn(history, 0, append("x", 1)).fail("aborted");
       const [txn] = transactions(history.events());
 
-      check.equal(
+      check.isEqualTo(
         seat,
         Object.keys(transactionJson(txn as NonNullable<typeof txn>)),
         ["call", "completion", "kind", "process", "args"],

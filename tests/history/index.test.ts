@@ -9,7 +9,7 @@ import { test as it } from "../../src/vitest.js";
 
 describe("index", () => {
   it("exports the names of the module", ({ seat }) => {
-    check.equal(
+    check.isEqualTo(
       seat,
       Object.keys(history).sort(),
       [
@@ -56,7 +56,7 @@ describe("index", () => {
         }),
     );
 
-    check.equal(
+    check.isEqualTo(
       seat,
       [render(linearizable), ...isolated.map(render)],
       [sentence(linearizable), ...isolated.map(isolationSentence)],

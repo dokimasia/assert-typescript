@@ -90,20 +90,20 @@ const ROWS: readonly Row[] = [
 describe("option", () => {
   describe("BUDGET", () => {
     it("allows 10,000,000 steps", ({ seat }) => {
-      check.equal(seat, BUDGET, 10_000_000, "the budget");
+      check.isEqualTo(seat, BUDGET, 10_000_000, "the budget");
     });
   });
 
   describe("MEMO_LIMIT", () => {
     it("allows 2^33 bits", ({ seat }) => {
-      check.equal(seat, MEMO_LIMIT, 2 ** 33, "the memo limit");
+      check.isEqualTo(seat, MEMO_LIMIT, 2 ** 33, "the memo limit");
     });
   });
 
   for (const row of ROWS) {
     describe(row.name, () => {
       it("returns an option that sets its setting alone", ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           configure([row.give()]),
           { ...DEFAULTS, ...row.want },
@@ -113,7 +113,7 @@ describe("option", () => {
 
       for (const tt of row.refusals) {
         it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-          check.equal(seat, thrown(tt.give), tt.want, "the refusal");
+          check.isEqualTo(seat, thrown(tt.give), tt.want, "the refusal");
         });
       }
     });
@@ -121,11 +121,11 @@ describe("option", () => {
 
   describe("configure", () => {
     it("returns the defaults without an option", ({ seat }) => {
-      check.equal(seat, configure([]), DEFAULTS, "the defaults");
+      check.isEqualTo(seat, configure([]), DEFAULTS, "the defaults");
     });
 
     it("lets a later option override an earlier one", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         configure([budget(5), budget(7)]).budget,
         7,

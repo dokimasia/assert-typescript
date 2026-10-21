@@ -65,7 +65,7 @@ function twoPartitions(): History {
 describe("linearizable", () => {
   describe("LINEARIZABLE", () => {
     it("is the id of the assertion", ({ seat }) => {
-      check.equal(seat, LINEARIZABLE, "linearizable", "the id");
+      check.isEqualTo(seat, LINEARIZABLE, "linearizable", "the id");
     });
   });
 
@@ -75,7 +75,7 @@ describe("linearizable", () => {
       write(history, 0, 1).ok(null);
       read(history, 1).ok(null);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         detailJson(checked(history, REGISTER, [])),
         {
@@ -117,7 +117,7 @@ describe("linearizable", () => {
       write(history, 0, 1).ok(null);
       read(history, 1).ok(1);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         checked(history, REGISTER, []),
         {
@@ -142,7 +142,7 @@ describe("linearizable", () => {
       write(history, 0, 1).fail("refused");
       const failed = checked(history, REGISTER, []);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [empty.partitions, failed.outcome, failed.partitions, failed.steps],
         [0, "passed", 0, 0],
@@ -157,7 +157,7 @@ describe("linearizable", () => {
       read(history, 2, "y").ok(null);
       const detail = checked(history, REGISTER, []);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [detail.outcome, detail.partitions, detail.steps],
         ["passed", 2, 2],
@@ -174,7 +174,7 @@ describe("linearizable", () => {
       read(history, 2).ok(9);
       const detail = checked(history, REGISTER, []);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           detail.outcome,
@@ -216,7 +216,7 @@ describe("linearizable", () => {
       read(history, 2, "y").ok(1);
       const detail = checked(history, REGISTER, []);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           detail.outcome,
@@ -239,7 +239,7 @@ describe("linearizable", () => {
       read(history, 2, "y").ok(3);
       const detail = checked(history, REGISTER, []);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           detail.partition,
@@ -263,7 +263,7 @@ describe("linearizable", () => {
       write(history, 2, 1, "y").ok(null);
       const detail = checked(history, REGISTER, []);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [detail.partitions, detail.partition, detail.calls],
         [1, [], 3],
@@ -291,13 +291,13 @@ describe("linearizable", () => {
         ]),
       ).ok(1);
 
-      check.equal(seat, checked(history, REGISTER, []).partitions, 1, "one key");
+      check.isEqualTo(seat, checked(history, REGISTER, []).partitions, 1, "one key");
     });
 
     it("passes within a budget that its steps spend exactly", ({ seat }) => {
       const detail = checked(twoPartitions(), REGISTER, [budget(2)]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [detail.outcome, detail.steps],
         ["passed", 3],
@@ -308,7 +308,7 @@ describe("linearizable", () => {
     it("stops before a step past its budget", ({ seat }) => {
       const detail = checked(twoPartitions(), REGISTER, [budget(1)]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           detail.outcome,
@@ -332,7 +332,7 @@ describe("linearizable", () => {
       read(history, 2, "y").ok(7);
       const detail = checked(history, REGISTER, [budget(1)]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [detail.outcome, detail.partition, detail.steps, detail.limit],
         ["violated", ["y"], 2, undefined],
@@ -348,7 +348,7 @@ describe("linearizable", () => {
       read(history, 3, "y").ok(2);
       const detail = checked(history, REGISTER, [budget(1)]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [detail.outcome, detail.partition, detail.steps],
         ["undecided", ["x"], 1],
@@ -360,7 +360,7 @@ describe("linearizable", () => {
       const passed = checked(twoPartitions(), REGISTER, [memoLimit(4)]);
       const stopped = checked(twoPartitions(), REGISTER, [memoLimit(3)]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           passed.outcome,
@@ -387,7 +387,7 @@ describe("linearizable", () => {
       late.ok(9);
       const detail = checked(history, REGISTER, []);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [detail.outcome, detail.calls, detail.concurrency],
         ["violated", 4, 3],
@@ -403,7 +403,7 @@ describe("linearizable", () => {
       onTestFinished(() => now.mockRestore());
       const detail = checked(twoPartitions(), REGISTER, [timeLimit(1)]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [detail.outcome, detail.limit, detail.steps, detail.states],
         ["undecided", "time", 0, [null]],
@@ -412,7 +412,7 @@ describe("linearizable", () => {
     });
 
     it("reports what a check on one worker reports for more workers", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         checked(twoPartitions(), REGISTER, [workers(4), budget(1)]),
         checked(twoPartitions(), REGISTER, [budget(1)]),
@@ -427,7 +427,7 @@ describe("linearizable", () => {
           throw new RangeError(`no ${op.name}`);
         },
       };
-      const err = check.throws(
+      const err = check.doesThrow(
         seat,
         () => checked(twoPartitions(), broken, []),
         "the spec's next throws",
@@ -443,7 +443,7 @@ describe("linearizable", () => {
     }) => {
       const { detail, states } = whole(new History(), REGISTER);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [detail.outcome, detail.partitions, detail.steps, states],
         ["passed", 0, 0, [null]],
@@ -459,7 +459,7 @@ describe("linearizable", () => {
       read(history, 1, "y").ok(1);
       const { detail, states } = whole(history, REGISTER);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [detail.outcome, detail.partitions, detail.steps, states],
         ["passed", 1, 2, [1]],
@@ -475,7 +475,7 @@ describe("linearizable", () => {
       read(history, 1).ok(2);
       const { detail, states } = whole(history, REGISTER);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [detailJson(detail), states],
         [
@@ -521,7 +521,7 @@ describe("linearizable", () => {
       const history = new History();
       read(history, 0).ok(1);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         fieldsOf(checked(history, REGISTER, []))["limit"],
         null,
@@ -530,7 +530,7 @@ describe("linearizable", () => {
     });
 
     it("returns the limit of an undecided check", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         fieldsOf(checked(twoPartitions(), REGISTER, [budget(1)]))["limit"],
         "steps",
@@ -541,7 +541,7 @@ describe("linearizable", () => {
 
   describe("detailJson", () => {
     it("returns the limit of an undecided check by its name", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         detailJson(checked(twoPartitions(), REGISTER, [budget(1)]))["limit"],
         "steps",
@@ -560,7 +560,7 @@ describe("linearizable", () => {
         "the register is linearizable",
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.failures, records(recorder)[0]?.["verdict"]],
         [[], "pass"],
@@ -576,7 +576,7 @@ describe("linearizable", () => {
       isLinearizable(recorder, history, REGISTER, "the register is linearizable");
       const [failure] = recorder.failures;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           failure?.assertion,
@@ -674,7 +674,7 @@ describe("linearizable", () => {
           "c",
         );
 
-        check.equal(seat, recorder.message, tt.want, "the fault");
+        check.isEqualTo(seat, recorder.message, tt.want, "the fault");
       });
     }
   });

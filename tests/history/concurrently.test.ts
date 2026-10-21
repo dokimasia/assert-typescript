@@ -10,7 +10,7 @@ describe("concurrently", () => {
     it("returns the output of each client in client order", async ({ seat }) => {
       const outcomes = await concurrently(3, 1000, (client) => client * 10);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         outcomes,
         [
@@ -28,7 +28,7 @@ describe("concurrently", () => {
         return `client ${client}`;
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         outcomes.map((outcome) => outcome.output),
         ["client 0", "client 1"],
@@ -46,7 +46,7 @@ describe("concurrently", () => {
         order.push(`end ${client}`);
       });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         order,
         ["start 0", "start 1", "end 0", "end 1"],
@@ -61,7 +61,7 @@ describe("concurrently", () => {
         client === 0 ? "done" : new Promise(() => undefined),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         outcomes,
         [
@@ -82,7 +82,12 @@ describe("concurrently", () => {
         "the clients throw",
       );
 
-      check.equal(seat, (err as Error).message, "client 1", "the error of client 1");
+      check.isEqualTo(
+        seat,
+        (err as Error).message,
+        "client 1",
+        "the error of client 1",
+      );
     });
 
     it("loses an error that a body raises after the time passed", async ({ seat }) => {
@@ -94,7 +99,12 @@ describe("concurrently", () => {
       fail(new Error("too late"));
       await Promise.resolve();
 
-      check.equal(seat, outcomes[0]?.finished, false, "the outcome before the error");
+      check.isEqualTo(
+        seat,
+        outcomes[0]?.finished,
+        false,
+        "the outcome before the error",
+      );
     });
 
     const tests: { name: string; give: [number, number]; want: string }[] = [
@@ -127,7 +137,7 @@ describe("concurrently", () => {
           "the refusal",
         );
 
-        check.equal(seat, (err as Error).message, tt.want, "the message");
+        check.isEqualTo(seat, (err as Error).message, tt.want, "the message");
       });
     }
   });

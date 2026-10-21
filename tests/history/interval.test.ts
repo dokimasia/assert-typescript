@@ -44,7 +44,7 @@ describe("interval", () => {
     it("returns a RangeError that names the entry", ({ seat }) => {
       const err = new IntervalError(3, "ends at 1, before it starts at 2");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err instanceof RangeError, err.name, err.entry, err.message],
         [true, "IntervalError", 3, "history: entry 3 ends at 1, before it starts at 2"],
@@ -57,7 +57,7 @@ describe("interval", () => {
     it("puts an invocation before a completion at one time", ({ seat }) => {
       const events = fromIntervals([read(0, 0, 5), read(1, 5, 9)]).events();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         events.map((event) => [event.kind, event.call]),
         [
@@ -77,7 +77,7 @@ describe("interval", () => {
         read(1, 0, 9),
       ]).events();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         events.map((event) => [event.kind, event.client]),
         [
@@ -130,7 +130,7 @@ describe("interval", () => {
       ];
       const events = fromIntervals(entries).events();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         events.map((event) => [event.kind, event.client, event.process]),
         [
@@ -144,7 +144,7 @@ describe("interval", () => {
         ],
         "client 0 moves to process 2, and the pending read has no completion",
       );
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           (events[2] as { error: unknown }).error,
@@ -162,7 +162,7 @@ describe("interval", () => {
         read(1, 0, 5),
       ]).events();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         events.map((event) => event.client),
         [1, 1, 0, 0],
@@ -171,11 +171,16 @@ describe("interval", () => {
     });
 
     it("accepts an entry that ends when it starts", ({ seat }) => {
-      check.equal(seat, fromIntervals([read(0, 4, 4)]).events().length, 2, "one call");
+      check.isEqualTo(
+        seat,
+        fromIntervals([read(0, 4, 4)]).events().length,
+        2,
+        "one call",
+      );
     });
 
     it("accepts entries of one client that share no instant", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         fromIntervals([read(0, 4, 6), read(0, 0, 3), read(1, 0, 9)]).events().length,
         6,
@@ -232,7 +237,7 @@ describe("interval", () => {
     ];
     for (const tt of tests) {
       it(`throws a RangeError for ${tt.name}`, ({ seat }) => {
-        check.equal(seat, refusal(tt.give), tt.want, "the entry and the message");
+        check.isEqualTo(seat, refusal(tt.give), tt.want, "the entry and the message");
       });
     }
   });

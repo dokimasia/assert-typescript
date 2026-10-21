@@ -57,13 +57,13 @@ function json(history: History, level: Level): Record<string, unknown> {
 describe("isolation", () => {
   describe("SERIALIZABLE", () => {
     it("is the id of the assertion of serializability", ({ seat }) => {
-      check.equal(seat, SERIALIZABLE, "serializable", "the id");
+      check.isEqualTo(seat, SERIALIZABLE, "serializable", "the id");
     });
   });
 
   describe("SNAPSHOT_ISOLATION", () => {
     it("is the id of the assertion of snapshot isolation", ({ seat }) => {
-      check.equal(seat, SNAPSHOT_ISOLATION, "snapshot-isolation", "the id");
+      check.isEqualTo(seat, SNAPSHOT_ISOLATION, "snapshot-isolation", "the id");
     });
   });
 
@@ -74,7 +74,7 @@ describe("isolation", () => {
       runTxn(history, 1, readOf("x", [1]), append("x", 2));
       runTxn(history, 0, readOf("x", [1, 2]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         LEVELS.map((level) => checkIsolation(history.events(), level)),
         [undefined, undefined],
@@ -91,7 +91,7 @@ describe("isolation", () => {
       runTxn(history, 0, append("x", 1), append("y", 1));
       runTxn(history, 0, readOf("x", [1]), readOf("y", [1]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         LEVELS.map((level) => checkIsolation(history.events(), level)),
         [undefined, undefined],
@@ -107,7 +107,7 @@ describe("isolation", () => {
       runTxn(history, 1, append("x", 1));
       reader.ok([readOf("x", []), readOf("x", [1])]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         outcome(history, SERIALIZABLE),
         ["internal-inconsistency", ["internal-inconsistency", "G-single", "G2"]],
@@ -120,7 +120,7 @@ describe("isolation", () => {
       runTxn(history, 0, append("x", 1), append("x", 2));
       runTxn(history, 1, readOf("x", [1]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         outcome(history, SERIALIZABLE),
         ["intermediate-read", ["intermediate-read", "G-single", "G2"]],
@@ -133,7 +133,7 @@ describe("isolation", () => {
       runTxn(history, 0, append("x", 1));
       runTxn(history, 1, readOf("x", [1, 1]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         outcome(history, SNAPSHOT_ISOLATION),
         ["duplicate-append", ["duplicate-append"]],
@@ -144,7 +144,7 @@ describe("isolation", () => {
     it("lists G2 of a read skew at serializability alone", ({ seat }) => {
       const history = readSkew("ok", true);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         LEVELS.map((level) => outcome(history, level)),
         [
@@ -156,7 +156,7 @@ describe("isolation", () => {
     });
 
     it("reports G2 of a write skew at serializability", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         outcome(writeSkew(), SERIALIZABLE),
         ["G2", ["G2"]],
@@ -185,7 +185,7 @@ describe("isolation", () => {
       calls[2]?.ok([readOf("x", [1]), readOf("y", [])]);
       calls[3]?.ok([readOf("x", []), readOf("y", [2])]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         LEVELS.map((level) => outcome(history, level)),
         [
@@ -202,7 +202,7 @@ describe("isolation", () => {
       runTxn(history, 1, readOf("x", [1]));
       const detail = checkIsolation(history.events(), SNAPSHOT_ISOLATION);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         detail?.transactions.map((txn) => [txn.call, txn.kind]),
         [
@@ -217,7 +217,7 @@ describe("isolation", () => {
       const history = new History();
       history.invoke(0, "write", [1], "x").ok(null);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => checkIsolation(history.events(), SERIALIZABLE)),
         'call 0 is "write", not "txn"',
@@ -234,7 +234,7 @@ describe("isolation", () => {
         output?: unknown;
       }[];
 
-      check.equal(
+      check.isEqualTo(
         seat,
         json(history, SERIALIZABLE),
         {
@@ -288,7 +288,7 @@ describe("isolation", () => {
       const history = new History();
       runTxn(history, 0, readOf("x", [9]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           json(history, SERIALIZABLE)["cycle"],
@@ -309,7 +309,7 @@ describe("isolation", () => {
       runTxn(history, 0, append("x", 1));
       runTxn(history, 1, append("x", 2), readOf("x", [1]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         json(history, SERIALIZABLE)["explanation"],
         [
@@ -332,7 +332,7 @@ describe("isolation", () => {
       const history = new History();
       runTxn(history, 0, readOf("x", [1]), append("x", 1));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         json(history, SNAPSHOT_ISOLATION)["explanation"],
         [
@@ -355,7 +355,7 @@ describe("isolation", () => {
       runTxn(history, 0, readOf("x", [1, 2]));
       runTxn(history, 0, readOf("x", [1, 3]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         json(history, SERIALIZABLE)["explanation"],
         [
@@ -374,7 +374,7 @@ describe("isolation", () => {
       invokeTxn(history, 0, append("x", 1)).fail("aborted");
       runTxn(history, 1, readOf("x", [1]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         json(history, SNAPSHOT_ISOLATION)["explanation"],
         [{ call: 2, key: literalOf("x"), value: literalOf(1), appender: 0 }],
@@ -387,7 +387,7 @@ describe("isolation", () => {
       runTxn(history, 0, append("x", 1), append("x", 2));
       runTxn(history, 1, readOf("x", [1]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         json(history, SERIALIZABLE)["explanation"],
         [
@@ -468,7 +468,7 @@ describe("isolation", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, evidenceJson(tt.give), tt.want, "the entry");
+        check.isEqualTo(seat, evidenceJson(tt.give), tt.want, "the entry");
       });
     }
   });
@@ -501,7 +501,7 @@ describe("isolation", () => {
         const recorder = new Recorder();
         tt.give(recorder, history, "the store is isolated");
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [recorder.failures, records(recorder)[0]?.["verdict"]],
           [[], "pass"],
@@ -515,7 +515,7 @@ describe("isolation", () => {
         tt.give(recorder, history, "the store is isolated");
         const [failure] = recorder.failures;
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [
             failure?.assertion,
@@ -555,7 +555,7 @@ describe("isolation", () => {
         const recorder = new Recorder();
         tt.give(recorder, {} as History, "c");
 
-        check.equal(
+        check.isEqualTo(
           seat,
           recorder.message,
           `${tt.op}: the history is no History`,
@@ -569,7 +569,7 @@ describe("isolation", () => {
         const recorder = new Recorder();
         tt.give(recorder, history, "c");
 
-        check.equal(
+        check.isEqualTo(
           seat,
           recorder.message,
           `${tt.op}: call 0 is "write", not "txn"`,

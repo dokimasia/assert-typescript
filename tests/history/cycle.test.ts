@@ -27,7 +27,7 @@ function graph(...edges: [number, number][]): Graph {
 describe("cycle", () => {
   describe("RELATIONS", () => {
     it("orders the relations as a cycle's entry lists them", ({ seat }) => {
-      check.equal(seat, RELATIONS, ["ww", "wr", "rw"], "ww, wr, rw");
+      check.isEqualTo(seat, RELATIONS, ["ww", "wr", "rw"], "ww, wr, rw");
     });
   });
 
@@ -37,7 +37,7 @@ describe("cycle", () => {
     }) => {
       const g = graph([4, 6], [6, 4], [0, 2], [2, 0], [2, 3], [3, 8]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         components([6, 4, 3, 2, 0, 8], g),
         [
@@ -49,7 +49,7 @@ describe("cycle", () => {
     });
 
     it("returns one component of a cycle through three transactions", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         components([0, 1, 2], graph([0, 1], [1, 2], [2, 0])),
         [[0, 1, 2]],
@@ -68,7 +68,7 @@ describe("cycle", () => {
     }) => {
       const g = graph([0, 2], [0, 1], [1, 3], [2, 3], [3, 4]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         path(0, 4, g, new Set([0, 1, 2, 3, 4])),
         [0, 1, 3, 4],
@@ -79,7 +79,7 @@ describe("cycle", () => {
     it("returns a path within the members alone", ({ seat }) => {
       const g = graph([0, 1], [0, 2], [1, 3], [2, 3]);
 
-      check.equal(seat, path(0, 3, g, new Set([0, 2, 3])), [0, 2, 3], "through 2");
+      check.isEqualTo(seat, path(0, 3, g, new Set([0, 2, 3])), [0, 2, 3], "through 2");
     });
 
     it("returns undefined for a goal without a path from the start", ({ seat }) => {
@@ -87,7 +87,7 @@ describe("cycle", () => {
     });
 
     it("returns the start alone for a start that is the goal", ({ seat }) => {
-      check.equal(seat, path(2, 2, graph(), new Set([2])), [2], "no edge");
+      check.isEqualTo(seat, path(2, 2, graph(), new Set([2])), [2], "no edge");
     });
   });
 
@@ -124,14 +124,14 @@ describe("cycle", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.want} for ${tt.name}`, ({ seat }) => {
-        check.equal(seat, alternates(tt.give), tt.want, "whether it alternates");
+        check.isEqualTo(seat, alternates(tt.give), tt.want, "whether it alternates");
       });
     }
   });
 
   describe("simple", () => {
     it("starts a cycle at its first rw edge", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         simple([
           [0, "wr"],
@@ -153,13 +153,13 @@ describe("cycle", () => {
         [1, "wr"],
       ];
 
-      check.equal(seat, simple(walk), walk, "from 0");
+      check.isEqualTo(seat, simple(walk), walk, "from 0");
     });
 
     it("keeps the part between two visits of a transaction that alternates", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         simple([
           [0, "rw"],
@@ -177,7 +177,7 @@ describe("cycle", () => {
     });
 
     it("keeps the rest of a walk whose loop has two adjacent rw edges", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         simple([
           [0, "rw"],

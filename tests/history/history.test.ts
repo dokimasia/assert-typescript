@@ -36,7 +36,7 @@ describe("history", () => {
         ],
       ]);
 
-      check.equal(seat, identityOf([a]), identityOf([b]), "one identity");
+      check.isEqualTo(seat, identityOf([a]), identityOf([b]), "one identity");
     });
 
     it("returns the identity of a map whose two keys have one literal", ({ seat }) => {
@@ -45,7 +45,7 @@ describe("history", () => {
         [1, "a"],
       ]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         identityOf(map),
         '{"type":"map","entries":[[{"type":"int","value":1},{"type":"string","value":"a"}],[{"type":"int","value":1},{"type":"string","value":"a"}]]}',
@@ -56,7 +56,7 @@ describe("history", () => {
     it("returns another identity for a record with its fields in another order", ({
       seat,
     }) => {
-      check.notEqual(
+      check.isNotEqualTo(
         seat,
         identityOf({ a: 1, b: 2 }),
         identityOf({ b: 2, a: 1 }),
@@ -65,7 +65,7 @@ describe("history", () => {
     });
 
     it("returns another identity for -0 than for 0", ({ seat }) => {
-      check.notEqual(seat, identityOf(-0), identityOf(0), "a float and an int");
+      check.isNotEqualTo(seat, identityOf(-0), identityOf(0), "a float and an int");
     });
 
     it("returns undefined for a value that no typed literal states", ({ seat }) => {
@@ -93,7 +93,7 @@ describe("history", () => {
       history.invoke(3, "read", []).ok(null);
       history.invoke(7, "read", []);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         history.events().map((event) => [event.client, event.process]),
         [
@@ -113,7 +113,7 @@ describe("history", () => {
       const history = new History();
       history.invoke(0, "write", [1], "x", "y");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         history.events(),
         [
@@ -136,7 +136,7 @@ describe("history", () => {
       const history = new History();
       history.invoke(0, "read", []);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => history.invoke(0, "read", [])),
         'history: invoke(0, "read") while call 0 of client 0 is open',
@@ -145,7 +145,7 @@ describe("history", () => {
     });
 
     it("throws a TypeError for a key that no typed literal states", ({ seat }) => {
-      const err = check.throws(
+      const err = check.doesThrow(
         seat,
         () => new History().invoke(0, "read", [], Symbol("k")),
         "the key is refused",
@@ -163,7 +163,7 @@ describe("history", () => {
       b.ok(null);
       a.ok(null);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         history.events().map((event) => event.call),
         [0, 1, 1, 0],
@@ -188,7 +188,7 @@ describe("history", () => {
       call.fail("e");
       call.unknown("u");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         completed,
         [
@@ -206,7 +206,7 @@ describe("history", () => {
       const history = new History();
       history.invoke(0, "read", []).ok(5);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         history.events()[1],
         {
@@ -228,7 +228,7 @@ describe("history", () => {
       call.ok(1);
       history.invoke(0, "read", []);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => call.ok(1)),
         "history: call 0 completes a second time",
@@ -243,7 +243,7 @@ describe("history", () => {
       history.invoke(0, "write", [1]).fail("refused");
       history.invoke(0, "read", []);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         history.events().map((event) => [event.kind, event.process]),
         [
@@ -260,7 +260,7 @@ describe("history", () => {
       const call = history.invoke(0, "read", []);
       call.unknown("lost");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => call.fail("e")),
         "history: call 0 completes a second time",
@@ -274,7 +274,7 @@ describe("history", () => {
       const history = new History();
       history.invoke(0, "write", [1]).unknown("timed out");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         history.events()[1],
         {
@@ -295,7 +295,7 @@ describe("history", () => {
       const call = history.invoke(0, "read", []);
       call.fail("refused");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => call.unknown("e")),
         "history: call 0 completes a second time",
@@ -309,7 +309,7 @@ describe("history", () => {
       const history = new History();
       history.invoke(0, "write", [1], "x").ok(null);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorded(history).ids,
         [['{"type":"string","value":"x"}'], []],

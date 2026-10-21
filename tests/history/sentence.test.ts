@@ -56,7 +56,7 @@ describe("sentence", () => {
       history.invoke(0, "write", [1], "x").ok(null);
       history.invoke(1, "read", [], "x").ok(null);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         sentence(recordOf(history)),
         [
@@ -75,7 +75,7 @@ describe("sentence", () => {
       history.invoke(0, "write", [1]).ok(null);
       history.invoke(1, "read", []).ok(1);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         sentence(recordOf(history, 1)),
         [
@@ -94,7 +94,7 @@ describe("sentence", () => {
       history.invoke(0, "write", [1]).unknown("lost");
       history.invoke(1, "read", []).ok(9);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         sentence(recordOf(history)),
         [
@@ -134,7 +134,7 @@ describe("sentence", () => {
         { from: 3, to: 0, relation: "rw", key: "z", value: 5, empty: false, next: 6 },
       ]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         isolationSentence(record),
         [
@@ -208,7 +208,7 @@ describe("sentence", () => {
     ];
     for (const tt of tests) {
       it(`states the observation of ${tt.name}`, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           isolationSentence(isolated(tt.give.anomaly, [tt.give])),
           `c: ${tt.give.anomaly}\n    kinds: ${tt.give.anomaly}, G2\n    ${tt.want}`,

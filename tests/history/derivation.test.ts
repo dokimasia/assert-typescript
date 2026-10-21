@@ -61,7 +61,7 @@ function crossedAppends(): History {
 describe("derivation", () => {
   describe("ANOMALIES", () => {
     it("lists the eleven kinds in report order", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         ANOMALIES,
         [
@@ -118,7 +118,7 @@ describe("derivation", () => {
       const history = new History();
       runTxn(history, 0, readOf("x", [9]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "garbage-read"),
         {
@@ -140,7 +140,7 @@ describe("derivation", () => {
       runTxn(history, 0, append("x", 1));
       runTxn(history, 1, readOf("x", [1, 1]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "duplicate-append")?.explanation,
         [
@@ -162,7 +162,7 @@ describe("derivation", () => {
       runTxn(history, 0, append("x", 1));
       runTxn(history, 1, append("x", 2), readOf("x", [1]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "internal-inconsistency")?.explanation,
         [
@@ -183,7 +183,7 @@ describe("derivation", () => {
       const history = new History();
       runTxn(history, 0, readOf("x", [1]), append("x", 1));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "internal-inconsistency")?.explanation,
         [
@@ -207,7 +207,7 @@ describe("derivation", () => {
       runTxn(history, 1, append("x", 1));
       reader.ok([readOf("x", []), readOf("x", [1])]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "internal-inconsistency")?.explanation,
         [
@@ -230,7 +230,7 @@ describe("derivation", () => {
       runTxn(history, 0, readOf("x", [1, 2]));
       runTxn(history, 0, readOf("x", [1, 3]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "incompatible-order"),
         {
@@ -265,7 +265,7 @@ describe("derivation", () => {
       runTxn(history, 0, readOf("y", [1]));
       runTxn(history, 0, readOf("y", [2]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "incompatible-order")?.explanation,
         [
@@ -284,7 +284,7 @@ describe("derivation", () => {
       invokeTxn(history, 0, append("x", 1)).fail("aborted");
       runTxn(history, 1, readOf("x", [1]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "aborted-read"),
         {
@@ -306,7 +306,7 @@ describe("derivation", () => {
       runTxn(history, 0, append("x", 1), append("x", 2));
       runTxn(history, 1, readOf("x", [1]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "intermediate-read")?.explanation,
         [
@@ -325,7 +325,7 @@ describe("derivation", () => {
     it("returns a G0 cycle of write dependencies with the evidence of each", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(crossedAppends(), "G0"),
         {
@@ -373,7 +373,12 @@ describe("derivation", () => {
       runTxn(history, 1, append("y", 2), append("z", 3));
       runTxn(history, 2, readOf("x", [1, 2]), readOf("y", [1, 2]), readOf("z", [3, 4]));
 
-      check.equal(seat, cycleOf(history, "G0"), [0, 2], "the cycle of calls 0 and 2");
+      check.isEqualTo(
+        seat,
+        cycleOf(history, "G0"),
+        [0, 2],
+        "the cycle of calls 0 and 2",
+      );
     });
 
     it("returns a G1c cycle of calls that each read the other's append", ({ seat }) => {
@@ -383,7 +388,7 @@ describe("derivation", () => {
       first.ok([append("x", 1), readOf("y", [2])]);
       second.ok([append("y", 2), readOf("x", [1])]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "G1c")?.cycle,
         [
@@ -395,7 +400,7 @@ describe("derivation", () => {
     });
 
     it("returns a G-single cycle of a read skew with an empty rw edge", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(readSkew("ok", true), "G-single"),
         {
@@ -436,7 +441,7 @@ describe("derivation", () => {
       runTxn(history, 1, append("x", 2), append("y", 5), append("z", 7));
       runTxn(history, 2, readOf("x", [1, 2]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "G-single")?.cycle,
         [
@@ -465,7 +470,7 @@ describe("derivation", () => {
       runTxn(history, 4, append("k4", "q"), readOf("k5", []));
       runTxn(history, 5, readOf("k2", ["b", "v"]), readOf("k4", ["p", "q"]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           instance(history, "G-single") !== undefined,
@@ -481,7 +486,7 @@ describe("derivation", () => {
       runTxn(history, 0, append("x", 1), readOf("x", [1]), readOf("y", [3]));
       runTxn(history, 1, append("x", 2), append("y", 3));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "G1c")?.cycle,
         [
@@ -493,7 +498,7 @@ describe("derivation", () => {
     });
 
     it("returns a G2 cycle of two adjacent rw edges for a write skew", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(writeSkew(), "G2")?.cycle,
         [
@@ -529,7 +534,7 @@ describe("derivation", () => {
       calls[2]?.ok([readOf("x", [1]), readOf("y", [])]);
       calls[3]?.ok([readOf("x", []), readOf("y", [2])]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         instance(history, "G-nonadjacent")?.cycle,
         [
@@ -549,7 +554,12 @@ describe("derivation", () => {
       runTxn(history, 2, readOf("k0", []), append("k1", 2));
       runTxn(history, 3, readOf("k1", []), append("k0", 1));
 
-      check.equal(seat, cycleOf(history, "G2"), [2, 4, 6, 0], "the cycle 2, 4, 6, 0");
+      check.isEqualTo(
+        seat,
+        cycleOf(history, "G2"),
+        [2, 4, 6, 0],
+        "the cycle 2, 4, 6, 0",
+      );
     });
 
     it("drops the inference of an unobserved append that did not commit", ({
@@ -568,7 +578,7 @@ describe("derivation", () => {
       it(`takes a call that completes as ${completes ?? "pending"} as committed when a read observed it`, ({
         seat,
       }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           cycleOf(readSkew(completes, true), "G-single"),
           [0, 1],
@@ -598,7 +608,7 @@ describe("derivation", () => {
       third.ok([readOf("a", []), append("b", 1)]);
       fourth.ok([readOf("b", []), append("a", 2)]);
 
-      check.equal(seat, cycleOf(history, "G2"), [0, 1], "the first write skew");
+      check.isEqualTo(seat, cycleOf(history, "G2"), [0, 1], "the first write skew");
     });
 
     it("returns the shortest path back from the closing edge", ({ seat }) => {
@@ -616,7 +626,7 @@ describe("derivation", () => {
       one.ok([append("y", 2), readOf("x", [1])]);
       two.ok([append("z", 3), readOf("y", [2])]);
 
-      check.equal(seat, cycleOf(history, "G1c"), [0, 1], "calls 0 and 1");
+      check.isEqualTo(seat, cycleOf(history, "G1c"), [0, 1], "calls 0 and 1");
     });
 
     it("returns a G-single cycle of the component that has one", ({ seat }) => {
@@ -626,7 +636,7 @@ describe("derivation", () => {
       writer.ok([append("a", 1), append("b", 2)]);
       reader.ok([readOf("a", []), readOf("b", [2])]);
 
-      check.equal(seat, cycleOf(history, "G-single"), [4, 5], "the read skew");
+      check.isEqualTo(seat, cycleOf(history, "G-single"), [4, 5], "the read skew");
     });
   });
 });

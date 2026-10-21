@@ -96,7 +96,7 @@ describe("search", () => {
         cause,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.name, err.message, err.fn, err.call, err.operation, err.cause],
         ["SpecError", 'the spec\'s next throws on "read"', "next", 4, "read", cause],
@@ -109,7 +109,7 @@ describe("search", () => {
     }) => {
       const err = new SpecError("initial", undefined, "boom");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [err.message, err.call, err.operation],
         ["the spec's initial throws", undefined, undefined],
@@ -120,7 +120,7 @@ describe("search", () => {
 
   describe("Search.run", () => {
     it("returns a pass with the states after the order it found", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         searched(writeThenRead(), REGISTER),
         {
@@ -140,7 +140,7 @@ describe("search", () => {
       history.invoke(0, "write", [1], "x").ok(null);
       history.invoke(1, "read", [], "x").ok(2);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         searched(history, REGISTER),
         {
@@ -164,7 +164,7 @@ describe("search", () => {
       history.invoke(0, "read", [], "x").ok(1);
       const ending = searched(history, REGISTER);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [ending.outcome, ending.steps],
         ["passed", 6],
@@ -183,7 +183,7 @@ describe("search", () => {
       second.ok(null);
       reader.ok(3);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         searched(history, REGISTER),
         {
@@ -208,7 +208,7 @@ describe("search", () => {
       lost.unknown("timed out");
       history.invoke(0, "read", [], "x").ok(2);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         searched(history, REGISTER),
         {
@@ -229,7 +229,7 @@ describe("search", () => {
       history.invoke(1, "acquire", [1], "lock").unknown("timed out");
       history.invoke(2, "acquire", [2], "lock");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         searched(history, LOCK),
         {
@@ -249,7 +249,7 @@ describe("search", () => {
       history.invoke(0, "write", [1], "x");
       history.invoke(1, "read", [], "x").ok(1);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         searched(history, REGISTER),
         {
@@ -270,7 +270,7 @@ describe("search", () => {
       history.invoke(1, "write", [2], "x").unknown("timed out");
       history.invoke(2, "read", [], "x").ok(9);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         searched(history, REGISTER),
         {
@@ -291,7 +291,7 @@ describe("search", () => {
       history.invoke(0, "write", [1], "x").ok(null);
       history.invoke(0, "read", [], "x").ok(7);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         searched(history, LOSSY),
         {
@@ -307,7 +307,7 @@ describe("search", () => {
     });
 
     it("skips a configuration that the memo contains", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         searched(writes(1), REGISTER),
         {
@@ -323,7 +323,7 @@ describe("search", () => {
     });
 
     it("never merges a state that contains a NaN", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         searched(writes(Number.NaN), REGISTER),
         {
@@ -358,7 +358,7 @@ describe("search", () => {
       b.ok(null);
       history.invoke(2, "c", [], "x").ok(null);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         searched(history, paths),
         {
@@ -381,7 +381,7 @@ describe("search", () => {
       const passed = searched(history, spec);
       const stopped = searched(history, spec, budget(2));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [passed.outcome, passed.steps, stopped.outcome, stopped.limit, stopped.steps],
         ["passed", 3, "undecided", "steps", 1],
@@ -392,7 +392,7 @@ describe("search", () => {
     it("stops before a step past its budget", ({ seat }) => {
       const ending = searched(writeThenRead(), REGISTER, budget(1));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [ending.outcome, ending.limit, ending.steps, ending.linearized, ending.states],
         ["undecided", "steps", 1, [0], [1]],
@@ -403,7 +403,7 @@ describe("search", () => {
     it("stops before a configuration past its memo limit", ({ seat }) => {
       const ending = searched(writeThenRead(), REGISTER, memoLimit(3));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [ending.outcome, ending.limit, ending.steps, ending.linearized],
         ["undecided", "memo", 2, [0]],
@@ -419,7 +419,7 @@ describe("search", () => {
       onTestFinished(() => now.mockRestore());
       const ending = searched(writeThenRead(), REGISTER, timeLimit(1));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [ending.outcome, ending.limit, ending.steps],
         ["undecided", "time", 0],
@@ -432,7 +432,7 @@ describe("search", () => {
       onTestFinished(() => now.mockRestore());
       const ending = searched(writeThenRead(), REGISTER, timeLimit(60_000));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [ending.outcome, now.mock.calls.length],
         ["passed", 2],
@@ -457,7 +457,7 @@ describe("search", () => {
       history.invoke(1, "read", [], "x").ok(0);
       const ending = searched(history, parity);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [ending.outcome, ending.states],
         ["passed", [4]],
@@ -514,7 +514,12 @@ describe("search", () => {
       }) => {
         const err = specError(writeThenRead(), { ...REGISTER, ...tt.give });
 
-        check.equal(seat, [err?.fn, err?.call], tt.want, "the function and the call");
+        check.isEqualTo(
+          seat,
+          [err?.fn, err?.call],
+          tt.want,
+          "the function and the call",
+        );
       });
     }
   });

@@ -87,7 +87,7 @@ describe("event", () => {
     ];
     for (const tt of tests) {
       it(`returns ${tt.name}`, ({ seat }) => {
-        check.equal(seat, eventJson(tt.give), tt.want, "the JSON form");
+        check.isEqualTo(seat, eventJson(tt.give), tt.want, "the JSON form");
       });
     }
   });
