@@ -23,7 +23,12 @@ function readAt(value: string | undefined): Reading {
 describe("switch", () => {
   describe("VARIABLE", () => {
     it("contains the name DOKIMI_ASSERT_RECORD", ({ seat }) => {
-      check.equal(seat, VARIABLE, "DOKIMI_ASSERT_RECORD", "the variable of the switch");
+      check.isEqualTo(
+        seat,
+        VARIABLE,
+        "DOKIMI_ASSERT_RECORD",
+        "the variable of the switch",
+      );
     });
   });
 
@@ -41,7 +46,7 @@ describe("switch", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           readAt(tt.give),
           tt.want as Reading,
@@ -53,7 +58,7 @@ describe("switch", () => {
     it("returns the fault of a value other than 0 or 1", ({ seat }) => {
       const read = readAt("yes");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         "fault" in read ? read.fault.message : "",
         `${VARIABLE}: "yes" is neither 0 nor 1`,
@@ -70,7 +75,12 @@ describe("switch", () => {
       const second = reading();
       restore();
 
-      check.equal(seat, [first, second], [{ on: true }, { on: true }], "one reading");
+      check.isEqualTo(
+        seat,
+        [first, second],
+        [{ on: true }, { on: true }],
+        "one reading",
+      );
     });
   });
 });

@@ -40,7 +40,7 @@ describe("calls", () => {
       const subject = {};
       const first = own(subject);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         own(subject),
         first,
@@ -53,20 +53,20 @@ describe("calls", () => {
       const calls = own({});
       add(calls, call("true"));
 
-      check.equal(seat, lines(calls), [], "new calls keep no record");
+      check.isEqualTo(seat, lines(calls), [], "new calls keep no record");
     });
   });
 
   describe("callsOf", () => {
     it("returns undefined for a seat without calls", ({ seat }) => {
-      check.equal(seat, callsOf({}), undefined, "an unknown seat has no calls");
+      check.isEqualTo(seat, callsOf({}), undefined, "an unknown seat has no calls");
     });
 
     it("returns undefined for a seat whose calls record nothing", ({ seat }) => {
       const subject = {};
       own(subject);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         callsOf(subject),
         undefined,
@@ -88,7 +88,7 @@ describe("calls", () => {
       add(calls, call("true"));
       add(calls, call("false"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         parsed(calls).map((r) => r["seq"]),
         [1, 2],
@@ -102,7 +102,7 @@ describe("calls", () => {
       add(calls, call("true"));
       keep(calls);
 
-      check.equal(seat, lines(calls), [], "keep starts over");
+      check.isEqualTo(seat, lines(calls), [], "keep starts over");
     });
   });
 
@@ -113,7 +113,7 @@ describe("calls", () => {
       write(calls, (seq, line) => written.push([seq, line]));
       add(calls, call("true"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         written.map(([seq, line]) => [seq, JSON.parse(line).assertion]),
         [[1, "true"]],
@@ -127,7 +127,7 @@ describe("calls", () => {
       const subject = keeping();
       Slot.begin(subject);
 
-      check.equal(seat, lines(own(subject)), [], "a running call has no line yet");
+      check.isEqualTo(seat, lines(own(subject)), [], "a running call has no line yet");
     });
   });
 
@@ -138,7 +138,7 @@ describe("calls", () => {
       run(body, Slot.begin(subject));
       add(body, call("true"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [body.entries.length, body.entries[0]?.seq],
         [1, 0],
@@ -153,7 +153,7 @@ describe("calls", () => {
       run(body, undefined);
       add(body, call("true"));
 
-      check.equal(seat, body.entries, [], "the run records nothing");
+      check.isEqualTo(seat, body.entries, [], "the run records nothing");
     });
   });
 
@@ -170,7 +170,7 @@ describe("calls", () => {
       cut(body, 3);
       slot.take(body);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         parsed(own(subject)).map((r) => r["assertion"]),
         ["first"],
@@ -189,7 +189,7 @@ describe("calls", () => {
       slot.take(body);
       slot.write(call("eventually"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         parsed(own(subject)).map((r) => [
           r["seq"],
@@ -206,7 +206,12 @@ describe("calls", () => {
     });
 
     it("returns undefined for a seat whose calls record nothing", ({ seat }) => {
-      check.equal(seat, Slot.begin({}), undefined, "an unrecorded call has no slot");
+      check.isEqualTo(
+        seat,
+        Slot.begin({}),
+        undefined,
+        "an unrecorded call has no slot",
+      );
     });
   });
 
@@ -223,7 +228,7 @@ describe("calls", () => {
       slot.take(second, "random");
       slot.write(call("prop-for-all"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         parsed(own(subject)).map((r) => [r["seq"], r["run"], r["phase"]]),
         [
@@ -248,7 +253,7 @@ describe("calls", () => {
       outer.take(own(second), "random");
       outer.write(call("prop-for-all"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         parsed(own(subject)).map((r) => [
           r["seq"],
@@ -273,7 +278,7 @@ describe("calls", () => {
       add(own(subject), call("later"));
       slot.write(call("eventually"));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         parsed(own(subject)).map((r) => [r["seq"], r["assertion"]]),
         [

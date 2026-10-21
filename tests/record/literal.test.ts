@@ -317,7 +317,7 @@ describe("literal", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           encode(tt.give) as unknown,
           tt.want,
@@ -329,7 +329,7 @@ describe("literal", () => {
     it("returns a float for -0", ({ seat }) => {
       const literal = encode(-0);
 
-      check.equal(seat, literal?.type, "float", "-0 is a float");
+      check.isEqualTo(seat, literal?.type, "float", "-0 is a float");
       check.isTrue(seat, Object.is(literal?.["value"], -0), "the value keeps its sign");
     });
 
@@ -344,7 +344,7 @@ describe("literal", () => {
 
   describe("opaque", () => {
     it("returns the opaque literal of the text", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         opaque("Error: boom"),
         { type: "opaque", text: "Error: boom" },
@@ -355,11 +355,11 @@ describe("literal", () => {
 
   describe("detail", () => {
     it("returns the typed literal of a value with one", ({ seat }) => {
-      check.equal(seat, detail(1), { type: "int", value: 1 }, "an int");
+      check.isEqualTo(seat, detail(1), { type: "int", value: 1 }, "an int");
     });
 
     it("returns the opaque literal of the text of an error", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         detail(new Error("boom")),
         opaque("Error: boom"),
@@ -368,7 +368,7 @@ describe("literal", () => {
     });
 
     it("returns the opaque literal of the text of a function", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         detail(function named() {}),
         opaque("[function named]"),
@@ -379,7 +379,7 @@ describe("literal", () => {
 
   describe("json", () => {
     it("returns one line with the keys of each object in their order", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         json({ b: 1, a: [true, null, "x"], d: { e: 2 } }),
         '{"b":1,"a":[true,null,"x"],"d":{"e":2}}',
@@ -388,21 +388,25 @@ describe("literal", () => {
     });
 
     it("leaves out a field whose value is undefined", ({ seat }) => {
-      check.equal(seat, json({ a: 1, c: undefined }), '{"a":1}', "no field c");
+      check.isEqualTo(seat, json({ a: 1, c: undefined }), '{"a":1}', "no field c");
     });
 
     it("writes -0 as -0", ({ seat }) => {
-      check.equal(seat, json({ e: -0 }), '{"e":-0}', "the sign survives");
+      check.isEqualTo(seat, json({ e: -0 }), '{"e":-0}', "the sign survives");
     });
 
     it("throws a TypeError for a number that is not finite", ({ seat }) => {
-      const err = check.throws(seat, () => json(Number.NaN), "NaN is no JSON number");
+      const err = check.doesThrow(
+        seat,
+        () => json(Number.NaN),
+        "NaN is no JSON number",
+      );
 
       check.isTrue(seat, err instanceof TypeError, "the error is a TypeError");
     });
 
     it("throws a TypeError for a value that is no JSON value", ({ seat }) => {
-      const err = check.throws(seat, () => json(1n), "a bigint is no JSON value");
+      const err = check.doesThrow(seat, () => json(1n), "a bigint is no JSON value");
 
       check.isTrue(seat, err instanceof TypeError, "the error is a TypeError");
     });

@@ -15,7 +15,7 @@ describe("call", () => {
         "utf8",
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         DEFINITION,
         vendored.trim(),
@@ -38,7 +38,7 @@ describe("call", () => {
         { seq: 3, parent: 1, run: 2, phase: "random" },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         line,
         `{"definition":"${DEFINITION}","seq":3,"parent":1,"run":2,"phase":"random",` +
@@ -60,7 +60,7 @@ describe("call", () => {
         { seq: 1 },
       );
 
-      check.contains(
+      check.doesContain(
         seat,
         line,
         '"where":{"file":"store.test.ts","line":42}',
@@ -81,7 +81,7 @@ describe("call", () => {
         { seq: 1 },
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         line,
         `{"definition":"${DEFINITION}","seq":1,"assertion":"true","contract":"the flag is set","verdict":"pass","aborting":true}`,
