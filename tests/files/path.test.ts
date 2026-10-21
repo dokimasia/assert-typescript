@@ -53,7 +53,7 @@ describe("path", () => {
     it("passes a path where nothing is", ({ seat }) => {
       const dir = fixture(seat);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         outcome((r) => absent(r, join(dir, "b.txt"), "m")),
         ["pass"],
@@ -64,7 +64,7 @@ describe("path", () => {
     it("passes a path below a file", ({ seat }) => {
       const dir = fixture(seat);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         outcome((r) => absent(r, join(dir, "a.txt", "b"), "m")),
         ["pass"],
@@ -75,7 +75,7 @@ describe("path", () => {
     it("reports the kind of the entry at the path", ({ seat }) => {
       const dir = fixture(seat);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         outcome((r) => absent(r, join(dir, "a.txt"), "m")),
         ["fail", { got: "file" }],
@@ -86,7 +86,7 @@ describe("path", () => {
     it("reports a link whose target is missing", ({ seat }) => {
       const dir = fixture(seat);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         outcome((r) => absent(r, join(dir, "dangling"), "m")),
         ["fail", { got: "link" }],
@@ -100,7 +100,7 @@ describe("path", () => {
         const dir = fixture(seat);
         const [verdict, fault] = outcome((r) => absent(r, join(dir, TOO_LONG), "m"));
 
-        check.equal(seat, verdict, "error", "the verdict");
+        check.isEqualTo(seat, verdict, "error", "the verdict");
         check.hasPrefix(
           seat,
           fault as string,
@@ -135,7 +135,7 @@ describe("path", () => {
       it(tt.name, ({ seat }) => {
         const dir = fixture(seat);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           outcome((r) => isFile(r, join(dir, tt.give), "m")),
           tt.want,
@@ -147,7 +147,7 @@ describe("path", () => {
     it.skipIf(WINDOWS)(
       "ends the call with a fault for an entry that is no file, directory or link",
       ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           outcome((r) => isFile(r, "/dev/null", "m")),
           ["error", "files.isFile: the entry is no file, directory or link"],
@@ -172,7 +172,7 @@ describe("path", () => {
       it(tt.name, ({ seat }) => {
         const dir = fixture(seat);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           outcome((r) => isDir(r, join(dir, tt.give), "m")),
           tt.want,
@@ -223,7 +223,7 @@ describe("path", () => {
       it(tt.name, ({ seat }) => {
         const dir = fixture(seat);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           outcome((r) => linksTo(r, join(dir, tt.give), tt.giveTarget, "m")),
           tt.want,
@@ -294,7 +294,7 @@ describe("path", () => {
       it(tt.name, ({ seat }) => {
         const dir = fixture(seat);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           outcome((r) => hasContent(r, join(dir, tt.give), tt.giveContent, "m")),
           tt.want,
@@ -306,7 +306,7 @@ describe("path", () => {
     it("ends the call with a fault for text with a lone surrogate", ({ seat }) => {
       const dir = fixture(seat);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         outcome((r) => hasContent(r, join(dir, "a.txt"), "\ud800", "m")),
         [
@@ -356,7 +356,7 @@ describe("path", () => {
       it.skipIf(WINDOWS)(tt.name, ({ seat }) => {
         const dir = fixture(seat);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           outcome((r) => hasMode(r, join(dir, tt.give), tt.giveMode, "m")),
           tt.want,
@@ -370,7 +370,7 @@ describe("path", () => {
     }) => {
       const dir = fixture(seat);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         outcome((r) => hasMode(r, join(dir, "a.txt"), 0o1000, "m")),
         ["error", "files.hasMode: the mode 0o1000 is no integer from 0 to 0o777"],
@@ -383,7 +383,7 @@ describe("path", () => {
       ({ seat }) => {
         const dir = fixture(seat);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           outcome((r) => hasMode(r, join(dir, "a.txt"), 0o644, "m")),
           ["error", "files.hasMode: the file system records no permission bits"],

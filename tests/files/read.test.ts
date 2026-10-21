@@ -15,7 +15,7 @@ describe("read", () => {
     it("returns the content of the file at the path", ({ seat }) => {
       const dir = workspace(seat, { "go.mod": text("module example.com/a\n") });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         read(seat, join(dir, "go.mod")),
         "module example.com/a\n",
@@ -40,7 +40,7 @@ describe("read", () => {
         const recorder = new Recorder();
         const content = read(recorder, path);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [content, recorder.message],
           ["", `files.read: no file is at the path ${JSON.stringify(path)}`],

@@ -33,7 +33,7 @@ describe("workspace", () => {
       const dir = workspace(seat, { "docs/a.md": text("# a\n") });
 
       check.hasPrefix(seat, dir, join(tmpdir(), "dokimi-files-"), "the directory");
-      check.equal(
+      check.isEqualTo(
         seat,
         readFileSync(join(dir, "docs", "a.md"), "utf8"),
         "# a\n",
@@ -70,7 +70,7 @@ describe("workspace", () => {
       const dir = workspace(cleaning, { "a.txt": text("a"), b: new Entry() });
       onTestFinished(() => cleaning.end());
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [cleaning.message, readdirSync(dir)],
         ["files.workspace: b: the entry states no file, directory or link", []],
@@ -90,7 +90,7 @@ describe("workspace", () => {
         const cleaning = new Cleaning();
         const dir = workspace(cleaning, {});
 
-        check.equal(seat, dir, "", "no directory");
+        check.isEqualTo(seat, dir, "", "no directory");
         check.hasPrefix(seat, cleaning.message, "files.workspace: ENOENT", "the fault");
       },
     );

@@ -74,7 +74,7 @@ describe("difference", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(seat, differs(tt.giveWant, tt.giveGot), tt.want, "the verdict");
+        check.isEqualTo(seat, differs(tt.giveWant, tt.giveGot), tt.want, "the verdict");
       });
     }
 
@@ -107,7 +107,7 @@ describe("difference", () => {
 
     for (const tt of modes) {
       it.skipIf(WINDOWS)(tt.name, ({ seat }) => {
-        check.equal(seat, differs(tt.giveWant, tt.giveGot), tt.want, "the verdict");
+        check.isEqualTo(seat, differs(tt.giveWant, tt.giveGot), tt.want, "the verdict");
       });
     }
   });
@@ -136,7 +136,7 @@ describe("difference", () => {
         ["z.txt", text("z")],
       ]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         differing(want, got, false),
         ["docs", "docs/b.md", "z.txt"],

@@ -51,19 +51,19 @@ function names(dir: string): string[] {
 describe("writer", () => {
   describe("FILE_MODE", () => {
     it("contains 0o644", ({ seat }) => {
-      check.equal(seat, FILE_MODE, 0o644, "the mode of a file");
+      check.isEqualTo(seat, FILE_MODE, 0o644, "the mode of a file");
     });
   });
 
   describe("EXECUTABLE_MODE", () => {
     it("contains 0o755", ({ seat }) => {
-      check.equal(seat, EXECUTABLE_MODE, 0o755, "the mode of an executable file");
+      check.isEqualTo(seat, EXECUTABLE_MODE, 0o755, "the mode of an executable file");
     });
   });
 
   describe("DIRECTORY_MODE", () => {
     it("contains 0o755", ({ seat }) => {
-      check.equal(seat, DIRECTORY_MODE, 0o755, "the mode of a directory");
+      check.isEqualTo(seat, DIRECTORY_MODE, 0o755, "the mode of a directory");
     });
   });
 
@@ -81,7 +81,7 @@ describe("writer", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(seat, modeOf(tt.give), tt.want, "the mode");
+        check.isEqualTo(seat, modeOf(tt.give), tt.want, "the mode");
       });
     }
   });
@@ -98,7 +98,7 @@ describe("writer", () => {
         ]),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           readFileSync(join(dir, "docs", "a.md"), "utf8"),
@@ -126,7 +126,7 @@ describe("writer", () => {
             ]),
           );
 
-          check.equal(
+          check.isEqualTo(
             seat,
             ["notes.txt", "bin", "bin/run", "keys", "keys/id"].map((p) =>
               modeAt(join(dir, p)),
@@ -150,7 +150,7 @@ describe("writer", () => {
           ]),
         );
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [
             modeAt(join(dir, "sealed")),
@@ -176,7 +176,7 @@ describe("writer", () => {
         ),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [fault, names(dir)],
         ['b//c: the path "b//c" has the name ""', []],
@@ -206,7 +206,7 @@ describe("writer", () => {
         "a.txt: the entry cannot be written: EEXIST",
         "the fault",
       );
-      check.equal(
+      check.isEqualTo(
         seat,
         readFileSync(join(dir, "a.txt"), "utf8"),
         "old",
@@ -222,7 +222,7 @@ describe("writer", () => {
       chmodSync(join(dir, "a.txt"), 0o400);
       overwrite(dir, new Map([["a.txt", text("new")]]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         readFileSync(join(dir, "a.txt"), "utf8"),
         "new",
@@ -246,7 +246,7 @@ describe("writer", () => {
           ]),
         );
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [modeAt(join(dir, "a.txt")), modeAt(join(dir, "b.txt"))],
           [0o644, 0o640],
@@ -260,7 +260,7 @@ describe("writer", () => {
       symlinkSync("a.txt", join(dir, "current"));
       overwrite(dir, new Map([["current", link("b.txt")]]));
 
-      check.equal(seat, readlinkSync(join(dir, "current")), "b.txt", "the target");
+      check.isEqualTo(seat, readlinkSync(join(dir, "current")), "b.txt", "the target");
     });
 
     it("keeps the entries of a directory and every entry that the tree does not state", ({
@@ -272,7 +272,7 @@ describe("writer", () => {
       writeFileSync(join(dir, "other.txt"), "other");
       overwrite(dir, new Map([["docs/new.md", text("new")]]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [names(join(dir, "docs")), readFileSync(join(dir, "other.txt"), "utf8")],
         [["kept.md", "new.md"], "other"],
@@ -288,7 +288,7 @@ describe("writer", () => {
         chmodSync(join(dir, "docs"), 0o750);
         overwrite(dir, new Map([["docs/a.md", text("a")]]));
 
-        check.equal(seat, modeAt(join(dir, "docs")), 0o750, "the mode is kept");
+        check.isEqualTo(seat, modeAt(join(dir, "docs")), 0o750, "the mode is kept");
       },
     );
 
@@ -299,7 +299,7 @@ describe("writer", () => {
         mkdirSync(join(dir, "keys"));
         overwrite(dir, new Map([["keys", directory().withMode(0o700)]]));
 
-        check.equal(seat, modeAt(join(dir, "keys")), 0o700, "the mode is set");
+        check.isEqualTo(seat, modeAt(join(dir, "keys")), 0o700, "the mode is set");
       },
     );
 
@@ -309,7 +309,12 @@ describe("writer", () => {
         const dir = temporary();
         overwrite(dir, new Map([["a/b.txt", text("b")]]));
 
-        check.equal(seat, modeAt(join(dir, "a")), 0o755, "the created parent's mode");
+        check.isEqualTo(
+          seat,
+          modeAt(join(dir, "a")),
+          0o755,
+          "the created parent's mode",
+        );
       },
     );
 
@@ -349,7 +354,7 @@ describe("writer", () => {
         tt.give(dir);
         const before = names(dir);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [thrown(() => overwrite(dir, tt.tree)), names(dir)],
           [tt.want, before],
@@ -364,7 +369,7 @@ describe("writer", () => {
         const dir = temporary();
         execFileSync("mkfifo", [join(dir, "fifo")]);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => overwrite(dir, new Map([["fifo", text("a")]]))),
           "fifo: the entry is no file, directory or link",
@@ -416,7 +421,7 @@ describe("writer", () => {
     });
 
     it("throws the fault of a tree that breaks a rule", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => overwrite(temporary(), new Map([["a/../b", text("a")]]))),
         'a/../b: the path "a/../b" has the name ".."',
@@ -430,7 +435,7 @@ describe("writer", () => {
       const dir = join(temporary(), "golden", "api");
       update(dir, new Map([["v1/types.go", text("package v1\n")]]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         readFileSync(join(dir, "v1", "types.go"), "utf8"),
         "package v1\n",
@@ -450,7 +455,7 @@ describe("writer", () => {
       symlinkSync(target, join(dir, "latest"));
       update(dir, new Map([["api.go", text("api")]]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [names(dir), readFileSync(target, "utf8")],
         [["api.go"], "kept"],
@@ -471,7 +476,7 @@ describe("writer", () => {
         ]),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [readFileSync(join(dir, "a.txt"), "utf8"), statSync(join(dir, "b.txt")).ino],
         ["new", kept],
@@ -489,7 +494,7 @@ describe("writer", () => {
         ]),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [modeAt(join(dir, "key")), modeAt(join(dir, "run.sh"))],
         [0o644, 0o755],
@@ -510,7 +515,7 @@ describe("writer", () => {
     });
 
     it("throws the fault of a tree that breaks a rule", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => update(temporary(), new Map([["", text("a")]]))),
         'the path "" has the name ""',
@@ -532,7 +537,7 @@ describe("writer", () => {
         chmodSync(join(dir, "a"), 0o500);
         unlock(dir);
 
-        check.equal(
+        check.isEqualTo(
           seat,
           [
             modeAt(join(dir, "a")),

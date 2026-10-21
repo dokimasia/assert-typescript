@@ -19,7 +19,7 @@ describe("write", () => {
       });
       write(seat, dir, { "api/store.gen.go": text("edited") });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           readFileSync(join(dir, "api", "store.gen.go"), "utf8"),
@@ -35,7 +35,7 @@ describe("write", () => {
       const recorder = new Recorder();
       write(recorder, dir, { "docs/a.md": text("a") });
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.message,
         "files.write: docs: the entry is a file, and the tree states a directory",

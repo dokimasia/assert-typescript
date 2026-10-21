@@ -26,13 +26,13 @@ describe("tree", () => {
     });
 
     it("returns 0 for equal paths", ({ seat }) => {
-      check.equal(seat, compareBytes("a/b", "a/b"), 0, "equal paths");
+      check.isEqualTo(seat, compareBytes("a/b", "a/b"), 0, "equal paths");
     });
   });
 
   describe("pathsOf", () => {
     it("returns the paths in the order of their UTF-8 bytes", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         pathsOf(["b", "\u{10000}", "a/b", "￿", "a"]),
         ["a", "a/b", "b", "￿", "\u{10000}"],
@@ -43,7 +43,7 @@ describe("tree", () => {
 
   describe("parentsOf", () => {
     it("returns the directories above a path, outermost first", ({ seat }) => {
-      check.equal(seat, parentsOf("a/b/c"), ["a", "a/b"], "the parents");
+      check.isEqualTo(seat, parentsOf("a/b/c"), ["a", "a/b"], "the parents");
     });
 
     it("returns no directory for a path of one name", ({ seat }) => {
@@ -97,7 +97,7 @@ describe("tree", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(seat, pathFault(tt.give), tt.want, "the fault of the path");
+        check.isEqualTo(seat, pathFault(tt.give), tt.want, "the fault of the path");
       });
     }
   });
@@ -110,7 +110,7 @@ describe("tree", () => {
         ["d", link("../outside")],
       ]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => checkTree(tree)),
         "",
@@ -177,7 +177,7 @@ describe("tree", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => checkTree(tt.give)),
           tt.want,
@@ -191,7 +191,7 @@ describe("tree", () => {
     it("adds each directory that a path implies, without a mode", ({ seat }) => {
       const whole = full(new Map([["a/b/c.txt", text("c")]]));
 
-      check.equal(
+      check.isEqualTo(
         seat,
         treeOf(whole),
         { a: directory(), "a/b": directory(), "a/b/c.txt": text("c") },
@@ -214,7 +214,7 @@ describe("tree", () => {
 
   describe("mapOf", () => {
     it("returns the entries of a tree by path", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [...mapOf({ "a.txt": text("a"), b: directory() })],
         [
@@ -235,7 +235,7 @@ describe("tree", () => {
         ]),
       );
 
-      check.equal(seat, Object.keys(tree), ["a", "b"], "the order of the paths");
+      check.isEqualTo(seat, Object.keys(tree), ["a", "b"], "the order of the paths");
     });
   });
 });

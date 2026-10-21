@@ -29,7 +29,7 @@ describe("compare", () => {
       const recorder = new Recorder();
       equal(recorder, dir, { "docs/b.md": text("b"), "a.txt": text("a") }, "the tree");
 
-      check.equal(seat, verdicts(recorder), ["pass"], "the trees are equal");
+      check.isEqualTo(seat, verdicts(recorder), ["pass"], "the trees are equal");
     });
 
     it("reports the record of tree-equal for a tree that differs", ({ seat }) => {
@@ -38,7 +38,7 @@ describe("compare", () => {
       equal(recorder, dir, { "a.txt": text("x"), "b.txt": text("b") }, "the tree");
       const [failure] = recorder.failures;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [failure?.assertion, failure?.contract, failure?.detail],
         [
@@ -59,7 +59,7 @@ describe("compare", () => {
       const recorder = new Recorder();
       equal(recorder, dir, { "a.txt": text("a") }, "the tree");
 
-      check.contains(
+      check.doesContain(
         seat,
         recorder.failures[0]?.where?.file ?? "",
         "compare.test.ts",
@@ -73,7 +73,7 @@ describe("compare", () => {
       const recorder = new Recorder();
       equal(recorder, temporary(), { a: new Entry() }, "the tree");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.message, verdicts(recorder)],
         ["files.equal: a: the entry states no file, directory or link", ["error"]],
@@ -100,7 +100,12 @@ describe("compare", () => {
       const recorder = new Recorder();
       contains(recorder, dir, { "b.txt": text("b") }, "the tree");
 
-      check.equal(seat, verdicts(recorder), ["pass"], "the tree contains the entry");
+      check.isEqualTo(
+        seat,
+        verdicts(recorder),
+        ["pass"],
+        "the tree contains the entry",
+      );
     });
 
     it("reports the record of tree-contains for a missing entry", ({ seat }) => {
@@ -108,7 +113,7 @@ describe("compare", () => {
       const recorder = new Recorder();
       contains(recorder, dir, { "b.txt": text("b") }, "the tree");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.failures[0]?.assertion, recorder.failures[0]?.detail],
         ["tree-contains", { want: { "b.txt": text("b") }, got: {}, differences: 1 }],
@@ -130,7 +135,7 @@ describe("compare", () => {
       const recorder = new Recorder();
       await unchanged(recorder, dir, () => undefined, "nothing is written");
 
-      check.equal(seat, verdicts(recorder), ["pass"], "the tree is unchanged");
+      check.isEqualTo(seat, verdicts(recorder), ["pass"], "the tree is unchanged");
     });
 
     it("reports the record of tree-unchanged for a callable that writes a file", async ({
@@ -145,7 +150,7 @@ describe("compare", () => {
         "nothing is written",
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.failures[0]?.assertion, recorder.failures[0]?.detail],
         [
@@ -173,7 +178,7 @@ describe("compare", () => {
         "nothing is written",
       );
 
-      check.equal(seat, verdicts(recorder), ["fail"], "the late write is seen");
+      check.isEqualTo(seat, verdicts(recorder), ["fail"], "the late write is seen");
     });
 
     it("rejects with the error of a callable that throws, and reports nothing", async ({
@@ -245,7 +250,7 @@ describe("compare", () => {
       const recorder = new Recorder();
       void unchanged(recorder, temporary(), () => undefined, "nothing is written");
 
-      check.equal(
+      check.isEqualTo(
         seat,
         dropped(recorder),
         ["nothing is written"],

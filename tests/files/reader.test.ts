@@ -57,17 +57,22 @@ describe("reader", () => {
     it("returns file for a file", ({ seat }) => {
       const dir = fixture();
 
-      check.equal(seat, kindOfStats(lstatSync(join(dir, "a.txt"))), "file", "the kind");
+      check.isEqualTo(
+        seat,
+        kindOfStats(lstatSync(join(dir, "a.txt"))),
+        "file",
+        "the kind",
+      );
     });
 
     it("returns directory for a directory", ({ seat }) => {
-      check.equal(seat, kindOfStats(lstatSync(fixture())), "directory", "the kind");
+      check.isEqualTo(seat, kindOfStats(lstatSync(fixture())), "directory", "the kind");
     });
 
     it("returns link for a link", ({ seat }) => {
       const dir = fixture();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         kindOfStats(lstatSync(join(dir, "current"))),
         "link",
@@ -86,7 +91,7 @@ describe("reader", () => {
 
   describe("readTree", () => {
     it.skipIf(WINDOWS)("returns every entry with its mode", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         treeOf(readTree(fixture(), true)),
         {
@@ -103,7 +108,7 @@ describe("reader", () => {
     it.skipIf(WINDOWS)(
       "returns the owner's execute bit of each file alone without modes",
       ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           treeOf(readTree(fixture(), false)),
           {
@@ -123,7 +128,7 @@ describe("reader", () => {
       const root = join(temporary(), "root");
       symlinkSync(dir, root);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [...readTree(root, false).keys()].sort(),
         ["a.txt", "current", "keys", "keys/id", "run.sh"],
@@ -143,7 +148,7 @@ describe("reader", () => {
     it("throws the fault of a root that is no directory", ({ seat }) => {
       const dir = fixture();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => readTree(join(dir, "a.txt"), true)),
         "the root of the tree is no directory",
@@ -188,7 +193,7 @@ describe("reader", () => {
         folder(join(dir, "run"));
         pipe(join(dir, "run", "fifo"));
 
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => readTree(dir, true)),
           "run/fifo: the entry is no file, directory or link",
@@ -202,7 +207,7 @@ describe("reader", () => {
     it.skipIf(WINDOWS)("returns a file with its content and its mode", ({ seat }) => {
       const dir = fixture();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         readPath(join(dir, "a.txt"), true),
         text("a\n").withMode(0o644),
@@ -215,7 +220,7 @@ describe("reader", () => {
       ({ seat }) => {
         const dir = fixture();
 
-        check.equal(
+        check.isEqualTo(
           seat,
           readPath(join(dir, "a.txt"), false),
           text("").withMode(0o644),
@@ -227,7 +232,7 @@ describe("reader", () => {
     it("returns the link at a path, and follows it not", ({ seat }) => {
       const dir = fixture();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         readPath(join(dir, "current"), true),
         link("a.txt"),
@@ -262,7 +267,7 @@ describe("reader", () => {
     it.skipIf(WINDOWS)(
       "throws the fault of an entry that is no file, directory or link",
       ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => readPath("/dev/null", true)),
           "the entry is no file, directory or link",

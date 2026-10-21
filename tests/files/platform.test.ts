@@ -9,7 +9,7 @@ import { WINDOWS } from "../helpers.js";
 describe("platform", () => {
   describe("HOST", () => {
     it.skipIf(WINDOWS)("records the nine permission bits off Windows", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [HOST.recordedBits, HOST.modeFault],
         [0o777, undefined],
@@ -18,7 +18,7 @@ describe("platform", () => {
     });
 
     it.runIf(WINDOWS)("records no permission bit on Windows", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         [HOST.recordedBits, HOST.modeFault],
         [0, "the file system records no permission bits"],
@@ -29,27 +29,37 @@ describe("platform", () => {
 
   describe("targetOf", () => {
     it("returns a relative target with slashes as it is", ({ seat }) => {
-      check.equal(seat, targetOf("../shared/a.txt"), "../shared/a.txt", "the target");
+      check.isEqualTo(
+        seat,
+        targetOf("../shared/a.txt"),
+        "../shared/a.txt",
+        "the target",
+      );
     });
 
     it.skipIf(WINDOWS)(
       "keeps a backslash, which is part of a name off Windows",
       ({ seat }) => {
-        check.equal(seat, targetOf("a\\b"), "a\\b", "the backslash is kept");
+        check.isEqualTo(seat, targetOf("a\\b"), "a\\b", "the backslash is kept");
       },
     );
 
     it.runIf(WINDOWS)(
       "returns the names of a target with slashes on Windows",
       ({ seat }) => {
-        check.equal(seat, targetOf("a\\b"), "a/b", "the backslash separates names");
+        check.isEqualTo(seat, targetOf("a\\b"), "a/b", "the backslash separates names");
       },
     );
 
     it.runIf(WINDOWS)(
       "drops the prefix of an absolute target on Windows",
       ({ seat }) => {
-        check.equal(seat, targetOf("\\\\?\\C:\\a"), "C:/a", "the prefix is dropped");
+        check.isEqualTo(
+          seat,
+          targetOf("\\\\?\\C:\\a"),
+          "C:/a",
+          "the prefix is dropped",
+        );
       },
     );
   });

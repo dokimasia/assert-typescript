@@ -24,7 +24,7 @@ function numbered(n: number, content: string): Map<string, Entry> {
 describe("record", () => {
   describe("MAX_PATHS", () => {
     it("contains 64 paths", ({ seat }) => {
-      check.equal(seat, MAX_PATHS, 64, "the most paths of a record");
+      check.isEqualTo(seat, MAX_PATHS, 64, "the most paths of a record");
     });
   });
 
@@ -46,7 +46,7 @@ describe("record", () => {
       ]);
       const record = comparison(want, got, ["a.txt", "b.txt", "c.txt"]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [
           treeOf(record?.want ?? new Map()),
@@ -67,7 +67,7 @@ describe("record", () => {
       const got = numbered(65, "a");
       const record = comparison(want, got, [...want.keys()]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [record?.want?.size, record?.got.size, record?.differences],
         [64, 64, 65],
@@ -90,7 +90,7 @@ describe("record", () => {
       ]);
       const record = comparison(want, got, ["docs", "key", "run.sh"]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         treeOf(record?.got ?? new Map()),
         {
@@ -113,7 +113,7 @@ describe("record", () => {
       ]);
       const record = missing(got);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [record.want, treeOf(record.got), record.differences],
         [null, { "a.txt": text("a"), "run.sh": executable("r") }, 2],
@@ -124,7 +124,12 @@ describe("record", () => {
     it("lists the first 64 entries and counts every one", ({ seat }) => {
       const record = missing(numbered(65, "a"));
 
-      check.equal(seat, [record.got.size, record.differences], [64, 65], "the record");
+      check.isEqualTo(
+        seat,
+        [record.got.size, record.differences],
+        [64, 65],
+        "the record",
+      );
     });
   });
 
@@ -139,7 +144,7 @@ describe("record", () => {
         undefined,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.failures, records(recorder).map((r) => r["verdict"])],
         [[], ["pass"]],
@@ -161,7 +166,7 @@ describe("record", () => {
       );
       const [failure] = recorder.failures;
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [failure?.assertion, failure?.detail, failure?.where],
         [
@@ -171,7 +176,7 @@ describe("record", () => {
         ],
         "the record",
       );
-      check.equal(
+      check.isEqualTo(
         seat,
         records(recorder)[0]?.["detail"],
         {
@@ -193,7 +198,7 @@ describe("record", () => {
         undefined,
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         [recorder.failures[0]?.detail["want"], records(recorder)[0]?.["detail"]],
         [

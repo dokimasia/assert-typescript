@@ -21,7 +21,7 @@ import { readPath } from "./reader.js";
  * @returns The content, and the empty string after a fault on a seat whose
  *   `fail` returns.
  * @example
- * check.contains(seat, files.read(seat, path), "version 2", "the file states the new version");
+ * check.doesContain(seat, files.read(seat, path), "version 2", "the file contains the new version");
  */
 export function read(seat: Seat, path: string): string {
   seat.helper();

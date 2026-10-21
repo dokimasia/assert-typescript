@@ -35,13 +35,13 @@ function fields(e: Entry): Record<string, unknown> {
 describe("entry", () => {
   describe("PERMISSIONS", () => {
     it("contains the nine permission bits", ({ seat }) => {
-      check.equal(seat, PERMISSIONS, 0o777, "the nine bits");
+      check.isEqualTo(seat, PERMISSIONS, 0o777, "the nine bits");
     });
   });
 
   describe("OWNER_EXECUTE", () => {
     it("contains the owner's execute bit", ({ seat }) => {
-      check.equal(seat, OWNER_EXECUTE, 0o100, "the bit");
+      check.isEqualTo(seat, OWNER_EXECUTE, 0o100, "the bit");
     });
   });
 
@@ -49,13 +49,18 @@ describe("entry", () => {
     it("returns an entry that states nothing", ({ seat }) => {
       const e = new Entry();
 
-      check.equal(seat, [fields(e), kindOf(e)], [{}, undefined], "the entry is empty");
+      check.isEqualTo(
+        seat,
+        [fields(e), kindOf(e)],
+        [{}, undefined],
+        "the entry is empty",
+      );
     });
   });
 
   describe("text", () => {
     it("returns a file whose content is the text", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         fields(text("a\n")),
         { text: "a\n" },
@@ -64,7 +69,7 @@ describe("entry", () => {
     });
 
     it("throws a RangeError for a string with a lone surrogate", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => text("\ud800")),
         "files: text states a string with a lone surrogate, which UTF-8 cannot encode",
@@ -75,7 +80,7 @@ describe("entry", () => {
 
   describe("bytes", () => {
     it("returns a file that states content of UTF-8 text as text", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         fields(bytes(Uint8Array.of(0x61, 0x0a))),
         { text: "a\n" },
@@ -84,7 +89,7 @@ describe("entry", () => {
     });
 
     it("returns a file that states other content as bytes", ({ seat }) => {
-      check.equal(seat, fields(bytes(PNG)), { bytes: PNG }, "the bytes are kept");
+      check.isEqualTo(seat, fields(bytes(PNG)), { bytes: PNG }, "the bytes are kept");
     });
 
     it("copies its content", ({ seat }) => {
@@ -92,13 +97,13 @@ describe("entry", () => {
       const e = bytes(content);
       content[0] = 0;
 
-      check.equal(seat, e.bytes, PNG, "a change of the argument changes nothing");
+      check.isEqualTo(seat, e.bytes, PNG, "a change of the argument changes nothing");
     });
   });
 
   describe("executable", () => {
     it("returns a file whose owner may execute it", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         fields(executable("#!/bin/sh\n")),
         { text: "#!/bin/sh\n", executable: true },
@@ -107,7 +112,7 @@ describe("entry", () => {
     });
 
     it("throws a RangeError for a string with a lone surrogate", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => executable("\udc00")),
         "files: executable states a string with a lone surrogate, which UTF-8 cannot encode",
@@ -118,19 +123,19 @@ describe("entry", () => {
 
   describe("directory", () => {
     it("returns a directory", ({ seat }) => {
-      check.equal(seat, fields(directory()), { directory: true }, "the directory");
+      check.isEqualTo(seat, fields(directory()), { directory: true }, "the directory");
     });
   });
 
   describe("link", () => {
     it("returns a link to its target", ({ seat }) => {
-      check.equal(seat, fields(link("../a.txt")), { link: "../a.txt" }, "the link");
+      check.isEqualTo(seat, fields(link("../a.txt")), { link: "../a.txt" }, "the link");
     });
   });
 
   describe("Entry.withMode", () => {
     it("returns a file with the mode", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         fields(text("secret\n").withMode(0o600)),
         { text: "secret\n", mode: 0o600 },
@@ -141,7 +146,7 @@ describe("entry", () => {
     it("returns an executable file whose mode replaces the execute flag", ({
       seat,
     }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         fields(executable("#!/bin/sh\n").withMode(0o700)),
         { text: "#!/bin/sh\n", mode: 0o700 },
@@ -150,7 +155,7 @@ describe("entry", () => {
     });
 
     it("returns a directory with the mode", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         fields(directory().withMode(0o700)),
         { directory: true, mode: 0o700 },
@@ -162,7 +167,7 @@ describe("entry", () => {
       const e = text("a");
       e.withMode(0o600);
 
-      check.equal(seat, fields(e), { text: "a" }, "the entry states no mode");
+      check.isEqualTo(seat, fields(e), { text: "a" }, "the entry states no mode");
     });
 
     const tests = [
@@ -195,14 +200,14 @@ describe("entry", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(seat, thrown(tt.give), tt.want, "the refusal");
+        check.isEqualTo(seat, thrown(tt.give), tt.want, "the refusal");
       });
     }
   });
 
   describe("withText", () => {
     it("returns the file with the text and its other fields", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         fields(withText(text("a").withMode(0o600), "b")),
         { text: "b", mode: 0o600 },
@@ -211,7 +216,7 @@ describe("entry", () => {
     });
 
     it("throws a RangeError for a string with a lone surrogate", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         thrown(() => withText(text("a"), "\ud800")),
         "files: text states a string with a lone surrogate, which UTF-8 cannot encode",
@@ -248,7 +253,7 @@ describe("entry", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(seat, kindOf(tt.give), tt.want, "the kind");
+        check.isEqualTo(seat, kindOf(tt.give), tt.want, "the kind");
       });
     }
   });
@@ -264,7 +269,12 @@ describe("entry", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(seat, isPermissions(tt.give), tt.want, "the verdict on the mode");
+        check.isEqualTo(
+          seat,
+          isPermissions(tt.give),
+          tt.want,
+          "the verdict on the mode",
+        );
       });
     }
   });
@@ -282,14 +292,14 @@ describe("entry", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(seat, modeText(tt.give), tt.want, "the text of the mode");
+        check.isEqualTo(seat, modeText(tt.give), tt.want, "the text of the mode");
       });
     }
   });
 
   describe("contentOf", () => {
     it("returns the UTF-8 bytes of a file of text", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         Uint8Array.from(contentOf(text("é"))),
         Uint8Array.of(0xc3, 0xa9),
@@ -298,21 +308,26 @@ describe("entry", () => {
     });
 
     it("returns the bytes of a file of bytes", ({ seat }) => {
-      check.equal(seat, contentOf(bytes(PNG)), PNG, "the bytes");
+      check.isEqualTo(seat, contentOf(bytes(PNG)), PNG, "the bytes");
     });
 
     it("returns no bytes for a directory", ({ seat }) => {
-      check.equal(seat, contentOf(directory()).length, 0, "a directory has no content");
+      check.isEqualTo(
+        seat,
+        contentOf(directory()).length,
+        0,
+        "a directory has no content",
+      );
     });
   });
 
   describe("contentValue", () => {
     it("returns content of UTF-8 text as a string", ({ seat }) => {
-      check.equal(seat, contentValue(Uint8Array.of(0x61)), "a", "the text");
+      check.isEqualTo(seat, contentValue(Uint8Array.of(0x61)), "a", "the text");
     });
 
     it("returns other content as bytes", ({ seat }) => {
-      check.equal(seat, contentValue(PNG), PNG, "the bytes");
+      check.isEqualTo(seat, contentValue(PNG), PNG, "the bytes");
     });
   });
 
@@ -333,7 +348,7 @@ describe("entry", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(seat, bitsOf(tt.give), tt.want, "the bits");
+        check.isEqualTo(seat, bitsOf(tt.give), tt.want, "the bits");
       });
     }
   });
@@ -359,7 +374,7 @@ describe("entry", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           fields(unstated(tt.give)),
           tt.want,

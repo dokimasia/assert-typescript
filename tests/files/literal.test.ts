@@ -16,7 +16,7 @@ function literal(...entries: unknown[]): { type: string; entries: unknown[] } {
 describe("literal", () => {
   describe("CONTENT_LIMIT", () => {
     it("contains 65,536 bytes", ({ seat }) => {
-      check.equal(seat, CONTENT_LIMIT, 65_536, "the limit");
+      check.isEqualTo(seat, CONTENT_LIMIT, 65_536, "the limit");
     });
   });
 
@@ -30,7 +30,7 @@ describe("literal", () => {
         ["keys/id", text("secret\n").withMode(0o600)],
       ]);
 
-      check.equal(
+      check.isEqualTo(
         seat,
         encode(tree, CONTENT_LIMIT),
         literal(
@@ -45,7 +45,7 @@ describe("literal", () => {
     });
 
     it("states a file longer than the limit by its digest and its size", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         encode(new Map([["a.txt", text("abc")]]), 2),
         literal({
@@ -59,7 +59,7 @@ describe("literal", () => {
     });
 
     it("states a file as long as the limit in full", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         encode(new Map([["a.txt", text("abc")]]), 3),
         literal({ path: "a.txt", text: "abc" }),
@@ -81,7 +81,7 @@ describe("literal", () => {
         ),
       );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         treeOf(tree),
         {
@@ -99,7 +99,7 @@ describe("literal", () => {
     });
 
     it("returns a file of bytes that are UTF-8 text as text", ({ seat }) => {
-      check.equal(
+      check.isEqualTo(
         seat,
         treeOf(decode(literal({ path: "a.txt", bytes: "610a" }))),
         { "a.txt": text("a\n") },
@@ -222,7 +222,7 @@ describe("literal", () => {
 
     for (const tt of tests) {
       it(tt.name, ({ seat }) => {
-        check.equal(
+        check.isEqualTo(
           seat,
           thrown(() => decode(tt.give)),
           tt.want,

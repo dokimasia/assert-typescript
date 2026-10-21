@@ -7,7 +7,7 @@ import { test as it } from "../../src/vitest.js";
 
 describe("index", () => {
   it("exports the names of the module files", ({ seat }) => {
-    check.equal(
+    check.isEqualTo(
       seat,
       Object.keys(files).sort(),
       [
