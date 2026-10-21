@@ -12,10 +12,12 @@ and held to it on every run.
 npm install --save-dev @dokimi/assert
 ```
 
-ESM only. Node 26 and up. No runtime dependencies.
+ES modules, and CommonJS for the main entry point and `@dokimi/assert/jest`.
+Node 26 and up. No runtime dependencies.
 
 - [Getting started](#getting-started)
 - [Two surfaces](#two-surfaces) — stop at the first failure, or see them all
+- [On expect](#on-expect) — the assertions as matchers of vitest and jest
 - [The assertions](#the-assertions) — every signature
 - [Equality](#equality) — why `0` does not equal `false` here
 - [Async and the forgotten await](#async-and-the-forgotten-await)
@@ -24,7 +26,7 @@ ESM only. Node 26 and up. No runtime dependencies.
 - [Properties](#properties) — generated inputs, shrunk counterexamples
 - [Histories](#histories) — linearizability and isolation
 - [Machines](#machines) — the steps of a case over a subject
-- [Without Vitest](#without-vitest)
+- [Without a runner](#without-a-runner)
 - [The standard](#the-standard)
 
 ## Getting started
@@ -37,7 +39,7 @@ test("get", ({ seat }) => {
   const item = store.get("widget");
 
   check.isNotNil(seat, item, "get answers the stored item");
-  check.equal(seat, item.name, "widget", "and the item is the one stored");
+  check.isEqualTo(seat, item.name, "widget", "and the item is the one stored");
 });
 ```
 
@@ -84,11 +86,11 @@ import { test } from "@dokimi/assert/vitest";
 test("reply", async ({ seat }) => {
   const reply = await client.fetch(url);
 
-  check.equal(seat, reply.status, 200, "the request succeeds");
+  check.isEqualTo(seat, reply.status, 200, "the request succeeds");
 
   soft.hasPrefix(seat, reply.body, "{", "the body is JSON");
-  soft.length(seat, reply.items, 3, "every item comes back");
-  soft.contains(seat, reply.headers, "etag", "the reply is cacheable");
+  soft.hasLength(seat, reply.items, 3, "every item comes back");
+  soft.doesContain(seat, reply.headers, "etag", "the reply is cacheable");
 });
 ```
 
@@ -103,12 +105,80 @@ AssertionFailed: 2 failures:
 Use `check` when nothing after it makes sense, and `soft` when each line
 states an independent property.
 
+## On expect
+
+`register` adds the standard's assertions to the `expect` of vitest or
+jest. A test then calls them on the chain, beside the runner's own
+matchers:
+
+```ts
+// vitest.setup.ts, which setupFiles names
+import { register } from "@dokimi/assert/vitest";
+
+register();
+```
+
+```ts
+import { expect, it } from "vitest";
+
+it("succeeds", async () => {
+  const reply = await client.fetch(url);
+
+  expect(reply.status).isEqualTo(200, "the request succeeds");
+  expect.soft(reply.items).hasLength(3, "every item comes back");
+  await expect(() => worker.drain()).completesWithin(50, "the worker drains in time");
+});
+```
+
+A jest project calls `register` of `@dokimi/assert/jest` from a file that
+`setupFilesAfterEnv` names. The jest adapter also adds `expect.soft`,
+which jest does not define. It serves jest 29 and jest 30, and loads in
+jest's default CommonJS mode.
+
+The value given to `expect` is the subject of the assertion, and the
+other arguments follow in the order of the function form. These
+assertions take another argument than the first as their subject:
+
+| Function form | On `expect` |
+|---|---|
+| `completesWithin(seat, within, fn, msg)` | `await expect(fn).completesWithin(within, msg)` |
+| `eventually(seat, timeout, interval, body, msg)` | `await expect(body).eventually(timeout, interval, msg)` |
+| `eventuallyTrue(seat, timeout, predicate, msg)` | `await expect(predicate).eventuallyTrue(timeout, msg)` |
+| `isPure(seat, observe, fn, msg)` | `await expect(fn).isPure(observe, msg)` |
+| `isNotPure(seat, observe, fn, msg)` | `await expect(fn).isNotPure(observe, msg)` |
+| `failsAfterClose(seat, close, call, sentinel, msg)` | `await expect(call).failsAfterClose(close, sentinel, msg)` |
+| `isPoisoned(seat, induce, observe, msg)` | `await expect(observe).isPoisoned(induce, msg)` |
+| `doesReject(seat, msg, body)` | `await expect(body).doesReject(msg)` |
+| `noTaskLeaks(seat, msg)` | `await expect(scope).noTaskLeaks(msg)`, where `scope` runs the work |
+
+A matcher under `.not` fails, and its message gives the negative to
+call, such as `isNotEqualTo` for `isEqualTo`. A matcher whose function
+form returns a promise returns one on the chain. A test that ends before
+such a matcher settles fails, because the matcher asserted nothing.
+
+`register` takes a mode for the runner's matchers that check what a
+standard assertion checks:
+
+- `register({ mode: "shadow", log: "dokimi-shadow.jsonl" })` keeps
+  every verdict. It logs each call of `toEqual` and `toStrictEqual` whose
+  verdict the standard's equality would change.
+- `register({ mode: "strict" })` makes `toEqual`, `toStrictEqual`,
+  `toContain`, `toContainEqual`, `toHaveLength`, `toMatch`,
+  `toBeCloseTo`, `toThrow` and `toThrowError` fail with the name of the
+  assertion to call.
+
+The declarations of `@dokimi/assert/vitest` fit vitest 5. A project on
+vitest 4 imports `@dokimi/assert/vitest4` instead. Keep the setup file
+in the program of `tsconfig.json`, so that TypeScript applies the
+declarations of the matchers to every test file.
+
 ## The assertions
 
 Both surfaces have the same 48 assertions, and `check` also has
-`rejects`. The `files` module adds nine, the `golden` module four, and the
-benchmark contract two ceilings. The `prop` module adds `forAll` and 37
-property forms, and the `history` module adds three checks.
+`doesReject`. They are matchers of `expect` as well, after `register`.
+The `files` module adds nine, the `golden` module four, and the benchmark
+contract two ceilings. The `prop` module adds `forAll` and 37 property
+forms, and the `history` module adds three checks.
 
 <!-- api-reference:start -->
 
@@ -119,8 +189,8 @@ only what happens on a failure differs.
 **Equality** — Structural, and strict about types.
 
 ```ts
-check.equal<T>(seat: Seat, got: T, want: NoInfer<T>, msg: string, ...options: Option[])
-check.notEqual<T>(seat: Seat, got: T, want: NoInfer<T>, msg: string, ...options: Option[])
+check.isEqualTo<T>(seat: Seat, got: T, want: NoInfer<T>, msg: string, ...options: Option[])
+check.isNotEqualTo<T>(seat: Seat, got: T, want: NoInfer<T>, msg: string, ...options: Option[])
 ```
 
 **Truth and absence** — `isNil` accepts null and undefined both, which is what nullish means.
@@ -135,7 +205,7 @@ check.isNotNil(seat: Seat, got: unknown, msg: string)
 **Size** — A string, an array, a Map, a Set or a plain object.
 
 ```ts
-check.length(seat: Seat, got: unknown, want: number, msg: string)
+check.hasLength(seat: Seat, got: unknown, want: number, msg: string)
 check.isEmpty(seat: Seat, got: unknown, msg: string)
 check.isNotEmpty(seat: Seat, got: unknown, msg: string)
 ```
@@ -143,8 +213,8 @@ check.isNotEmpty(seat: Seat, got: unknown, msg: string)
 **Containment** — What holding means follows the haystack.
 
 ```ts
-check.contains(seat: Seat, haystack: unknown, needle: unknown, msg: string, ...options: Option[])
-check.notContains(seat: Seat, haystack: unknown, needle: unknown, msg: string, ...options: Option[])
+check.doesContain(seat: Seat, haystack: unknown, needle: unknown, msg: string, ...options: Option[])
+check.doesNotContain(seat: Seat, haystack: unknown, needle: unknown, msg: string, ...options: Option[])
 check.containsInOrder(seat: Seat, got: unknown, needles: readonly string[], msg: string)
 ```
 
@@ -153,13 +223,13 @@ check.containsInOrder(seat: Seat, got: unknown, needles: readonly string[], msg:
 ```ts
 check.hasPrefix(seat: Seat, got: unknown, prefix: string, msg: string)
 check.hasSuffix(seat: Seat, got: unknown, suffix: string, msg: string)
-check.matches(seat: Seat, got: unknown, pattern: string, msg: string)
+check.doesMatch(seat: Seat, got: unknown, pattern: string, msg: string)
 ```
 
 **Numbers** — Where exact equality is the wrong question.
 
 ```ts
-check.closeTo(seat: Seat, got: unknown, want: number, tolerance: number, msg: string)
+check.isCloseTo(seat: Seat, got: unknown, want: number, tolerance: number, msg: string)
 check.inRange(seat: Seat, got: unknown, low: number, high: number, msg: string)
 ```
 
@@ -179,10 +249,10 @@ check.errorIsNot(seat: Seat, err: unknown, target: unknown, msg: string)
 check.errorAs<E>(seat: Seat, err: unknown, want: ErrorClass<E>, msg: string): E | undefined
 ```
 
-**Throwing** — `throws` refuses a callable that answers a promise, since an unawaited rejection is not a throw.
+**Throwing** — `doesThrow` refuses a callable that answers a promise, since an unawaited rejection is not a throw.
 
 ```ts
-check.throws(seat: Seat, fn: () => unknown, msg: string): unknown
+check.doesThrow(seat: Seat, fn: () => unknown, msg: string): unknown
 check.doesNotThrow(seat: Seat, fn: () => unknown, msg: string)
 check.rejectsWith(seat: Seat, fn: () => Promise<unknown>, msg: string): Promise<unknown>
 ```
@@ -237,7 +307,7 @@ check.isPermutation<T>(seat: Seat, got: readonly T[], want: readonly NoInfer<T>[
 **Testing an assertion** — On `check` only: `soft` cannot drive a check to failure, because it does not stop.
 
 ```ts
-check.rejects(seat: Seat, msg: string, body: (check: Seat) => unknown): Promise<readonly Failure[]>
+check.doesReject(seat: Seat, msg: string, body: (check: Seat) => unknown): Promise<readonly Failure[]>
 ```
 
 **Golden files** — recorded output, compared and rewritable.
@@ -307,23 +377,23 @@ Case.target(label: string, score: number): void
 **Property forms** — Each form states an assertion of a function of a generated input, and generates the input from the generator of `prop.using`.
 
 ```ts
-prop.equal<T, U>(seat: Seat, got: (input: T) => U, want: (input: T) => U, msg: string, ...options: FormOption[]): Promise<void>
-prop.notEqual<T, U>(seat: Seat, got: (input: T) => U, want: (input: T) => U, msg: string, ...options: FormOption[]): Promise<void>
+prop.isEqualTo<T, U>(seat: Seat, got: (input: T) => U, want: (input: T) => U, msg: string, ...options: FormOption[]): Promise<void>
+prop.isNotEqualTo<T, U>(seat: Seat, got: (input: T) => U, want: (input: T) => U, msg: string, ...options: FormOption[]): Promise<void>
 prop.isTrue<T>(seat: Seat, condition: (input: T) => boolean, msg: string, ...options: FormOption[]): Promise<void>
 prop.isFalse<T>(seat: Seat, condition: (input: T) => boolean, msg: string, ...options: FormOption[]): Promise<void>
 prop.isNil<T>(seat: Seat, got: (input: T) => unknown, msg: string, ...options: FormOption[]): Promise<void>
 prop.isNotNil<T>(seat: Seat, got: (input: T) => unknown, msg: string, ...options: FormOption[]): Promise<void>
-prop.length<T>(seat: Seat, got: (input: T) => unknown, want: number, msg: string, ...options: FormOption[]): Promise<void>
+prop.hasLength<T>(seat: Seat, got: (input: T) => unknown, want: number, msg: string, ...options: FormOption[]): Promise<void>
 prop.isEmpty<T>(seat: Seat, got: (input: T) => unknown, msg: string, ...options: FormOption[]): Promise<void>
 prop.isNotEmpty<T>(seat: Seat, got: (input: T) => unknown, msg: string, ...options: FormOption[]): Promise<void>
-prop.contains<T>(seat: Seat, got: (input: T) => unknown, needle: unknown, msg: string, ...options: FormOption[]): Promise<void>
-prop.notContains<T>(seat: Seat, got: (input: T) => unknown, needle: unknown, msg: string, ...options: FormOption[]): Promise<void>
+prop.doesContain<T>(seat: Seat, got: (input: T) => unknown, needle: unknown, msg: string, ...options: FormOption[]): Promise<void>
+prop.doesNotContain<T>(seat: Seat, got: (input: T) => unknown, needle: unknown, msg: string, ...options: FormOption[]): Promise<void>
 prop.containsInOrder<T>(seat: Seat, got: (input: T) => unknown, needles: readonly string[], msg: string, ...options: FormOption[]): Promise<void>
 prop.isPermutation<T, E>(seat: Seat, got: (input: T) => readonly E[], want: (input: T) => readonly E[], msg: string, ...options: FormOption[]): Promise<void>
 prop.hasPrefix<T>(seat: Seat, got: (input: T) => unknown, prefix: string, msg: string, ...options: FormOption[]): Promise<void>
 prop.hasSuffix<T>(seat: Seat, got: (input: T) => unknown, suffix: string, msg: string, ...options: FormOption[]): Promise<void>
-prop.matches<T>(seat: Seat, got: (input: T) => unknown, pattern: string, msg: string, ...options: FormOption[]): Promise<void>
-prop.closeTo<T>(seat: Seat, got: (input: T) => unknown, want: number, tolerance: number, msg: string, ...options: FormOption[]): Promise<void>
+prop.doesMatch<T>(seat: Seat, got: (input: T) => unknown, pattern: string, msg: string, ...options: FormOption[]): Promise<void>
+prop.isCloseTo<T>(seat: Seat, got: (input: T) => unknown, want: number, tolerance: number, msg: string, ...options: FormOption[]): Promise<void>
 prop.inRange<T>(seat: Seat, got: (input: T) => unknown, low: number, high: number, msg: string, ...options: FormOption[]): Promise<void>
 prop.pairwise<T, E>(seat: Seat, got: (input: T) => readonly E[], predicate: (earlier: E, later: E) => boolean, msg: string, ...options: FormOption[]): Promise<void>
 prop.noError<T>(seat: Seat, fn: (input: T) => unknown, msg: string, ...options: FormOption[]): Promise<void>
@@ -331,7 +401,7 @@ prop.hasError<T>(seat: Seat, fn: (input: T) => unknown, msg: string, ...options:
 prop.errorIs<T>(seat: Seat, fn: (input: T) => unknown, target: unknown, msg: string, ...options: FormOption[]): Promise<void>
 prop.errorIsNot<T>(seat: Seat, fn: (input: T) => unknown, target: unknown, msg: string, ...options: FormOption[]): Promise<void>
 prop.errorAs<T, E>(seat: Seat, fn: (input: T) => unknown, want: ErrorClass<E>, msg: string, ...options: FormOption[]): Promise<void>
-prop.throws<T>(seat: Seat, fn: (input: T) => unknown, msg: string, ...options: FormOption[]): Promise<void>
+prop.doesThrow<T>(seat: Seat, fn: (input: T) => unknown, msg: string, ...options: FormOption[]): Promise<void>
 prop.doesNotThrow<T>(seat: Seat, fn: (input: T) => unknown, msg: string, ...options: FormOption[]): Promise<void>
 prop.isPure<T>(seat: Seat, observe: () => unknown, fn: (input: T) => unknown, msg: string, ...options: FormOption[]): Promise<void>
 prop.isNotPure<T>(seat: Seat, observe: () => unknown, fn: (input: T) => unknown, msg: string, ...options: FormOption[]): Promise<void>
@@ -396,6 +466,7 @@ prop.store(dir: string): Option
 prop.explain(enabled: boolean): Option
 prop.workers(n: number): Option
 prop.hermetic(): Option
+prop.around(wrapper: Wrapper): Option
 prop.draws(entries: string): Option
 prop.using<T>(generator: Generator<T>): FormOption
 prop.example<T>(...values: readonly T[]): FormOption
@@ -467,7 +538,7 @@ does not matter, relax the comparison for one call:
 ```ts
 import { equateEmpty, equateNans } from "@dokimi/assert";
 
-check.equal(seat, reply.items, [], "no items came back", equateEmpty());
+check.isEqualTo(seat, reply.items, [], "no items came back", equateEmpty());
 ```
 
 An option applies to the call it is passed to and nothing else. There is
@@ -478,7 +549,7 @@ another is how two tests come to mean different things.
 
 These assertions return a promise:
 
-- `rejects` and `rejectsWith`
+- `doesReject` and `rejectsWith`
 - `honoursCancellation`, `honoursDeadline`, `completesWithin` and
   `nullHandleSafe`
 - `isPure`, `eventually` and `eventuallyTrue`
@@ -593,7 +664,7 @@ import { test } from "@dokimi/assert/vitest";
 test("reverse", async ({ seat }) => {
   await prop.forAll(seat, "a reversed list starts with its first element", (c) => {
     const xs = c.draw(prop.list(prop.integer(0, 9)), "xs");
-    check.equal(c, xs.toReversed()[0], xs[0], "the reverse starts with the first element");
+    check.isEqualTo(c, xs.toReversed()[0], xs[0], "the reverse starts with the first element");
   });
 });
 ```
@@ -607,10 +678,25 @@ the token that replays it, through `prop.replay` or the variable
 first.
 
 A property form states one assertion for every input, such as
-`prop.equal` of two functions of the input. `prop.using` states the
+`prop.isEqualTo` of two functions of the input. `prop.using` states the
 generator of the input, because TypeScript erases the types that another
 language derives an input from. `prop.ofShape` derives a generator from
 the text of a shape file instead.
+
+`prop.around` runs each run of the body inside a wrapper, so that every
+case, shrink candidate and replay starts in a fresh environment, such as
+vitest's fake timers:
+
+```ts
+await prop.forAll(seat, "a retry waits for its backoff", body, prop.around(async (run) => {
+  vi.useFakeTimers();
+  try {
+    await run();
+  } finally {
+    vi.useRealTimers();
+  }
+}));
+```
 
 ## Histories
 
@@ -718,7 +804,7 @@ A task marks each point where another task may run with
 `await scheduler.yield()`, because a library cannot intercept a native
 `await`.
 
-## Without Vitest
+## Without a runner
 
 The core has no runner dependency. Construct a seat and flush it where
 your framework ends a test:
@@ -728,7 +814,7 @@ import { check, soft, Collector } from "@dokimi/assert";
 
 const seat = new Collector();
 try {
-  check.equal(seat, got, want, "the reply matches");
+  check.isEqualTo(seat, got, want, "the reply matches");
   soft.hasPrefix(seat, got.id, "req_", "the id carries its prefix");
 } finally {
   seat.flush();
@@ -736,8 +822,8 @@ try {
 ```
 
 `flush` throws what `soft` collected, and reports any async assertion
-nobody awaited. Importing `@dokimi/assert/vitest` is what pulls Vitest
-in; the main entry point never does.
+nobody awaited. Only `@dokimi/assert/vitest` imports vitest, and only
+`@dokimi/assert/jest` imports jest. The main entry point imports neither.
 
 ## The standard
 
@@ -747,8 +833,8 @@ and implemented in several languages. This library vendors the
 definition and holds itself to it:
 
 - 195 corpus cases state what each assertion must report, run against
-  both surfaces, with the call record of each call. They are the same
-  cases every other implementation runs.
+  both surfaces and the matchers of `expect`, with the call record of
+  each call. They are the same cases every other implementation runs.
 - 430 property vectors, 80 history vectors, 14 machine vectors and 57
   file vectors pin the property engine, the history checks, machines and
   the assertions of files.
@@ -769,7 +855,7 @@ collector ran: measuring one unchanged body six times gave 43, -3, 43,
 fail the next for no reason, so the overlay records the gap instead of
 pretending.
 
-`throws` refuses a callable that answers a promise. An unawaited
+`doesThrow` refuses a callable that answers a promise. An unawaited
 rejection is not a throw, and passing there would make the assertion lie
 about what it checked. Use `rejectsWith` for a promise.
 
@@ -800,7 +886,10 @@ npm run spec-sync   # refresh the vendored definition
 CI runs the gate on Node 26 on Linux, then packs the library, installs it
 into an empty project and imports it, because a package that typechecks
 and does not install is still broken. It runs the tests on Windows and
-macOS as well.
+macOS as well, and the specs of the adapters on vitest 5 and jest 29.
+`tools/consumer/run.sh` installs the packed library beside each
+supported major of vitest and jest, compiles a type probe and runs one
+test file.
 
 ## Licence
 

@@ -57,9 +57,9 @@ describe("README", () => {
   describe("Getting started", () => {
     it("shows the sentence of a failing check", ({ seat }) => {
       const recorder = new Recorder();
-      check.equal(recorder, "gadget", "widget", "and the item is the one stored");
+      check.isEqualTo(recorder, "gadget", "widget", "and the item is the one stored");
 
-      check.contains(
+      check.doesContain(
         seat,
         README,
         `AssertionFailed: ${recorder.message}\n`,
@@ -71,24 +71,24 @@ describe("README", () => {
   describe("What a seat is", () => {
     it("states the behaviour of each seat in its table", ({ seat }) => {
       const collector = new Collector();
-      soft.equal(collector, 1, 2, "the count is right");
+      soft.isEqualTo(collector, 1, 2, "the count is right");
       const recorder = new Recorder();
-      check.equal(recorder, 1, 2, "the count is right");
-      soft.equal(recorder, 1, 2, "the count is right");
+      check.isEqualTo(recorder, 1, 2, "the count is right");
+      soft.isEqualTo(recorder, 1, 2, "the count is right");
 
-      check.length(
+      check.hasLength(
         seat,
         collector.collected,
         1,
         "a Collector collects what soft records",
       );
-      check.throws(
+      check.doesThrow(
         seat,
-        () => check.equal(collector, 1, 2, "the count is right"),
+        () => check.isEqualTo(collector, 1, 2, "the count is right"),
         "it throws on check",
       );
-      check.length(seat, recorder.failures, 2, "a Recorder collects both");
-      check.contains(
+      check.hasLength(seat, recorder.failures, 2, "a Recorder collects both");
+      check.doesContain(
         seat,
         section("### What a seat is"),
         "| `Collector`, from the `seat` fixture | throws | collects, thrown when the test ends |",
@@ -100,15 +100,15 @@ describe("README", () => {
   describe("Two surfaces", () => {
     it("shows the report of two failing calls of soft", ({ seat }) => {
       const collector = new Collector();
-      soft.length(collector, [1, 2], 3, "every item comes back");
-      soft.contains(
+      soft.hasLength(collector, [1, 2], 3, "every item comes back");
+      soft.doesContain(
         collector,
         { "content-type": "application/json" },
         "etag",
         "the reply is cacheable",
       );
 
-      check.contains(
+      check.doesContain(
         seat,
         README,
         `AssertionFailed: ${thrown(() => collector.flush())}\n`,
@@ -119,7 +119,7 @@ describe("README", () => {
 
   describe("The assertions", () => {
     it("states the number of assertions on both surfaces", ({ seat }) => {
-      check.contains(
+      check.doesContain(
         seat,
         section("## The assertions"),
         `Both surfaces have the same ${Object.keys(soft).length} assertions`,
@@ -131,19 +131,25 @@ describe("README", () => {
   describe("Equality", () => {
     it("shows a call that equateEmpty relaxes", ({ seat }) => {
       const recorder = new Recorder();
-      check.equal(recorder, null as unknown, [] as unknown, "strict");
-      check.equal(recorder, null as unknown, [] as unknown, "relaxed", equateEmpty());
+      check.isEqualTo(recorder, null as unknown, [] as unknown, "strict");
+      check.isEqualTo(
+        recorder,
+        null as unknown,
+        [] as unknown,
+        "relaxed",
+        equateEmpty(),
+      );
 
-      check.equal(
+      check.isEqualTo(
         seat,
         recorder.failures.map((f) => f.contract),
         ["strict"],
         "equateEmpty relaxes its call",
       );
-      check.contains(
+      check.doesContain(
         seat,
         section("## Equality"),
-        'check.equal(seat, reply.items, [], "no items came back", equateEmpty());',
+        'check.isEqualTo(seat, reply.items, [], "no items came back", equateEmpty());',
         "the example",
       );
     });
@@ -158,7 +164,7 @@ describe("README", () => {
         "the worker stops when told",
       );
 
-      check.contains(
+      check.doesContain(
         seat,
         README,
         `AssertionFailed: ${thrown(() => collector.flush())}\n`,
@@ -168,8 +174,8 @@ describe("README", () => {
 
     it("names each assertion that returns a promise", ({ seat }) => {
       const text = section("## Async and the forgotten await");
-      for (const name of [...TRACKED, "rejects", "files.unchanged"]) {
-        soft.contains(seat, text, `\`${name}\``, `the section names ${name}`);
+      for (const name of [...TRACKED, "doesReject", "files.unchanged"]) {
+        soft.doesContain(seat, text, `\`${name}\``, `the section names ${name}`);
       }
     });
   });
@@ -195,7 +201,7 @@ describe("README", () => {
         },
         "the rename rewrites the declaration",
       );
-      check.contains(
+      check.doesContain(
         seat,
         section("## Trees of files"),
         'files.text("secret\\n").withMode(0o600)',
@@ -212,7 +218,7 @@ describe("README", () => {
         "a reversed list starts with its first element",
         (c) => {
           const xs = c.draw(prop.list(prop.integer(0, 9)), "xs");
-          check.equal(
+          check.isEqualTo(
             c,
             xs.toReversed()[0],
             xs[0],
@@ -221,8 +227,8 @@ describe("README", () => {
         },
       );
 
-      check.contains(seat, recorder.message, "\n  xs: [0, 1]", "the counterexample");
-      check.contains(
+      check.doesContain(seat, recorder.message, "\n  xs: [0, 1]", "the counterexample");
+      check.doesContain(
         seat,
         section("## Properties"),
         "`[0, 1]`",
@@ -244,7 +250,7 @@ describe("README", () => {
       const recorder = new Recorder();
       history.isLinearizable(recorder, calls, register, "the register is linearizable");
 
-      check.contains(
+      check.doesContain(
         seat,
         section("## Histories"),
         `AssertionFailed: ${recorder.message}\n`,
@@ -286,19 +292,19 @@ describe("README", () => {
       });
       const steps = "  step increment on client 1\n  step increment on client 2\n";
 
-      check.contains(
+      check.doesContain(
         seat,
         `${recorder.message}\n`,
         `\n${steps}`,
         "the steps of the race",
       );
-      check.contains(seat, section("## Machines"), steps, "the README states them");
+      check.doesContain(seat, section("## Machines"), steps, "the README states them");
     });
   });
 
   describe("The standard", () => {
     it("states the number of corpus cases", ({ seat }) => {
-      check.contains(
+      check.doesContain(
         seat,
         section("## The standard"),
         `${cases().length} corpus cases state`,
@@ -319,7 +325,7 @@ describe("README", () => {
         counts.set(family, (counts.get(family) ?? 0) + 1);
       }
 
-      check.contains(
+      check.doesContain(
         seat,
         section("## The standard").replaceAll("\n  ", " "),
         `${counts.get("property")} property vectors, ${counts.get("history")} history vectors, ${counts.get("machine")} machine vectors and ${counts.get("file")} file vectors`,
@@ -336,7 +342,7 @@ describe("README", () => {
         // The prose names a member by the last segment of the name that the
         // naming table gives it: bench-max-allocs is written maxAllocs.
         const member = (named[d.id] ?? d.id).split(".").pop() as string;
-        soft.contains(seat, text, member, `${d.id} is explained`);
+        soft.doesContain(seat, text, member, `${d.id} is explained`);
       }
     });
   });
@@ -357,7 +363,7 @@ describe("README", () => {
         ?.split("<!-- api-reference:end -->")[0]
         ?.trim();
 
-      check.equal(
+      check.isEqualTo(
         seat,
         published,
         generated,

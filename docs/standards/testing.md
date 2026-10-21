@@ -28,6 +28,13 @@ rules.
   counts and its API reference with the code.
 - A test file without a file of its name does not exist, except
   `tests/helpers.ts`.
+- The spec of a module that declares types alone, such as
+  `src/expect/types.ts`, states its cases with `expectTypeOf`. They hold
+  at compile time, and `npm run types` checks them.
+- The declarations of each vitest major, `src/vitest/vitest4.d.ts` and
+  `src/vitest/vitest5.d.ts`, cannot both be in one program. Their spec is
+  the consumer project of `tools/consumer/run.sh`, which compiles a type
+  probe against each major with `skipLibCheck` off.
 - The scripts under `tools/` are not part of the package and have no
   spec.
 
@@ -125,14 +132,19 @@ rules.
 ## Verdicts
 
 - The specs of `src/matcher/`, of the surfaces `src/check.ts` and
-  `src/soft.ts`, of the seats in `src/seat.ts`, of the fixture in
-  `src/vitest.ts`, of the corpus in `src/conformance/corpus.ts`, and of
-  the vectors in `src/conformance/vector.ts`, `src/conformance/files.ts`,
+  `src/soft.ts`, of the seats in `src/seat.ts`, of the corpus in
+  `src/conformance/corpus.ts`, and of the vectors in
+  `src/conformance/vector.ts`, `src/conformance/files.ts`,
   `src/conformance/prop/vectors.ts`, `src/conformance/history/vectors.ts`
   and `src/conformance/stateful/vectors.ts` use vitest's `expect` alone.
-  These modules compare the values, decide the verdict, and deliver it to
-  the test, so a defect in them could pass a test that is written with
-  the library.
+  So do the specs of the matchers in `src/expect/`, of the adapters in
+  `src/vitest/api.ts` and `src/jest/api.ts`, and of their entry points
+  `src/vitest.ts` and `src/jest.ts`. These modules compare the values,
+  decide the verdict, and deliver it to the test, so a defect in them
+  could pass a test that is written with the library.
+- The specs of the adapters use vitest's own matchers, and no case
+  registers the standard's matchers for another case. A case that
+  registers them restores the runner's matchers when it ends.
 - The verdicts of the corpus compare a value with `canonical` of
   `src/conformance/literal.ts`. The verdicts of the vectors compare JSON
   with `sameJson` of the same module: the JSON of a call record or of the
@@ -158,6 +170,10 @@ rules.
   rewrites it.
 - The vendored definition is stored under `src/conformance/spec`.
   `npm run spec:sync` refreshes it, and nobody edits it by hand.
+- The fixture suites of `tests/jest.test.ts` are stored under
+  `tests/testdata/jest`. The spec runs jest on them in a child process, as
+  a consumer's suite runs, and reads jest's report. Their files end in
+  `.fixture.cjs`, so vitest does not run them.
 
 ## Enforcement
 
@@ -169,4 +185,5 @@ A tool checks a rule wherever one can. Review checks every other rule.
 | 100% coverage of every module | The thresholds of `vitest.config.ts`, through `npm run coverage` |
 | The public names match the definition's naming table | The completeness gate in `tests/index.test.ts` |
 | The README matches the code | `tests/readme.test.ts` |
+| The declarations and the adapters work on each supported major of vitest and jest | The jobs `runners` and `consumer` of CI |
 | Every other rule of this document | Review |
