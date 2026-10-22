@@ -876,11 +876,11 @@ Jazzer.js runs on its byte inputs.
 
 ```sh
 npm install
-npm run check       # lint, types, coverage, build
+npm run check       # lint, Markdown, types, build, coverage
 npm test
 npm run fmt
 npm run build
-npm run spec-sync   # refresh the vendored definition
+npm run spec:sync   # refresh the vendored definition
 ```
 
 CI runs the gate on Node 26 on Linux, then packs the library, installs it
