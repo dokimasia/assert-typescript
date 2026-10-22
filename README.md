@@ -888,9 +888,10 @@ fail the next for no reason, so the overlay records the gap instead of
 pretending. `allocsChecked()` returns `{ checked: false, reason }` in
 every run for the same reason.
 
-A run of `prop.forAll` and `prop.fuzz` does not take `prop.using`,
-because its body states each generator that it draws from. A property
-form takes the option for the generator of its input.
+A run of `prop.forAll` and `prop.fuzz` and a call of `prop.values` do not
+take `prop.using`, because the body or the caller states each generator
+that it draws from. A property form takes the option for the generator of
+its input.
 
 `doesThrow` refuses a callable that answers a promise. An unawaited
 rejection is not a throw, and passing there would make the assertion lie
