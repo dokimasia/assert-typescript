@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the table of strict mode. It uses vitest's `expect` alone,
  * because a refusal delivers its verdict to the runner.

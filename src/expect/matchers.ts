@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The matchers of the standard's assertions on the expect chain of vitest
  * and of jest.

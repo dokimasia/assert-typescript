@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The comparison of shadow mode: a call of a runner's `toEqual` or
  * `toStrictEqual`, compared with the standard's equality.

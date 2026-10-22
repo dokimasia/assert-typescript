@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The table of strict mode: each matcher of the runners that checks what
  * a standard assertion checks, with the assertion to call instead.

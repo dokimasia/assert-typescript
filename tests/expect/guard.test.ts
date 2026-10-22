@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the record of the asynchronous matchers of each test. It
  * uses vitest's `expect` alone, because the record delivers the failure

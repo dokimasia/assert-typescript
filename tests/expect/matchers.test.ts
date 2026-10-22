@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the matchers of the expect chain. It compares each matcher's
  * outcome with the failure that the function form reports for the same

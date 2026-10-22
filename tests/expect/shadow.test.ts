@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the comparison of shadow mode. It uses vitest's `expect`
  * alone, because the comparison decides which calls the log states.
