@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * A history: the invocations and the completions of the calls that the
  * clients of an object make, in one recording order.

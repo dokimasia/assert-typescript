@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the searches of the dependency graph of committed transactions. */
 
 import { describe } from "vitest";

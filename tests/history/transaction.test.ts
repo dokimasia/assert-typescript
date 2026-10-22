@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the transactions of a history of list appends: the
  * workload's contract, and the histories that it refuses, as the

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the calls of a history as a check reads them, and of their
  * partitions, which are those of the definition's reference

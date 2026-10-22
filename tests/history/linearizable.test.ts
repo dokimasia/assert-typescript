@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the check of linearizability: its partitions, its limits and
  * the record that it reports. Each outcome, each count of steps and each

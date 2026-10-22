@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the derivation over the transactions of a history: the first
  * instance of each anomaly, with its cycle and its evidence. Each instance

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the search of one partition. Each verdict, each count of
  * steps and each frontier is that of the definition's reference

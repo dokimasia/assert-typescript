@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the isolation checks: the kinds that each level reports and
  * the record of a failure. Each verdict and each record is that of the

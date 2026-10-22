@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the sequential specifications that a check reads: the call
  * as a spec sees it, the default comparison and key of states, and the spec

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of a history: its events in one recording order, its processes,
  * its calls and the usage errors. The orders and the processes are those of

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of a history of calls with a start and an end. The orders and
  * the refusals are those of the definition's reference implementation.

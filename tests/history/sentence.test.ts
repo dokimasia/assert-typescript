@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the sentences of the records of the history checks. */
 
 import { describe } from "vitest";
