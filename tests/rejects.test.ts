@@ -2,6 +2,7 @@
 
 import { describe } from "vitest";
 import { Failure } from "../src/failure.js";
+import { fault } from "../src/fault.js";
 import { byIdentity, check, soft } from "../src/index.js";
 import { AssertionFailed, Recorder, type Seat, Standard } from "../src/seat.js";
 import { test as it } from "../src/vitest.js";
@@ -166,6 +167,71 @@ describe("rejects", () => {
         ["it is true later"],
         "the record",
       );
+    });
+
+    it("ends the call with the fault that ends the check", async ({ seat }) => {
+      const broken = new RangeError("the check refuses its argument");
+      const recorder = new Recorder();
+      const failures = await check.doesReject(recorder, "a faulted check", (inner) => {
+        fault(inner, broken);
+        check.isTrue(inner, false, "it fails after the fault");
+      });
+
+      check.isEqualTo(
+        seat,
+        failures,
+        [],
+        "a check that ends with a fault returns an empty list",
+      );
+      check.hasLength(seat, recorder.faults, 1, "one fault");
+      check.isEqualTo(
+        seat,
+        recorder.faults[0],
+        broken,
+        "the seat receives the fault",
+        byIdentity(),
+      );
+      check.isEqualTo(
+        seat,
+        records(recorder).map((r) => [r["assertion"], r["verdict"], r["error"]]),
+        [["rejects", "error", "the check refuses its argument"]],
+        "the call record of rejects states the fault",
+      );
+    });
+
+    it("rejects with the fault that ends the check on a seat without reportFault", async ({
+      seat,
+    }) => {
+      const broken = new RangeError("the check refuses its argument");
+      const thrown = await check.rejectsWith(
+        seat,
+        () =>
+          check.doesReject(new Standard(), "a faulted check", (inner) => {
+            fault(inner, broken);
+          }),
+        "rejects rejects",
+      );
+
+      check.isEqualTo(seat, thrown, broken, "the rejection is the fault", byIdentity());
+    });
+
+    it("passes a fault that the check notes to its seat", async ({ seat }) => {
+      const noted = new Error("a file of the store is of a later format");
+      const recorder = new Recorder();
+      await check.doesReject(recorder, "a check that notes a fault", (inner) => {
+        inner.reportFault?.(noted, false);
+        check.isTrue(inner, false, "it fails");
+      });
+
+      check.hasLength(seat, recorder.faults, 1, "one noted fault");
+      check.isEqualTo(
+        seat,
+        recorder.faults[0],
+        noted,
+        "the seat receives the noted fault",
+        byIdentity(),
+      );
+      check.isFalse(seat, recorder.failed, "the failing check passes rejects");
     });
 
     it("rejects with what the check throws that is no failure", async ({ seat }) => {

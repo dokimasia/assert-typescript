@@ -15,12 +15,14 @@ import { own } from "./record/calls.js";
 
 /**
  * The seat of the check that rejects drives. It keeps each record of the
- * check in call order, and whether the check failed at all. A failure
- * that stops ends the check, as it ends a test.
+ * check in call order, whether the check failed at all, and the fault that
+ * ended the check. A failure that stops ends the check, as it ends a test,
+ * and so does a fault that ends its call.
  */
 class Check extends Body implements Reporter {
   #records: Failure[] = [];
   #failed = false;
+  #fault: Error | undefined;
 
   /** Marks the check failed, and ends it. */
   fail(): never {
@@ -40,9 +42,29 @@ class Check extends Body implements Reporter {
     if (aborting) throw new Ended();
   }
 
-  /** The check's records, and whether it failed. */
-  get outcome(): { readonly records: readonly Failure[]; readonly failed: boolean } {
-    return { records: [...this.#records], failed: this.#failed };
+  /**
+   * Keeps a fault that ends its call, and ends the check. A noted fault
+   * goes to the seat of rejects, and the check runs on.
+   *
+   * @param fault - The fault.
+   * @param ending - Whether the fault ends its call.
+   */
+  override reportFault(fault: Error, ending: boolean): void {
+    if (!ending) {
+      super.reportFault(fault, ending);
+      return;
+    }
+    this.#fault = fault;
+    throw new Ended();
+  }
+
+  /** The check's records, whether it failed, and the fault that ended it. */
+  get outcome(): {
+    readonly records: readonly Failure[];
+    readonly failed: boolean;
+    readonly fault: Error | undefined;
+  } {
+    return { records: [...this.#records], failed: this.#failed, fault: this.#fault };
   }
 }
 
@@ -55,7 +77,11 @@ async function drive(
   const call = Running.begin(seat, callSite());
   const check = await runOn(new Check(seat, call.slot), body);
   call.slot?.take(own(check));
-  const { records, failed } = check.outcome;
+  const { records, failed, fault } = check.outcome;
+  if (fault !== undefined) {
+    call.fault(Mode.Fatal, "rejects", msg, fault);
+    return [];
+  }
   if (!failed) {
     call.fail(Mode.Fatal, "rejects", msg, {});
     return records;
@@ -73,6 +99,15 @@ async function drive(
  * fails the check without a record. The calls of the check are recorded
  * under the call of rejects. The seat's signal derives from the signal of
  * seat, and aborts when the check ends.
+ *
+ * A fault that ends the check ends the call of rejects with the same
+ * fault, because the check did not decide about the implementation. A
+ * fault of this library ends a check this way, and so does one that a
+ * helper passes to `fault`. The call record of rejects states the verdict
+ * error, and rejects passes the fault to seat as `fault` passes it. The
+ * promise then resolves to no record on a seat with reportFault, and
+ * rejects with the fault on any other seat. A fault that the check notes
+ * goes to seat as a noted fault, and the check runs on.
  *
  * @param seat - Where the failure is reported.
  * @param msg - The contract under test.
