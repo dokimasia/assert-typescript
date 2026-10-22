@@ -2,9 +2,9 @@
 rfc: 0005
 title: Definition 9.0.0 in TypeScript
 author: Roy Klopper <roy.klopper@stealthscale.io>
-status: Draft
+status: Accepted
 created: 2026-10-20
-updated: 2026-10-20
+updated: 2026-10-22
 discussion: none
 depends-on: assert-spec RFC-0013, assert-spec RFC-0031
 supersedes: none

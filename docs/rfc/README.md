@@ -9,7 +9,8 @@ code later can tell what was weighed rather than guessing.
 | [0002](0002-the-standard-on-vitest-expect.md) | The standard's assertions on vitest's expect | Accepted |
 | [0003](0003-definition-7-2-in-typescript.md) | Definition 7.2.0 in TypeScript | Accepted |
 | [0004](0004-the-standard-on-jest-expect.md) | The standard's assertions on jest's expect | Accepted |
-| [0005](0005-definition-9-in-typescript.md) | Definition 9.0.0 in TypeScript | Draft |
+| [0005](0005-definition-9-in-typescript.md) | Definition 9.0.0 in TypeScript | Accepted |
+| [0006](0006-definition-10-in-typescript.md) | Definition 10.0.0 in TypeScript | Accepted |
 
 Statuses are Draft, Review, Accepted, Rejected, Withdrawn and
 Superseded. A rejected RFC stays on disk: it is the record of why not.
