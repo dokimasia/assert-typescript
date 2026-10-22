@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the call records of a test, of a recorder and of a run of a body. */
 
 import { describe } from "vitest";

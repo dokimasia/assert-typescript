@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the typed literal of a value, as a call record states it. */
 
 import { describe } from "vitest";
