@@ -158,6 +158,23 @@ export function cases(n: number): Option {
 }
 
 /**
+ * Returns s as a seed, an unsigned 64-bit integer.
+ *
+ * @param call - The call that states s, such as `seed(7)`, which names the
+ *   error.
+ * @param s - The seed, an integer in [0, 2^64).
+ * @returns The seed.
+ * @throws RangeError that names call, for an s outside [0, 2^64).
+ */
+export function seedValue(call: string, s: bigint | number): bigint {
+  const value = typeof s === "bigint" ? s : Number.isSafeInteger(s) ? BigInt(s) : -1n;
+  if (value < 0n || value >= SEED_LIMIT) {
+    throw new RangeError(`prop: ${call} states no integer in [0, 2^64)`);
+  }
+  return value;
+}
+
+/**
  * Sets the seed of the run. Without it, DOKIMI_ASSERT_PROP_SEED states the
  * seed in decimal, then a run in a process of a mutation run and a run
  * under the ci profile derive it from the contract, and otherwise each run
@@ -169,11 +186,7 @@ export function cases(n: number): Option {
  * @throws RangeError for a seed outside [0, 2^64).
  */
 export function seed(s: bigint | number): Option {
-  const value = typeof s === "bigint" ? s : Number.isSafeInteger(s) ? BigInt(s) : -1n;
-  if (value < 0n || value >= SEED_LIMIT) {
-    throw new RangeError(`prop: seed(${s}) states no integer in [0, 2^64)`);
-  }
-  return { kind: "seed", value };
+  return { kind: "seed", value: seedValue(`seed(${s})`, s) };
 }
 
 /**

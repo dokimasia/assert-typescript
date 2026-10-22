@@ -16,6 +16,7 @@ import {
   replay,
   require,
   seed,
+  seedValue,
   shrink,
   shrinkTime,
   store,
@@ -54,6 +55,23 @@ describe("option", () => {
         thrown(() => cases(1.5)),
         "prop: cases(1.5) states no whole number of 1 or more",
         "cases refuses a fraction",
+      );
+    });
+  });
+
+  describe("seedValue", () => {
+    it("returns the seed of a safe integer as a bigint", ({ seat }) => {
+      check.isEqualTo(seat, seedValue("values(g, 7, 3)", 7), 7n, "the seed 7");
+    });
+
+    it("throws a RangeError that names the call for a seed outside [0, 2^64)", ({
+      seat,
+    }) => {
+      check.isEqualTo(
+        seat,
+        thrown(() => seedValue("values(g, -1, 3)", -1)),
+        "prop: values(g, -1, 3) states no integer in [0, 2^64)",
+        "the call that states the seed",
       );
     });
   });

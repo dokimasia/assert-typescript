@@ -104,6 +104,7 @@ describe("index", () => {
         "string",
         "stringMatching",
         "using",
+        "values",
         "workers",
       ],
       "the names",

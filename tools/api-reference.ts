@@ -201,6 +201,11 @@ const PROP: [string, string, string[]][] = [
     ["of", "ofShape", "shapeOf", "register", "registerValues", "registerVariants"],
   ],
   [
+    "Values of a seed",
+    "The values of a generator for a seed, outside a property. A benchmark that takes its inputs from them measures the same inputs on every run.",
+    ["values"],
+  ],
+  [
     "Property options",
     "The settings of a run. A later option overrides an earlier one of the same setting.",
     [

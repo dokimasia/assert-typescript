@@ -22,7 +22,8 @@
  * returns the target of a fuzzer. The registry names generators and shapes:
  * {@link register}, {@link registerValues} and {@link registerVariants}
  * state them, and {@link of}, {@link shapeOf} and {@link ofShape} read
- * them.
+ * them. {@link values} returns the values of a generator for a seed,
+ * outside a property.
  *
  * A failing run keeps its minimal case in the store of the test, under
  * `testdata/prop`, and later runs replay it first.
@@ -129,3 +130,4 @@ export {
   registerVariants,
   shapeOf,
 } from "./registry.js";
+export { values } from "./values.js";
