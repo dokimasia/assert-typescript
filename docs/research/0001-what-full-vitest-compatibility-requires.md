@@ -10,6 +10,11 @@ supersedes: none
 superseded-by: none
 ---
 
+<!--
+  ~ Copyright Dokimasia B.V. 2026
+  ~ SPDX-License-Identifier: MIT
+-->
+
 # Research-0001: Can a vitest suite use the standard's assertions through expect while every file written for vitest 4.1 or 5.0 runs unchanged, and which vitest mechanisms does that need?
 
 ## The question
