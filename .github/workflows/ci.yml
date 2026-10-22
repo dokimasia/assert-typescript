@@ -1,73 +1,312 @@
+# Managed by ergon init, with .ergon/local/.github/workflows/ci.yml merged in. Change the repository's settings there and run ergon init sync.
+#
+# The gate of the repository, with the jobs that each producer of ergon init contributes. A check
+# of text runs on the Linux runner of the section github of .ergon.yaml, and every other job on a
+# matrix of runners. A job that sets up a toolchain runs its steps once the repository has the
+# files of the toolchain, and sets the toolchain up before ergon. A job that runs tools keeps the
+# tools of ergon in the cache of GitHub Actions, and removes the tools that the options do not name
+# before the cache saves them. version.yml opens the version pull request after the run of a push
+# to main passes, and release.yml publishes a commit only when a run of the gate passed on its
+# content. A new run of a pull request cancels its earlier run, and every other run has a
+# concurrency group of its own.
+#
+# The job skip runs first. Every other job skips when a passed run already covers the content of
+# the run: a push whose content passed, such as the merge of a pull request whose run passed, and a
+# version commit whose parent passed, which version.yml marks with the status ergon/version. The
+# job result passes when every job passed or skipped, so it is the one check that a branch requires.
+
 name: CI
 on:
   pull_request:
+  merge_group:
   push:
     branches: [main]
-
+permissions: {}
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+# Every command runs in bash, which is Git Bash on Windows.
+defaults:
+  run:
+    shell: bash
 jobs:
-  check:
-    runs-on: ubuntu-latest
+  skip:
+    name: Skip a tested commit
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      statuses: read
+    outputs:
+      skip: ${{ steps.skip.outputs.skip }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ergon
+      - name: Find a passed run that covers the content
+        id: skip
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          ergon release ci skip --commit "$COMMIT"
+  docs:
+    name: Docs
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true'"
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ergon
+      - name: Keep the tools of ergon
+        id: ergon-tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: "ergon-tools-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('.ergon.yaml', '.ergon/init.lock') }}"
+          path: "${{ runner.os == 'Windows' && '~/AppData/Local/ergon/tools' || runner.os == 'macOS' && '~/Library/Caches/ergon/tools' || '~/.cache/ergon/tools' }}"
+          restore-keys: "ergon-tools-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-"
+      - name: Lint the Markdown files
+        run: |
+          make lint-common
+      - name: Prune the tools of ergon
+        if: "steps.ergon-tools.outputs.cache-hit != 'true'"
+        run: |
+          ergon tool prune
+  commits:
+    name: Commits
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true' && (github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]')"
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ergon
+      - name: Keep the tools of ergon
+        id: ergon-tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: "ergon-tools-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('.ergon.yaml', '.ergon/init.lock') }}"
+          path: "${{ runner.os == 'Windows' && '~/AppData/Local/ergon/tools' || runner.os == 'macOS' && '~/Library/Caches/ergon/tools' || '~/.cache/ergon/tools' }}"
+          restore-keys: "ergon-tools-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-"
+      - name: Check the commit messages
+        env:
+          BASE: "${{ github.event.pull_request.base.sha }}"
+          HEAD: "${{ github.event.pull_request.head.sha }}"
+        run: |
+          status=0
+          for commit in $(git rev-list --no-merges "$BASE..$HEAD"); do
+            git log -1 --format=%B "$commit" | ergon tool run common.commitlint -- lint || status=1
+          done
+          exit "$status"
+      - name: Prune the tools of ergon
+        if: "steps.ergon-tools.outputs.cache-hit != 'true'"
+        run: |
+          ergon tool prune
+  changeset:
+    name: Changeset
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true' && (github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]' && !(github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == format('ergon-release/{0}', github.base_ref)))"
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ergon
+      - name: Check the changesets
+        env:
+          BASE: "${{ github.event.pull_request.base.sha }}"
+        run: |
+          ergon release status --since "$BASE"
+  baseline:
+    name: Baseline
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true'"
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ergon
+      - name: Check the managed files
+        run: |
+          ergon init check
+  workflows:
+    name: Workflows
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true'"
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ergon
+      - name: Keep the tools of ergon
+        id: ergon-tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: "ergon-tools-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('.ergon.yaml', '.ergon/init.lock') }}"
+          path: "${{ runner.os == 'Windows' && '~/AppData/Local/ergon/tools' || runner.os == 'macOS' && '~/Library/Caches/ergon/tools' || '~/.cache/ergon/tools' }}"
+          restore-keys: "ergon-tools-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-"
+      - name: Lint the workflows
+        run: |
+          make lint-github
+      - name: Prune the tools of ergon
+        if: "steps.ergon-tools.outputs.cache-hit != 'true'"
+        run: |
+          ergon tool prune
+  license:
+    name: License
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true'"
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ergon
+      - name: Check the license headers
+        run: |
+          ergon license check
+  spec:
+    name: Spec
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true'"
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ergon
+      - name: Keep the tools of ergon
+        id: ergon-tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: "ergon-tools-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('.ergon.yaml', '.ergon/init.lock') }}"
+          path: "${{ runner.os == 'Windows' && '~/AppData/Local/ergon/tools' || runner.os == 'macOS' && '~/Library/Caches/ergon/tools' || '~/.cache/ergon/tools' }}"
+          restore-keys: "ergon-tools-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-"
+      - name: Check the copies of the definitions
+        env:
+          GITHUB_TOKEN: "${{ github.token }}"
+        run: |
+          ergon tool run spec.spec -- check --remote
+      - name: Prune the tools of ergon
+        if: "steps.ergon-tools.outputs.cache-hit != 'true'"
+        run: |
+          ergon tool prune
+  check-typescript:
+    name: "TypeScript (${{ matrix.os }})"
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true'"
     strategy:
       fail-fast: false
       matrix:
-        # The floor package.json declares, and every version since. A
-        # library runs on whatever its consumers run. Node 26 is the
-        # first version with Temporal.
-        node-version: ["26.x"]
+        os: [ubuntu-26.04, macos-26, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: npm
-
-      - run: npm ci
-
-      - name: Lint and format
-        run: npm run lint
-
-      - name: Types
-        run: npm run types
-
-      # Before the tests, not after: the README's API reference is
-      # generated from the emitted declarations, and the test that
-      # compares the README with the code reads them.
+          persist-credentials: false
+      - if: "hashFiles('package.json') != ''"
+        uses: ./.github/actions/setup-make
+      - name: Set up Node.js
+        if: "hashFiles('package.json') != ''"
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      - name: Install the packages
+        if: "hashFiles('package.json') != ''"
+        run: |
+          npm ci
+      - if: "hashFiles('package.json') != ''"
+        uses: ./.github/actions/setup-ergon
+      - name: Check TypeScript
+        if: "hashFiles('package.json') != ''"
+        run: |
+          make check-typescript
+  result:
+    name: Result
+    if: always()
+    needs: [skip, docs, commits, changeset, baseline, workflows, license, spec, check-typescript, package, runners, consumer]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions: {}
+    steps:
+      - name: Require every job to pass or to skip
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+  package:
+    name: Package
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true'"
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      - name: Install the packages
+        run: |
+          npm ci
       - name: Build
-        run: npm run build
-
-      - name: Tests and coverage
-        run: npm run coverage
-
-      - name: Check the build ships no .ts specifiers
+        run: |
+          npm run build
+      - name: Check that the build names no .ts file
         run: |
           if grep -rn '\.ts"' --include='*.js' --include='*.d.ts' dist/; then
             echo "dist names .ts files, which the package does not ship"
             exit 1
           fi
-          echo "dist names only .js"
-
-      - name: Check the build ships no import.meta in the CommonJS build
+      - name: Check that the CommonJS build reads no import.meta
         run: |
           if grep -rln 'import\.meta' dist/cjs/; then
-            echo "the CommonJS build reads import.meta, which CommonJS has not"
+            echo "the CommonJS build reads import.meta, which CommonJS does not have"
             exit 1
           fi
-          echo "dist/cjs reads no import.meta"
-
-      - name: Check the package installs and imports
+      - name: Check that the package installs and imports
         run: |
-          npm pack --silent
-          mkdir -p /tmp/consumer && cd /tmp/consumer
-          npm init -y --silent >/dev/null
-          npm install --silent "$GITHUB_WORKSPACE"/dokimi-assert-*.tgz
+          npm pack --silent --pack-destination "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cd "$RUNNER_TEMP/consumer"
+          npm init -y --silent > /dev/null
+          npm install --silent "$RUNNER_TEMP"/dokimi-assert-*.tgz
           node --input-type=module -e "
             import { check, Recorder } from '@dokimi/assert';
             import { cases } from '@dokimi/assert/conformance';
@@ -84,13 +323,10 @@ jobs:
             if (!seat.failed) { throw new Error('the assertion reported nothing'); }
             console.log('required:', seat.message);
           "
-
-  # The specs of the adapters run against each supported major of each
-  # runner. The check job runs them on vitest 4 and jest 30, the development
-  # dependencies. The specs read the names of the running engine, so a
-  # release that defines one of the assertion names fails here.
   runners:
-    runs-on: ubuntu-latest
+    name: "Specs on ${{ matrix.name }}"
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true'"
     strategy:
       fail-fast: false
       matrix:
@@ -101,90 +337,64 @@ jobs:
           - name: jest 29
             install: jest@^29.7.0
             specs: tests/jest.test.ts tests/jest/api.test.ts
-    name: Specs on ${{ matrix.name }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: "26.x"
-          cache: npm
-
-      - run: npm ci
-
-      - run: npm install --no-save ${{ matrix.install }}
-
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      - name: Install the packages
+        run: |
+          npm ci
+      - name: Install the runner
+        env:
+          INSTALL: "${{ matrix.install }}"
+        run: |
+          read -ra packages <<< "$INSTALL"
+          npm install --no-save "${packages[@]}"
       - name: Build
-        run: npm run build
-
-      - name: Tests
-        run: npx vitest run ${{ matrix.specs }}
-
-  # A consumer project installs the packed library beside one runner, with
-  # the declarations of its dependencies checked, compiles the type probes
-  # of tools/consumer and runs one test file that registers the matchers.
+        run: |
+          npm run build
+      - name: Run the specs
+        env:
+          SPECS: "${{ matrix.specs }}"
+        run: |
+          read -ra specs <<< "$SPECS"
+          npx vitest run "${specs[@]}"
   consumer:
-    runs-on: ubuntu-latest
+    name: "Consumer on ${{ matrix.consumer }}"
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true'"
     strategy:
       fail-fast: false
       matrix:
         consumer: [vitest4, vitest5, jest29, jest30]
-    name: Consumer on ${{ matrix.consumer }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: "26.x"
-          cache: npm
-
-      - run: npm ci
-
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      - name: Install the packages
+        run: |
+          npm ci
       - name: Build
-        run: npm run build
-
+        run: |
+          npm run build
       - name: Install, compile and run
-        run: ./tools/consumer/run.sh ${{ matrix.consumer }}
-
-  # The file helpers and assertions call the file system of each platform,
-  # and Windows records no permission bits. The tests run there without
-  # coverage, because a case that a platform skips leaves a branch that no
-  # test there takes.
-  platforms:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "26.x"
-          cache: npm
-
-      - run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Tests
-        run: npm test
-
-  # The vendored definition is the standard that this library meets. spec
-  # check fails for a copy that differs from its manifest, and for a copy
-  # whose commit is not on the branch main of assert-spec.
-  spec:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: stealth-scale/spec/.github/actions/setup-spec@78d70fd5be63102e43f8dd9628d4594914bb390e # v0.2.0
-        with:
-          version: v0.2.0
-
-      - name: Check the vendored definition
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: spec check --remote
+          CONSUMER: "${{ matrix.consumer }}"
+        run: |
+          ./tools/consumer/run.sh "$CONSUMER"

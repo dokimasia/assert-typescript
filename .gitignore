@@ -1,35 +1,4 @@
-# Dependencies
-node_modules/
-.pnp/
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/releases
-
-# Build output
-dist/
-build/
-*.tsbuildinfo
-*.tgz
-
-# Tests and coverage
-coverage/
-.vitest/
-*.lcov
-
-# Caches
-.cache/
-.eslintcache
-.node_repl_history
-.npm/
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Managed by ergon init, with .ergon/local/.gitignore merged in. Change the repository's settings there and run ergon init sync.
 
 # Editors and IDEs
 .idea/
@@ -38,28 +7,39 @@ lerna-debug.log*
 *.swo
 *~
 
-# Zed: settings.json is the shared config that points the editor at the
-# workspace TypeScript and picks the formatter. Nothing else in .zed is.
-.zed/*
-!.zed/settings.json
-
-# Agentic / LLM
+# Agents
 .claude/
 .codex/
 .gemini/
-.topoi/
-superpowers/
 AGENT.md
 CLAUDE.md
 GEMINI.md
 
-# OS
+# Operating systems
 .DS_Store
 Thumbs.db
 
 # Secrets
 .env
-.env.*
-!.env.example
 *.local
 secrets.json
+
+# ergon release
+# The publish plan of the release workflow, which a build of a release must not see as a change
+/publish-plan.json
+
+# JavaScript and TypeScript
+node_modules/
+dist/
+coverage/
+
+# TypeScript
+*.tsbuildinfo
+
+# The tarball of npm pack
+*.tgz
+
+# Zed: settings.json points the editor at the TypeScript of the workspace and picks the formatter.
+# Nothing else in .zed is shared.
+.zed/*
+!.zed/settings.json

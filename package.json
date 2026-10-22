@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Test assertions defined by a language-neutral standard and held to it",
   "license": "MIT",
-  "author": "ThesmOS B.V.",
+  "author": "Dokimasia B.V.",
   "type": "module",
   "engines": {
     "node": ">=26"

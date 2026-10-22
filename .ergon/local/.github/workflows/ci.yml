@@ -1,0 +1,150 @@
+# Copyright Dokimasia B.V. 2026
+# SPDX-License-Identifier: MIT
+
+# The checks of the package beside the gate of TypeScript, on Linux:
+#
+# - The job package checks the build, and installs the packed package into an empty project, which
+#   imports it as an ES module and requires it as CommonJS.
+# - The job runners runs the specs of the adapters on the majors of vitest and jest that the
+#   development dependencies do not install. The specs read the names of the running engine, so a
+#   release of a runner that defines one of the assertion names fails here.
+# - The job consumer installs the packed package beside one runner, compiles the type probes of
+#   tools/consumer and runs one test file that registers the matchers.
+jobs:
+  package:
+    name: Package
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true'"
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      - name: Install the packages
+        run: |
+          npm ci
+      - name: Build
+        run: |
+          npm run build
+      - name: Check that the build names no .ts file
+        run: |
+          if grep -rn '\.ts"' --include='*.js' --include='*.d.ts' dist/; then
+            echo "dist names .ts files, which the package does not ship"
+            exit 1
+          fi
+      - name: Check that the CommonJS build reads no import.meta
+        run: |
+          if grep -rln 'import\.meta' dist/cjs/; then
+            echo "the CommonJS build reads import.meta, which CommonJS does not have"
+            exit 1
+          fi
+      - name: Check that the package installs and imports
+        run: |
+          npm pack --silent --pack-destination "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cd "$RUNNER_TEMP/consumer"
+          npm init -y --silent > /dev/null
+          npm install --silent "$RUNNER_TEMP"/dokimi-assert-*.tgz
+          node --input-type=module -e "
+            import { check, Recorder } from '@dokimi/assert';
+            import { cases } from '@dokimi/assert/conformance';
+            const seat = new Recorder();
+            check.isEqualTo(seat, 1, 2, 'the package works');
+            if (!seat.failed) { throw new Error('the assertion reported nothing'); }
+            console.log('installed and imported:', seat.message);
+            console.log('conformance cases:', cases().length);
+          "
+          node -e "
+            const { check, Recorder } = require('@dokimi/assert');
+            const seat = new Recorder();
+            check.isEqualTo(seat, 1, 2, 'the CommonJS build works');
+            if (!seat.failed) { throw new Error('the assertion reported nothing'); }
+            console.log('required:', seat.message);
+          "
+
+  runners:
+    name: "Specs on ${{ matrix.name }}"
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true'"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: vitest 5
+            install: vitest@^5.0.3 @vitest/coverage-v8@^5.0.3
+            specs: ""
+          - name: jest 29
+            install: jest@^29.7.0
+            specs: tests/jest.test.ts tests/jest/api.test.ts
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      - name: Install the packages
+        run: |
+          npm ci
+      - name: Install the runner
+        env:
+          INSTALL: "${{ matrix.install }}"
+        run: |
+          read -ra packages <<< "$INSTALL"
+          npm install --no-save "${packages[@]}"
+      - name: Build
+        run: |
+          npm run build
+      - name: Run the specs
+        env:
+          SPECS: "${{ matrix.specs }}"
+        run: |
+          read -ra specs <<< "$SPECS"
+          npx vitest run "${specs[@]}"
+
+  consumer:
+    name: "Consumer on ${{ matrix.consumer }}"
+    needs: skip
+    if: "needs.skip.outputs.skip != 'true'"
+    strategy:
+      fail-fast: false
+      matrix:
+        consumer: [vitest4, vitest5, jest29, jest30]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      - name: Install the packages
+        run: |
+          npm ci
+      - name: Build
+        run: |
+          npm run build
+      - name: Install, compile and run
+        env:
+          CONSUMER: "${{ matrix.consumer }}"
+        run: |
+          ./tools/consumer/run.sh "$CONSUMER"
+
+  result:
+    needs: [package, runners, consumer]

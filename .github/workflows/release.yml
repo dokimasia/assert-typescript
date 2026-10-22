@@ -1,65 +1,149 @@
+# Managed by ergon init. Add repository settings to .ergon/local/.github/workflows/release.yml and run ergon init sync.
+#
+# The publish of the packages of the repository on every push to main. The job select-mode chooses
+# the next job: publish for a commit with a package to publish, such as the merge of the version
+# pull request that version.yml opens. The job verify lets the publish run only when a run of ci.yml
+# passed on the content of the commit, such as the run of the version pull request. The jobs pack
+# and publish then release each package of the publish plan. The job pack sets up the toolchains of
+# the repository before ergon, which build the artifacts.
+# The job publish sets them up too, and the toolchain of each registry uploads the packages.
+
 name: Release
 
 on:
   push:
-    tags: ["v*"]
-  workflow_dispatch:
+    branches: [main]
+
+permissions: {}
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
-permissions:
-  contents: read
+# Every command runs in bash.
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  # The gate runs again here rather than trusting the CI run on the
-  # commit. A tag can point at anything, and a published version can
-  # never be taken back.
-  verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26.x
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run types
-      - run: npm run coverage
-
-  publish:
-    needs: verify
-    runs-on: ubuntu-latest
-    environment: npm
+  select-mode:
+    name: Select the mode
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
     permissions:
       contents: read
-      # Trusted publishing: npm verifies this workflow's identity, so
-      # no long-lived token is stored anywhere.
-      id-token: write
+    outputs:
+      mode: ${{ steps.mode.outputs.mode }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: 26.x
-          registry-url: https://registry.npmjs.org
-          cache: npm
-
-      - run: npm ci
-      - run: npm run build
-
-      # A tag that disagrees with package.json would publish a version
-      # nobody asked for, under a number that can never be reused.
-      - name: Check the tag matches the packaged version
-        if: startsWith(github.ref, 'refs/tags/')
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ergon
+      - name: Select the mode
+        id: mode
         run: |
-          packaged=$(node -p "require('./package.json').version")
-          tagged="${GITHUB_REF_NAME#v}"
-          if [ "$packaged" != "$tagged" ]; then
-            echo "tag $GITHUB_REF_NAME carries $tagged, package.json says $packaged"
-            exit 1
-          fi
-          echo "tag and package.json agree on $packaged"
+          ergon release ci select-mode --output publish-plan.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: publish-plan
+          path: publish-plan.json
+          if-no-files-found: error
 
-      - run: npm publish --provenance --access public
+  verify:
+    name: Verify the gate
+    needs: select-mode
+    if: needs.select-mode.outputs.mode == 'publish'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ergon
+      - name: Find a passed run of ci.yml
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          ergon release ci verify
+
+  pack:
+    name: Pack
+    needs: [select-mode, verify]
+    if: needs.select-mode.outputs.mode == 'publish'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node.js
+        if: "hashFiles('package.json') != ''"
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      - name: Install the packages
+        if: "hashFiles('package.json') != ''"
+        run: |
+          npm ci
+      - uses: ./.github/actions/setup-ergon
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: publish-plan
+      - name: Pack the packages
+        run: |
+          ergon release pack --from-publish-plan publish-plan.json --out-dir dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: |
+            publish-plan.json
+            dist
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    needs: pack
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    # The trusted publisher of each registry names this environment, which the subject of the OIDC
+    # token of the job states.
+    environment: release
+    permissions:
+      contents: write
+      # The registries exchange the OIDC token of the job for a token that uploads the packages.
+      id-token: write
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+      published-packages: ${{ steps.publish.outputs.published-packages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node.js
+        if: "hashFiles('package.json') != ''"
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      - name: Install the packages
+        if: "hashFiles('package.json') != ''"
+        run: |
+          npm ci
+      - uses: ./.github/actions/setup-ergon
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+      - name: Publish the packages
+        id: publish
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          ergon release publish --from-publish-plan publish-plan.json --from-pack-dir dist

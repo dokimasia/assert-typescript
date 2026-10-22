@@ -1,0 +1,10 @@
+# Copyright Dokimasia B.V. 2026
+# SPDX-License-Identifier: MIT
+
+# The tarball of npm pack
+*.tgz
+
+# Zed: settings.json points the editor at the TypeScript of the workspace and picks the formatter.
+# Nothing else in .zed is shared.
+.zed/*
+!.zed/settings.json

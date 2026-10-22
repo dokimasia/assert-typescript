@@ -1,3 +1,8 @@
+<!--
+  ~ Copyright Dokimasia B.V. 2026
+  ~ SPDX-License-Identifier: MIT
+-->
+
 # @dokimi/assert
 
 Test assertions for TypeScript, defined by a language-neutral standard
