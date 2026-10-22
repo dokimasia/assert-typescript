@@ -11,7 +11,7 @@ describe("call", () => {
   describe("DEFINITION", () => {
     it("contains the version of the vendored definition", ({ seat }) => {
       const vendored = readFileSync(
-        join(import.meta.dirname, "../../src/conformance/spec/VERSION"),
+        join(import.meta.dirname, "../../src/conformance/VERSION"),
         "utf8",
       );
 

@@ -2,7 +2,7 @@
  * Reading the definition this library is held to.
  *
  * The files are vendored rather than fetched, so a build is
- * reproducible and a test run needs no network. `npm run spec-sync`
+ * reproducible and a test run needs no network. `npm run spec:sync`
  * refreshes them.
  */
 
@@ -13,8 +13,11 @@ import { fileURLToPath } from "node:url";
 /** This language's column in the naming table. */
 export const LANGUAGE = "typescript";
 
-/** Where the vendored definition sits, relative to this module. */
-const SPEC = join(dirname(fileURLToPath(import.meta.url)), "spec");
+/** The directory of the vendored definition, which is the directory of this module. */
+const ROOT = dirname(fileURLToPath(import.meta.url));
+
+/** The directory spec of the vendored definition. */
+const SPEC = join(ROOT, "spec");
 
 /** What one assertion's entry in the definition states. */
 export interface AssertionSpec {
@@ -87,7 +90,7 @@ export function names(): Record<string, string> {
  * @returns The version, as the VERSION file states it.
  */
 export function version(): string {
-  return readFileSync(join(SPEC, "VERSION"), "utf8").trim();
+  return readFileSync(join(ROOT, "VERSION"), "utf8").trim();
 }
 
 /**
@@ -100,7 +103,9 @@ export function version(): string {
  * @returns The overlay, as vendored.
  */
 export function overlay(): Overlay {
-  return read("overlay.json") as Overlay;
+  return JSON.parse(
+    readFileSync(join(ROOT, "overlays", `${LANGUAGE}.json`), "utf8"),
+  ) as Overlay;
 }
 
 /**

@@ -17,8 +17,8 @@ import { RUNNERS as HISTORY } from "./history/vectors.js";
 import { checkProp, KINDS } from "./prop/vectors.js";
 import { RUNNERS as STATEFUL } from "./stateful/vectors.js";
 
-/** Where the vendored corpus is, relative to this module. */
-const CORPUS = join(dirname(fileURLToPath(import.meta.url)), "spec", "corpus");
+/** The corpus of the vendored definition, beside this module. */
+const CORPUS = join(dirname(fileURLToPath(import.meta.url)), "corpus");
 
 /** The directories of the corpus whose files state the vectors that this library runs. */
 const FAMILIES = ["files", "history", "prop", "stateful"];

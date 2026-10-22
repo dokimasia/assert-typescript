@@ -47,7 +47,7 @@ describe("definition", () => {
   describe("version", () => {
     it("returns the version of the vendored VERSION file", ({ seat }) => {
       const vendored = readFileSync(
-        join(import.meta.dirname, "../../src/conformance/spec/VERSION"),
+        join(import.meta.dirname, "../../src/conformance/VERSION"),
         "utf8",
       );
 

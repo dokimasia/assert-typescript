@@ -25,8 +25,8 @@ import {
 } from "./definition.js";
 import { canonical, decode, type Literal, Objects } from "./literal.js";
 
-/** Where the vendored corpus sits, relative to this module. */
-const CORPUS = join(dirname(fileURLToPath(import.meta.url)), "spec", "corpus");
+/** The corpus of the vendored definition, beside this module. */
+const CORPUS = join(dirname(fileURLToPath(import.meta.url)), "corpus");
 
 /** An assertion as a corpus case calls it: a seat, then its arguments. */
 type Invoker = (seat: Recorder, ...args: unknown[]) => unknown;
