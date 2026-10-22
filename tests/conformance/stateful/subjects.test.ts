@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the machine subjects of the definition. Each run's outcome is
  * the one that the machines vectors of the definition state for the subject

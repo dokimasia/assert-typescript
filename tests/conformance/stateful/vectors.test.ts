@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the runner of the machines vectors. It uses vitest's `expect`
  * alone, because the runner decides the verdict of every machines vector.

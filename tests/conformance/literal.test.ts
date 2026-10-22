@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the decoding of a corpus case's typed literals, and of the
  * comparison of a reported value with one that a case states.

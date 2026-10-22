@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the functions of the subject kinds that take one input. */
 
 import { describe } from "vitest";

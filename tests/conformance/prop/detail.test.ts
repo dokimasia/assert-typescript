@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the detail of a run, as a property vector states it. */
 
 import { describe } from "vitest";

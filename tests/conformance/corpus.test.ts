@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the corpus and of its verdicts. It drives every case of the
  * vendored corpus against both surfaces, and compares the failure and the

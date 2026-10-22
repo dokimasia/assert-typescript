@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The predicates of the property vectors: the conditions that their bodies
  * and filters state as data.

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the runners of the history vectors. It uses vitest's `expect`
  * alone, because the runners decide the verdict of every history vector.

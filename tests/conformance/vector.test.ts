@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the vectors and of their runner. It runs every vector that
  * this library runs, each in a directory of its own. It uses vitest's

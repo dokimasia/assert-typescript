@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * Turning a corpus case's typed literals into native values, and
  * comparing a reported value with one that a case states.

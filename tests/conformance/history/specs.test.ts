@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the named specs of the history vectors. Each step is the one
  * that the definition's reference implementation takes from the same state.

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the reader of the vendored definition that this library implements. */
 
 import { readFileSync } from "node:fs";

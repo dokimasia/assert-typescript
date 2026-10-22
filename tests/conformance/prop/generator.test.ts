@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the generators of the property vectors, stated as data. */
 
 import { describe } from "vitest";

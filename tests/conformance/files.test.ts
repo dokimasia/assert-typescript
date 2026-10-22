@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the runners of the files vectors: the rules that the
  * definition's vectors cannot drive, such as the refusal of a vector that
