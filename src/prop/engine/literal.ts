@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * Typed literals of decoded values: the language-neutral form in which the
  * definition states a value of a generator or a shape.

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The options of a property: the settings of a run of forAll, fuzz and a
  * property form, and the options that only a form takes.

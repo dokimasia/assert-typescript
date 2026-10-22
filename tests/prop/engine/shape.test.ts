@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of shapes: what each decodes from recorded choices, its
  * defaults, and how a read fails. The decoded values are those of the

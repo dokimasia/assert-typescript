@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the namespace prop: the names that it exports, and the sentences that it registers. */
 
 import { describe } from "vitest";

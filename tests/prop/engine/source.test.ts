@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the random source. The stream must equal the C code that Bob
  * Jenkins published, bit for bit: testdata/smallprng.json contains the

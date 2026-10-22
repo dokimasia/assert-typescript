@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of a case: where its values come from, what it records, and its
  * cap. The pinned draws are the draws of the definition's reference

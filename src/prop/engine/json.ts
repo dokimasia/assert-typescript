@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * Strict JSON, as a store file must be: one JSON text that repeats no name
  * within an object and nests at most a given number of levels.

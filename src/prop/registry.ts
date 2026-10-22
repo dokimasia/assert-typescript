@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The registry of a test file. It maps the name of a shape definition to
  * its generator, its values or its variants.

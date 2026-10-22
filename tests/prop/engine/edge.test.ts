@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the edge phase: the value that each choice takes at each boundary. */
 
 import { describe } from "vitest";

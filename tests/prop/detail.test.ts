@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the record of a property's run, and of its sentence. */
 
 import { describe } from "vitest";

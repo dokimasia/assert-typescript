@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of running generators backwards: the choices of a generated
  * value replay to that value, and the first sequence of choices where more

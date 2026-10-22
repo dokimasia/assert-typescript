@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the shrinker: the replay before it, the smallest case of each
  * failure, and the explanation. Each shrunk case, each count of runs and

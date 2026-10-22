@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the property forms. Each form passes a true property and fails a false one. */
 
 import { describe } from "vitest";

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The shortlex order of choice sequences, the one order that the shrinker
  * uses.

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * A case: the choices that one call of a body makes, recorded with their
  * spans.

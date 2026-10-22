@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the store: an entry's name, its format, and the verdict on
  * each file. The pinned name is the name of the definition's reference

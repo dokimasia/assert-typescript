@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the run of a property, which forAll, fuzz and the property forms share. */
 
 import { chmodSync, readdirSync, readFileSync, writeFileSync } from "node:fs";

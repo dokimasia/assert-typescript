@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of forAll, the assertion that a body passes for every case that a run generates. */
 
 import { describe } from "vitest";

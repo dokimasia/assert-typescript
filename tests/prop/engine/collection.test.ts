@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of collections: their sizes, their continue flags and their discards. */
 
 import { describe } from "vitest";

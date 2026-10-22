@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the three kinds of choice: their bounds, targets, sort keys and replay rules. */
 
 import { describe } from "vitest";

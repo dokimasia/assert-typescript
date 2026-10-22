@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of a run: its phases, its counts and each of its outcomes. The
  * counts are those of the definition's reference implementation on the

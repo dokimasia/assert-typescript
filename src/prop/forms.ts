@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The property forms: each runs an assertion on every case of a run, as
  * forAll runs a body, and fails the test with one record of the form's id,

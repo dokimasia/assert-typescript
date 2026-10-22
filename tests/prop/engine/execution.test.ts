@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of one call of a body, and each way that it can end. */
 
 import { describe } from "vitest";

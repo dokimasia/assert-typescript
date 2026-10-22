@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the typed literal of a drawn value, as its generator states the value's type. */
 
 import { describe } from "vitest";

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The TypeScript values of shapes: how a generator of a shape file turns the
  * value that the engine decodes into the value that a body receives, and

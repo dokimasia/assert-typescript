@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the replay token: its bytes, its round trip, and the tokens
  * that it refuses. The pinned bytes are the bytes of the definition's

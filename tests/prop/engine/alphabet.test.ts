@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the default alphabet of the string generator. */
 
 import { describe } from "vitest";

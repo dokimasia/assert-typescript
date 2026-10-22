@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of a campaign: a run that explores for a span of time and keeps
  * the cases that show new behaviour. Each campaign but one measures its

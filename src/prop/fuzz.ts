@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * fuzz: a property whose cases a fuzzer decodes from its byte inputs.
  *

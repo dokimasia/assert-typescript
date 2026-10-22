@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the binary floats of a float choice: their bits, widths, neighbours and sort key. */
 
 import { describe } from "vitest";

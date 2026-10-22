@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The machinery of the property forms: a form runs its assertion on each
  * case of a run, as forAll runs a body, with the arguments that the case

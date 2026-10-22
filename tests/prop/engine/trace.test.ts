@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of traces: the entries of a case, and the provider that serves a trace's values. */
 
 import { describe } from "vitest";

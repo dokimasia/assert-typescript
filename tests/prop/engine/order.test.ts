@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the shortlex order of choice sequences. */
 
 import { describe } from "vitest";

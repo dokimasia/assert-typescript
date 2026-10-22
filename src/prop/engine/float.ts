@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The binary floats of a float choice: their bits, their widths, their
  * neighbours and their sort key.

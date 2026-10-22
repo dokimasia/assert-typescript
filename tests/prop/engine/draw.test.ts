@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the draws: what each consumes from the stream, and what it
  * returns. The pinned draws are the draws of the definition's reference

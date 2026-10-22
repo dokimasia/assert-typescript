@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the directory of a property's store, and the files in it. */
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";

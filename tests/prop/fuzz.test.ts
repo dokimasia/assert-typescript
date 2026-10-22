@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of fuzz, which replays a property's stored cases and returns the target of a fuzzer. */
 
 import { mkdirSync, writeFileSync } from "node:fs";

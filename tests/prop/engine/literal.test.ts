@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of typed literals: what each decodes to, and the one literal of each value. */
 
 import { describe } from "vitest";

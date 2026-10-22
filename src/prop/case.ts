@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The case of a property's body: one call of the body, and the seat that
  * the body's assertions report to.

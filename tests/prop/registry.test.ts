@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the registry of shape names. The registry is the test file's,
  * so the cases run in order: the registrations and the reads first, and the
