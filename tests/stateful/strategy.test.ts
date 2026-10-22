@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the strategies of the task scheduler. */
 
 import { describe } from "vitest";

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the stateful module, which re-exports the machines, their steps and the task scheduler. */
 
 import { describe } from "vitest";

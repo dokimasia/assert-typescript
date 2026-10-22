@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the task scheduler: its releases, its yields, and the choices
  * of its two strategies. Each order and each choice is that of the

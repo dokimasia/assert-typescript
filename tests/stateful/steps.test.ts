@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the steps of a machine: the swarm, the steps of each part, the
  * checks, traces and places. Each choice, each step and each refusal is that
