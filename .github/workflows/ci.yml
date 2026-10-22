@@ -172,29 +172,19 @@ jobs:
       - name: Tests
         run: npm test
 
-  # The vendored definition is the standard that this library meets. A
-  # copy that does not match the manifest beside it fails, always. A copy
-  # that differs from upstream fails only when this change touched it:
-  # falling behind is allowed and an issue tracks it, but committing a
-  # copy that nobody else has is not.
+  # The vendored definition is the standard that this library meets. spec
+  # check fails for a copy that differs from its manifest, and for a copy
+  # whose commit is not on the branch main of assert-spec.
   spec:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
-      - name: Did this change touch the vendored copy?
-        id: touched
-        run: |
-          base="${{ github.event.pull_request.base.sha || github.event.before }}"
-          if [ -z "$base" ] || ! git cat-file -e "$base" 2>/dev/null; then
-            echo "strict=" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$base" HEAD -- src/conformance/spec | grep -q .; then
-            echo "strict=--strict" >> "$GITHUB_OUTPUT"
-          else
-            echo "strict=" >> "$GITHUB_OUTPUT"
-          fi
+      - uses: stealth-scale/spec/.github/actions/setup-spec@78d70fd5be63102e43f8dd9628d4594914bb390e # v0.2.0
+        with:
+          version: v0.2.0
 
       - name: Check the vendored definition
-        run: ./tools/spec-check.sh src/conformance/spec ${{ steps.touched.outputs.strict }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: spec check --remote

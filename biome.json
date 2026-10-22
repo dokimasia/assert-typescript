@@ -5,7 +5,10 @@
       "src/**",
       "tests/**",
       "tools/**",
-      "!src/conformance/spec/**"
+      "!src/conformance/spec/**",
+      "!src/conformance/corpus/**",
+      "!src/conformance/overlays/**",
+      "!src/conformance/manifest.json"
     ]
   },
   "formatter": {

@@ -61,13 +61,12 @@
     "coverage": "vitest run --coverage",
     "fmt": "biome check --write src tests tools",
     "lint": "biome check src tests tools",
-    "spec-sync": "node tools/spec-sync.ts",
     "test": "vitest run",
     "types": "tsc --noEmit",
     "lint-md": "npx --yes markdownlint-cli '**/*.md' --ignore node_modules --ignore dist",
     "api-docs": "npm run build && node tools/api-reference.ts --write",
-    "spec:sync": "./tools/spec-sync.sh src/conformance/spec typescript",
-    "spec:check": "./tools/spec-check.sh src/conformance/spec"
+    "spec:sync": "spec sync",
+    "spec:check": "spec check"
   },
   "peerDependencies": {
     "jest": "^29.7.0 || ^30.5.2",

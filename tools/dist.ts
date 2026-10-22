@@ -3,8 +3,9 @@
  *
  * - It writes dist/cjs/package.json, so that Node loads the files of the
  *   CommonJS build as CommonJS in a package whose type is module.
- * - It copies the vendored definition into dist/conformance/spec, which
- *   the conformance runner reads beside its modules.
+ * - It copies the vendored definition into dist/conformance: the
+ *   directories spec, corpus and overlays and the file VERSION, which the
+ *   conformance runner reads beside its modules.
  * - It copies the zone table into dist/cjs/conformance/spec, which the
  *   CommonJS build of the property engine reads.
  * - It copies the declarations of each vitest major into dist/vitest.
@@ -27,7 +28,9 @@ function copy(from: string, to: string): void {
 }
 
 writeFileSync(join(DIST, "cjs", "package.json"), '{ "type": "commonjs" }\n');
-copy("conformance/spec", "conformance/spec");
+for (const entry of ["spec", "corpus", "overlays", "VERSION"]) {
+  copy(`conformance/${entry}`, `conformance/${entry}`);
+}
 copy("conformance/spec/zones.json", "cjs/conformance/spec/zones.json");
 copy("vitest/vitest4.d.ts", "vitest/vitest4.d.ts");
 copy("vitest/vitest5.d.ts", "vitest/vitest5.d.ts");

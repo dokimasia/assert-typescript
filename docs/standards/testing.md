@@ -168,8 +168,9 @@ rules.
 - A golden file is stored under `testdata/golden` of the project, where
   `golden.match` resolves a name. `DOKIMI_ASSERT_UPDATE_GOLDEN=1`
   rewrites it.
-- The vendored definition is stored under `src/conformance/spec`.
-  `npm run spec:sync` refreshes it, and nobody edits it by hand.
+- The vendored definition is stored in `src/conformance`, beside the
+  conformance runner, as `.spec.yaml` declares. `npm run spec:sync`
+  refreshes it, and nobody edits it by hand.
 - The fixture suites of `tests/jest.test.ts` are stored under
   `tests/testdata/jest`. The spec runs jest on them in a child process, as
   a consumer's suite runs, and reads jest's report. Their files end in
