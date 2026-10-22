@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the matching of text against a pattern of the portable subset. */
 
 import { describe } from "vitest";
