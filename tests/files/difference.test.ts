@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the rules by which a tree read differs from a wanted tree. */
 
 import { describe } from "vitest";

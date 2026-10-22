@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The entries of a tree of files: a file with its content, a directory and
  * a symbolic link, each with its permission bits where a test states them.

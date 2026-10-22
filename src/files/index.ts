@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * Trees of files for a test, and the assertions about the files that the
  * code under test reads and writes.

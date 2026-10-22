@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The workspace of a test: a directory of the test's own, with a tree
  * written into it.

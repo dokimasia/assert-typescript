@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the reader of a tree and of the entry at one path. */
 
 import { execFileSync } from "node:child_process";

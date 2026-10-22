@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the write of a tree over a directory that exists. */
 
 import { readFileSync } from "node:fs";

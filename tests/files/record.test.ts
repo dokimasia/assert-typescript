@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the record of a comparison of trees that fails. */
 
 import { describe } from "vitest";

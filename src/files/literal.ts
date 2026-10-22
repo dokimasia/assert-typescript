@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The tree literal of the definition: `{"type": "tree", "entries": [...]}`,
  * its entries in path order. Each entry states `path` and exactly one of

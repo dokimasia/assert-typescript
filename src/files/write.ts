@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * Writing a tree over the entries of a directory that exists, such as an
  * edit between two runs of the code under test.

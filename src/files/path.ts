@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The assertions about the entry at one path of the operating system:
  * `absent`, `isFile`, `isDir`, `linksTo`, `hasContent` and `hasMode`.

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of a tree of files and of the rules that every tree keeps. */
 
 import { describe } from "vitest";

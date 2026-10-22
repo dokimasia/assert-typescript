@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * What the file systems of the platform record, which decides what a tree
  * reads and what an assertion about a mode can check.

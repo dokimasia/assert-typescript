@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The record of a comparison of trees that fails, and the verdict of a
  * comparison.
