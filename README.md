@@ -71,6 +71,27 @@ Use `Standard` outside a test runner, where nothing owns the end of a
 test. Use `Recorder` to read back what an assertion reported instead of
 suffering it.
 
+A fault ends a call without a verdict, such as a path that `files.read`
+cannot read. A `Recorder` keeps each fault as the error it is in
+`faults`, and the other seats throw it. A helper of your own ends its
+call with `fault`, as the calls of this library end theirs:
+
+```ts
+import { fault, type Seat } from "@dokimi/assert";
+
+function loaded(seat: Seat, path: string): Catalog | undefined {
+  if (path === "") {
+    fault(seat, new RangeError("loaded: the path is empty"));
+    return undefined;
+  }
+  return Catalog.load(path);
+}
+```
+
+A fault that ends the check of `doesReject` ends the call of
+`doesReject` with the same fault, because the check did not decide about
+the implementation.
+
 ## Two surfaces
 
 `check` stops at the first failure. `soft` records and carries on, so
@@ -452,6 +473,12 @@ prop.registerValues<T>(name: string, ...values: readonly T[])
 prop.registerVariants(name: string, variants: Readonly<Record<string, string | undefined>>)
 ```
 
+**Values of a seed** — The values of a generator for a seed, outside a property. A benchmark that takes its inputs from them measures the same inputs on every run.
+
+```ts
+prop.values<T>(generator: Generator<T>, seed: bigint | number, n: number): T[]
+```
+
 **Property options** — The settings of a run. A later option overrides an earlier one of the same setting.
 
 ```ts
@@ -683,6 +710,11 @@ generator of the input, because TypeScript erases the types that another
 language derives an input from. `prop.ofShape` derives a generator from
 the text of a shape file instead.
 
+`prop.values(generator, seed, n)` returns the values of the first random
+cases of a seed, which are the same in every implementation of the
+standard. A benchmark takes its inputs from it, so every run measures the
+same inputs.
+
 `prop.around` runs each run of the body inside a wrapper, so that every
 case, shrink candidate and replay starts in a fresh environment, such as
 vitest's fake timers:
@@ -853,7 +885,12 @@ only be read as a heap-usage delta, which moves with whether the
 collector ran: measuring one unchanged body six times gave 43, -3, 43,
 -10, -10 and -8 bytes per iteration. A ceiling set from one run would
 fail the next for no reason, so the overlay records the gap instead of
-pretending.
+pretending. `allocsChecked()` returns `{ checked: false, reason }` in
+every run for the same reason.
+
+A run of `prop.forAll` and `prop.fuzz` does not take `prop.using`,
+because its body states each generator that it draws from. A property
+form takes the option for the generator of its input.
 
 `doesThrow` refuses a callable that answers a promise. An unawaited
 rejection is not a throw, and passing there would make the assertion lie
