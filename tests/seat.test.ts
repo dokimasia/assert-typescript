@@ -144,6 +144,50 @@ describe("seat", () => {
     });
   });
 
+  describe("Recorder.reportFault", () => {
+    it("fails the recorder with the message of a fault that ends its call", () => {
+      const seat = new Recorder();
+      seat.reportFault(new Error("the path is empty"), true);
+
+      expect([seat.failed, seat.message]).toEqual([true, "the path is empty"]);
+    });
+
+    it("keeps a noted fault without a failure", () => {
+      const seat = new Recorder();
+      seat.reportFault(new Error("a file of the store is skipped"), false);
+
+      expect(seat.failed).toBe(false);
+    });
+
+    it("keeps no failure record", () => {
+      const seat = new Recorder();
+      seat.reportFault(new Error("the path is empty"), true);
+
+      expect(seat.failures).toEqual([]);
+    });
+  });
+
+  describe("Recorder.faults", () => {
+    it("returns every fault in call order, ending or not", () => {
+      const ending = new Error("the path is empty");
+      const noted = new Error("a file of the store is skipped");
+      const seat = new Recorder();
+      seat.reportFault(noted, false);
+      seat.reportFault(ending, true);
+
+      expect(seat.faults).toEqual([noted, ending]);
+      expect(seat.faults[0]).toBe(noted);
+    });
+
+    it("returns a copy that the caller may change", () => {
+      const seat = new Recorder();
+      seat.reportFault(new Error("the path is empty"), true);
+      (seat.faults as Error[]).pop();
+
+      expect(seat.faults).toHaveLength(1);
+    });
+  });
+
   describe("Recorder.records", () => {
     it("returns the call records in the order of their numbers", () => {
       const seat = new Recorder();

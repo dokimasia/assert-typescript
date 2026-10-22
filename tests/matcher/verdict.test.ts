@@ -4,7 +4,7 @@
  * because every assertion reports its verdict through it.
  */
 
-import { describe, expect, it, onTestFinished } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { Failure } from "../../src/failure.js";
 import { Mode } from "../../src/matcher/seat.js";
 import {
@@ -12,6 +12,7 @@ import {
   fail,
   fault,
   faultText,
+  noteFault,
   pass,
   Running,
 } from "../../src/matcher/verdict.js";
@@ -19,18 +20,28 @@ import { VARIABLE } from "../../src/record/switch.js";
 import { Recorder } from "../../src/seat.js";
 import { Plain, records, setRecording } from "../helpers.js";
 
+/** Returns what call throws, and undefined for a call that returns. */
+function thrownBy(call: () => void): unknown {
+  try {
+    call();
+  } catch (err) {
+    return err;
+  }
+  return undefined;
+}
+
 describe("verdict", () => {
   it("ends every call with the fault of a switch that is neither 0 nor 1", () => {
     onTestFinished(setRecording("yes"));
-    const seat = new Plain();
+    const seat = new Recorder();
     pass(seat, Mode.Soft, "true", "the count is right");
     fail(seat, Mode.Soft, "true", "it fails");
     fault(seat, Mode.Soft, "true", "it faults", new Error("a fault"));
     Running.of(seat).passRun(Mode.Soft, "prop-for-all", "a run", undefined, {});
     Running.of(seat).failRun(Mode.Soft, new Failure("prop-for-all", "a run", {}), {});
 
-    expect(seat.received).toEqual(
-      Array(5).fill(["fail", `${VARIABLE}: "yes" is neither 0 nor 1`]),
+    expect(seat.faults.map((f) => f.message)).toEqual(
+      Array(5).fill(`${VARIABLE}: "yes" is neither 0 nor 1`),
     );
   });
 
@@ -53,16 +64,33 @@ describe("verdict", () => {
   });
 
   describe("end", () => {
-    it("sends the text of the fault to fail", () => {
-      const seat = new Plain();
-      end(seat, new Error("a fault"));
+    it("passes the fault to reportFault of a seat that takes faults, as ending", () => {
+      const broken = new Error("a fault");
+      const seat = new Recorder();
+      end(seat, broken);
 
-      expect(seat.received).toEqual([["fail", "a fault"]]);
+      expect(seat.faults).toEqual([broken]);
+      expect(seat.message).toBe("a fault");
+    });
+
+    it("throws the fault for a seat without reportFault", () => {
+      const broken = new Error("a fault");
+      const seat = new Plain();
+
+      expect(thrownBy(() => end(seat, broken))).toBe(broken);
+      expect(seat.received).toEqual([]);
+    });
+
+    it("throws an error of the text of a fault that is no error", () => {
+      const thrown = thrownBy(() => end(new Plain(), 42));
+
+      expect(thrown).toBeInstanceOf(Error);
+      expect((thrown as Error).message).toBe("42");
     });
 
     it("marks the frame of the call as a helper", () => {
       const seat = new Plain();
-      end(seat, new Error("a fault"));
+      thrownBy(() => end(seat, new Error("a fault")));
 
       expect(seat.helpers).toBe(1);
     });
@@ -72,6 +100,27 @@ describe("verdict", () => {
       end(seat, new Error("a fault"));
 
       expect(seat.records).toEqual([]);
+    });
+  });
+
+  describe("noteFault", () => {
+    it("passes the fault to reportFault of a seat that takes faults, as noted", () => {
+      const noted = new Error("a file of the store is skipped");
+      const seat = new Recorder();
+      noteFault(seat, noted);
+
+      expect(seat.faults).toEqual([noted]);
+      expect(seat.failed).toBe(false);
+    });
+
+    it("writes the message of the fault through console.warn for a seat without reportFault", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      onTestFinished(() => warn.mockRestore());
+      const seat = new Plain();
+      noteFault(seat, new Error("a file of the store is skipped"));
+
+      expect(warn.mock.calls).toEqual([["a file of the store is skipped"]]);
+      expect(seat.received).toEqual([]);
     });
   });
 
@@ -149,11 +198,14 @@ describe("verdict", () => {
   });
 
   describe("fault", () => {
-    it("ends a call of Mode.Soft through fail", () => {
+    it("ends a call of Mode.Soft with the fault", () => {
+      const broken = new Error("it broke");
       const seat = new Plain();
-      fault(seat, Mode.Soft, "matches", "the id is well formed", new Error("it broke"));
+      const thrown = thrownBy(() =>
+        fault(seat, Mode.Soft, "matches", "the id is well formed", broken),
+      );
 
-      expect(seat.received).toEqual([["fail", "it broke"]]);
+      expect(thrown).toBe(broken);
     });
 
     it("reports no failure record", () => {

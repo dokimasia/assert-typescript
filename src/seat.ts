@@ -109,6 +109,8 @@ export class Standard implements Seat {
 export class Recorder implements Seat {
   /** Every record that arrived, in call order. */
   #records: Failure[] = [];
+  /** Every fault that arrived through reportFault, in call order. */
+  #faults: Error[] = [];
   /** What assertions read time from, or undefined for the platform. */
   #clock: Clock | undefined;
   /** The signal that this recorder states, or undefined for none. */
@@ -149,6 +151,25 @@ export class Recorder implements Seat {
    */
   get failures(): readonly Failure[] {
     return [...this.#records];
+  }
+
+  /**
+   * Keeps a fault as the error it is, so a test compares the error rather
+   * than search its text. A fault that ends its call fails the recorder, as
+   * fail does with the fault's message. A fault that the call notes and runs
+   * on past does not fail it.
+   *
+   * @param fault The fault.
+   * @param ending Whether the fault ends its call.
+   */
+  reportFault(fault: Error, ending: boolean): void {
+    this.#faults.push(fault);
+    if (ending) this.fail(fault.message);
+  }
+
+  /** Every fault that arrived through reportFault, in call order. */
+  get faults(): readonly Error[] {
+    return [...this.#faults];
   }
 
   /** The call records of this recorder's calls, in the order of their seq, as JSON lines. */

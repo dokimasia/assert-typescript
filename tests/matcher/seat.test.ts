@@ -12,6 +12,7 @@ import {
   report,
   type Seat,
   signalOf,
+  takesFaults,
   takesRecords,
 } from "../../src/matcher/seat.js";
 import { Collector, Recorder } from "../../src/seat.js";
@@ -54,6 +55,16 @@ describe("seat", () => {
 
     it("returns false for a seat without a report method", () => {
       expect(takesRecords(new Collector())).toBe(false);
+    });
+  });
+
+  describe("takesFaults", () => {
+    it("returns true for a seat with a reportFault method", () => {
+      expect(takesFaults(new Recorder())).toBe(true);
+    });
+
+    it("returns false for a seat without a reportFault method", () => {
+      expect(takesFaults(new Collector())).toBe(false);
     });
   });
 

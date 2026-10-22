@@ -6,11 +6,13 @@
  * recorded under that call. The seat's signal derives from the signal of
  * the assertion's seat and aborts when the body ends, so work that the
  * body starts with it stops before the assertion returns. A failure that
- * stops ends the body, as it ends a test.
+ * stops ends the body, as it ends a test, and so does a fault that ends its
+ * call.
  */
 
 import { own, run, type Slot } from "../record/calls.js";
 import { type Seat, signalOf } from "./seat.js";
+import { noteFault } from "./verdict.js";
 
 /** Thrown by the seat of a body to end the body at a failure that stops. */
 export class Ended {}
@@ -18,6 +20,8 @@ export class Ended {}
 /** The seat of one run of a body. */
 export abstract class Body implements Seat {
   readonly #controller = new AbortController();
+  /** The seat of the assertion that runs the body. */
+  readonly #parent: Seat;
   /** Aborts when the assertion's seat's signal does, and when the body ends. */
   readonly signal: AbortSignal;
 
@@ -28,6 +32,7 @@ export abstract class Body implements Seat {
    * @param slot - The slot of that call, or undefined when it is not recorded.
    */
   constructor(parent: Seat, slot: Slot | undefined) {
+    this.#parent = parent;
     this.signal = AbortSignal.any([signalOf(parent), this.#controller.signal]);
     run(own(this), slot);
   }
@@ -40,6 +45,22 @@ export abstract class Body implements Seat {
 
   /** Reports a failure that the body carries on past. */
   abstract record(message: string): void;
+
+  /**
+   * Receives a fault of the body. A fault that ends its call fails the body
+   * as fail does with the fault's message, and ends it. A noted fault goes
+   * to the seat of the assertion that runs the body, and the body runs on.
+   *
+   * @param fault - The fault.
+   * @param ending - Whether the fault ends its call.
+   */
+  reportFault(fault: Error, ending: boolean): void {
+    if (!ending) {
+      noteFault(this.#parent, fault);
+      return;
+    }
+    this.fail(fault.message);
+  }
 
   /** Ends the body: the signal aborts. */
   end(): void {

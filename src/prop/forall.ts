@@ -72,8 +72,10 @@ async function start(
  * same contract and store. It ends the call with a fault before any other
  * case for an entry of the draws option that the body cannot follow. It
  * writes an entry of each failure of a counterexample to the store, unless a
- * file of the entry's name exists or the process is one of a mutation run,
- * and notes a store that cannot keep it through console.warn.
+ * file of the entry's name exists or the process is one of a mutation run.
+ * It notes the fault of a store that cannot keep it: a seat with
+ * reportFault receives the fault with ending false, and any other seat
+ * through console.warn.
  *
  * @param seat - Where the failure is reported.
  * @param contract - The property, as the record's contract states it.

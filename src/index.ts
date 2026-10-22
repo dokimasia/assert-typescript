@@ -20,10 +20,12 @@
  * this module.
  */
 
+export { allocsChecked } from "./allocs.js";
 export * as bench from "./bench.js";
 export * as check from "./check.js";
 export { type Clock, Controlled, System } from "./clock.js";
 export { Failure, type Where } from "./failure.js";
+export { fault } from "./fault.js";
 export * as files from "./files/index.js";
 export * as golden from "./golden.js";
 export * as history from "./history/index.js";

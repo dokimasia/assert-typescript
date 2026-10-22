@@ -9,8 +9,9 @@
  * phase of the case.
  *
  * A property notes each fault that does not end its call, such as a file of
- * its store that it skips, through console.warn. The test runner shows the
- * note beside the test.
+ * its store that it skips. A seat with reportFault receives the fault with
+ * ending false, and any other seat through console.warn, which the test
+ * runner shows beside the test.
  *
  * A run stops between two cases when the signal of its seat aborts, which
  * vitest does when the test times out, and then writes no store entry.
@@ -23,7 +24,7 @@ import { join } from "node:path";
 import type { Where } from "../failure.js";
 import { Fault, ofOperation } from "../matcher/fault.js";
 import { Mode, type Seat, signalOf } from "../matcher/seat.js";
-import type { Running } from "../matcher/verdict.js";
+import { noteFault, type Running } from "../matcher/verdict.js";
 import { own, type Slot } from "../record/calls.js";
 import { Case, caseOf, execute as executeCase, type Location } from "./case.js";
 import { detailJson, detailOf, recordOf } from "./detail.js";
@@ -209,9 +210,9 @@ function observerOf(slot: Slot | undefined): Observer {
   return (phase, execution) => slot?.take(own(caseOf(execution.case)), phase);
 }
 
-/** Writes the text of a fault that does not end the call of op where the test runner shows it beside the test. */
-function note(op: string, fault: Fault): void {
-  console.warn(ofOperation(op, fault).message);
+/** Notes a fault of the call of op on seat that does not end the call. */
+function note(seat: Seat, op: string, fault: Fault): void {
+  noteFault(seat, ofOperation(op, fault));
 }
 
 /** The settings of a property's calls, its store and how it reports. */
@@ -346,7 +347,7 @@ export class Property {
     if (outcome === undefined) return;
     if (outcome.kind === "counterexample" && this.#budget === 0) concluded(outcome);
     for (const fault of [...this.#storeFaults(loaded, outcome), ...saved])
-      note(this.call.op, fault);
+      note(seat, this.call.op, fault);
     this.#report(running, outcome);
   }
 
@@ -379,7 +380,8 @@ export class Property {
     );
     const outcome = await this.#drive(running, work);
     if (outcome === undefined) return;
-    for (const fault of this.#storeFaults(loaded, outcome)) note(this.call.op, fault);
+    for (const fault of this.#storeFaults(loaded, outcome))
+      note(seat, this.call.op, fault);
     this.#report(running, outcome);
   }
 
@@ -415,7 +417,7 @@ export class Property {
     const outcome = await this.#drive(running, bridged());
     if (outcome === undefined) return;
     if (outcome.kind === "counterexample") {
-      for (const fault of this.#save(outcome)) note(this.call.op, fault);
+      for (const fault of this.#save(outcome)) note(seat, this.call.op, fault);
     }
     this.#report(running, outcome);
   }

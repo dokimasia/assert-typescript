@@ -103,16 +103,6 @@ function counting(count: { calls: number }): Option {
   });
 }
 
-/** Returns the texts that console.warn receives until the test ends. */
-function warnings(): string[] {
-  const texts: string[] = [];
-  const spy = vi.spyOn(console, "warn").mockImplementation((text: unknown) => {
-    texts.push(String(text));
-  });
-  onTestFinished(() => spy.mockRestore());
-  return texts;
-}
-
 describe("property", () => {
   describe("Property.of", () => {
     it("closes the registry", ({ seat }) => {
@@ -389,13 +379,13 @@ describe("property", () => {
       seat,
     }) => {
       setVariable(MUTANT, undefined);
-      const texts = warnings();
       const dir = temporary();
       await runOn(new Recorder(), BELOW_FIVE, store(dir));
       writeFileSync(join(dir, "later.json"), JSON.stringify({ store: 2 }));
       const [written] = readdirSync(dir).filter((file) => file !== "later.json");
+      const recorder = new Recorder();
       await runOn(
-        new Recorder(),
+        recorder,
         (c) => {
           check.isTrue(
             c,
@@ -411,12 +401,12 @@ describe("property", () => {
 
       check.isEqualTo(
         seat,
-        texts,
+        recorder.faults.map((f) => f.message),
         [
           `prop.forAll: ${join(dir, "later.json")}: the entry is of a later format, so the run skips it`,
           `prop.forAll: ${join(dir, written as string)}: the stored case decodes to other values than it records, and the run tested those`,
         ],
-        "two notes",
+        "two noted faults",
       );
     });
 
@@ -424,18 +414,18 @@ describe("property", () => {
       "notes a store that cannot keep an entry",
       async ({ seat }) => {
         setVariable(MUTANT, undefined);
-        const texts = warnings();
         const dir = temporary();
         chmodSync(dir, 0o500);
-        await runOn(new Recorder(), BELOW_FIVE, store(dir));
+        const recorder = new Recorder();
+        await runOn(recorder, BELOW_FIVE, store(dir));
         chmodSync(dir, 0o700);
 
-        check.isEqualTo(seat, texts.length, 1, "one note");
+        check.isEqualTo(seat, recorder.faults.length, 1, "one noted fault");
         check.hasPrefix(
           seat,
-          texts[0],
+          recorder.faults[0]?.message,
           `prop.forAll: ${dir}: the store keeps no case of "c": `,
-          "the note",
+          "the noted fault",
         );
       },
     );
@@ -728,7 +718,6 @@ describe("property", () => {
       seat,
     }) => {
       setVariable(MUTANT, undefined);
-      const texts = warnings();
       const dir = temporary();
       await runOn(new Recorder(), BELOW_FIVE, store(dir));
       const recorder = new Recorder();
@@ -754,7 +743,7 @@ describe("property", () => {
         ["counterexample", 6],
         "found, not shrunk",
       );
-      check.isEqualTo(seat, texts.length, 1, "the difference is noted");
+      check.isEqualTo(seat, recorder.faults.length, 1, "the difference is noted");
     });
 
     it("ends the call with a fault for a second claim", async ({ seat }) => {
@@ -919,7 +908,6 @@ describe("property", () => {
       seat,
     }) => {
       setVariable(MUTANT, undefined);
-      const texts = warnings();
       const file = join(temporary(), "file");
       writeFileSync(file, "");
       const recorder = new Recorder();
@@ -932,9 +920,9 @@ describe("property", () => {
 
       check.hasPrefix(
         seat,
-        texts[0],
+        recorder.faults[0]?.message,
         `prop.forAll: ${file}: the store keeps no case of "c": `,
-        "the note",
+        "the noted fault",
       );
     });
 

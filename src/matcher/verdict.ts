@@ -3,9 +3,10 @@
  *
  * Each verdict writes the call's record when its seat records calls. A
  * failure then sends its record to a seat that takes records, and the
- * sentence rendered from it to any other seat. A fault ends the call
- * through the seat's `fail` on either surface, because the call checked
- * nothing and a test that ran on would meet the fault again.
+ * sentence rendered from it to any other seat. A fault ends the call on
+ * either surface, because the call checked nothing and a test that ran on
+ * would meet the fault again. A seat that takes faults receives it, and the
+ * fault is thrown for any other seat.
  */
 
 import { callSite, Failure, render, type Where } from "../failure.js";
@@ -13,7 +14,7 @@ import type { Call, Site } from "../record/call.js";
 import { add, callsOf, Slot } from "../record/calls.js";
 import { detail as literalOf } from "../record/literal.js";
 import { reading } from "../record/switch.js";
-import { Mode, report, type Seat, takesRecords } from "./seat.js";
+import { Mode, report, type Seat, takesFaults, takesRecords } from "./seat.js";
 
 /**
  * Returns the text of a fault.
@@ -26,15 +27,48 @@ export function faultText(error: unknown): string {
 }
 
 /**
- * Ends a call that reports no verdict with a fault, through the seat's
- * `fail`. It writes no call record. It may not return.
+ * Returns a fault as an error.
+ *
+ * @param error - The fault.
+ * @returns error itself when it is an Error, and otherwise an Error whose
+ *   message is its text.
+ */
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(faultText(error));
+}
+
+/**
+ * Ends a call that reports no verdict with a fault. A seat that takes
+ * faults receives it with ending true, and the fault is thrown for any
+ * other seat. It writes no call record. It may not return.
+ *
+ * @param seat - The seat of the call.
+ * @param error - The fault.
+ * @throws The fault, as an Error, for a seat that does not take faults.
+ */
+export function end(seat: Seat, error: unknown): void {
+  seat.helper();
+  const fault = asError(error);
+  if (!takesFaults(seat)) throw fault;
+  seat.reportFault(fault, true);
+}
+
+/**
+ * Notes a fault that does not end the call, such as a file of a property's
+ * store that the run skips. A seat that takes faults receives it with
+ * ending false. For any other seat, the message of the fault goes to
+ * console.warn, which the test runner shows beside the test.
  *
  * @param seat - The seat of the call.
  * @param error - The fault.
  */
-export function end(seat: Seat, error: unknown): void {
-  seat.helper();
-  seat.fail(faultText(error));
+export function noteFault(seat: Seat, error: unknown): void {
+  const fault = asError(error);
+  if (!takesFaults(seat)) {
+    console.warn(fault.message);
+    return;
+  }
+  seat.reportFault(fault, false);
 }
 
 /**
@@ -149,8 +183,8 @@ export class Running {
 
   /**
    * Reports that the call ended without a verdict, because error refused
-   * an argument or the environment. It ends the call through the seat's
-   * `fail` on either surface, and may not return.
+   * an argument or the environment. It ends the call with the fault on
+   * either surface, as {@link end} does, and may not return.
    *
    * @param mode - The surface of the call.
    * @param assertion - The canonical id.

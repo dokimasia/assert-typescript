@@ -26,6 +26,14 @@ export interface Seat {
   /** Report a failure the test may carry on past. */
   record(message: string): void;
 
+  /**
+   * Receives a fault. ending is true for an error that ends the call
+   * without a verdict, and false for one that the call notes and runs on
+   * past. The library throws an ending fault for a seat without this
+   * member, and writes the message of a noted fault through console.warn.
+   */
+  reportFault?(fault: Error, ending: boolean): void;
+
   /** Aborts when the test that runs on this seat ends, where the seat states one. */
   readonly signal?: AbortSignal | undefined;
 }
@@ -94,6 +102,18 @@ export interface Reporter {
  */
 export function takesRecords(seat: Seat): seat is Seat & Reporter {
   return typeof (seat as Partial<Reporter>).report === "function";
+}
+
+/**
+ * Reports whether a seat takes faults.
+ *
+ * @param seat - The seat of a call.
+ * @returns True when the seat has a `reportFault` member.
+ */
+export function takesFaults(
+  seat: Seat,
+): seat is Seat & Required<Pick<Seat, "reportFault">> {
+  return typeof seat.reportFault === "function";
 }
 
 /** A seat that carries a clock. */

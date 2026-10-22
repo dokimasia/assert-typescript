@@ -82,6 +82,30 @@ describe("body", () => {
     });
   });
 
+  describe("Body.reportFault", () => {
+    it("ends the body with the message of a fault that ends its call", async () => {
+      const probe = new Probe(new Recorder(), undefined);
+      await runOn(probe, (seat) => {
+        seat.reportFault?.(new Error("the path is empty"), true);
+        seat.record("after the fault");
+      });
+
+      expect(probe.messages).toEqual(["the path is empty"]);
+    });
+
+    it("passes a noted fault to the parent, and the body runs on", async () => {
+      const noted = new Error("a file of the store is skipped");
+      const parent = new Recorder();
+      const probe = new Probe(parent, undefined);
+      await runOn(probe, (seat) => {
+        seat.reportFault?.(noted, false);
+        seat.record("after the note");
+      });
+
+      expect([parent.faults, probe.messages]).toEqual([[noted], ["after the note"]]);
+    });
+  });
+
   describe("runOn", () => {
     it("returns the seat once the body returns", async () => {
       const probe = new Probe(new Recorder(), undefined);
