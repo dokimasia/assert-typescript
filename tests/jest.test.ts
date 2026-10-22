@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the jest entry point, driven as a consumer's suite drives it.
  * It runs jest on the fixture suites in testdata/jest, which register the

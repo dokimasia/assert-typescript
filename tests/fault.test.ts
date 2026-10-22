@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the end of a helper's call with a fault. */
 
 import { describe } from "vitest";

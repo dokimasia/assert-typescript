@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the comparison of output with a golden file. */
 
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";

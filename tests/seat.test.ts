@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the seats that an assertion reports through. It uses
  * vitest's `expect` alone, because every other spec asserts on a seat.

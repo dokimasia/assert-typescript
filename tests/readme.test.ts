@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the README: its examples run, and its counts and its API
  * reference are the code's. The API reference is generated from the

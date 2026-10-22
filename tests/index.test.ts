@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the entry point of the package, and the completeness gate:
  * every assertion that the definition states is exported under the name

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the surface that stops the test at the first failure. It
  * uses vitest's `expect` alone, because the other specs assert with this

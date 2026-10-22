@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the vitest entry point: the names that it exports. It uses
  * vitest's `expect` alone, because the other specs assert on the seat that

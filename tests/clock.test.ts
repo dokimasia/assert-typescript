@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the clocks that an assertion reads time from. */
 
 import { describe } from "vitest";

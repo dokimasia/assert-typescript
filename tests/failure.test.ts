@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /** The spec of the record that a failing assertion reports, and of its sentence. */
 
 import { tmpdir } from "node:os";
