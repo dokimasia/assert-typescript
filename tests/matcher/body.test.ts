@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the seat that an assertion makes for a body. It uses
  * vitest's `expect` alone, because `eventually` and `rejects` decide

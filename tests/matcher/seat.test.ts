@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the interface that every assertion reports through. It uses
  * vitest's `expect` alone, because every verdict reaches the test through

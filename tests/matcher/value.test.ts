@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the assertions about a value. It uses vitest's `expect`
  * alone, because the surfaces call these assertions.

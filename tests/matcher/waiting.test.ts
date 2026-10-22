@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the assertions that retry, and of the one that checks that
  * nothing was left running. It uses vitest's `expect` alone, because the

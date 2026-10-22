@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the relaxations of the comparison. It uses vitest's `expect`
  * alone, because the comparison reads them.

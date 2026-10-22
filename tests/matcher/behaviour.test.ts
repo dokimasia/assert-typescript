@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the assertions about how a subject behaves. It uses vitest's
  * `expect` alone, because the surfaces call these assertions.

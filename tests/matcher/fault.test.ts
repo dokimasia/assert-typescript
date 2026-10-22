@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the faults of the library. It uses vitest's `expect` alone,
  * as every spec of the matcher does.

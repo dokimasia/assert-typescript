@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the register of the asynchronous assertions that a caller
  * never awaited. It uses vitest's `expect` alone, because a forgotten

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the verdict of an assertion call: a pass, a failure or a
  * fault, and the call record of each. It uses vitest's `expect` alone,

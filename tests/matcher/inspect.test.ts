@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the rendering of a value into a failure's sentence. It uses
  * vitest's `expect` alone, because every failure's sentence contains it.

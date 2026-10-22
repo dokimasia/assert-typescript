@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the assertion about how neighbouring items relate. It uses
  * vitest's `expect` alone, because the surfaces call this assertion.

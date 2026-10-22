@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the comparison that every assertion that compares reports
  * through. It uses vitest's `expect` alone, because a defect in the
