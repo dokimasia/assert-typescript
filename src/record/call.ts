@@ -7,11 +7,20 @@
  * the order the definition lists them.
  */
 
-import { basename } from "node:path";
+import { readFileSync } from "node:fs";
+import { basename, join } from "node:path";
+import { directoryOf } from "../failure.js";
 import { json } from "./literal.js";
 
-/** The definition version that this library implements, which every call record states. */
-export const DEFINITION = "10.0.0";
+/**
+ * The definition version that this library implements, which every call
+ * record states: the version of the vendored definition, which its file
+ * VERSION contains. The build copies the file beside this module's directory.
+ */
+export const DEFINITION = readFileSync(
+  join(directoryOf(), "../conformance/VERSION"),
+  "utf8",
+).trim();
 
 /** How a call ended. */
 export type Verdict = "pass" | "fail" | "error";
