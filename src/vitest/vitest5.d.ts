@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The declarations of `@dokimi/assert/vitest`: the vitest adapter, and the
  * matchers of the standard's assertions in the shape of vitest 5.

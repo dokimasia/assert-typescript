@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The vitest adapter: the standard's assertions on vitest's `expect`, and
  * a seat supplied per test.

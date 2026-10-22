@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the vitest adapter, driven as a consumer's suite drives it.
  * It uses vitest's own matchers alone, because the adapter delivers the
