@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The spec of the jest adapter, on jest's `expect` in a vitest worker. A
  * mock of `@jest/globals` hands the adapter that `expect`, and keeps each

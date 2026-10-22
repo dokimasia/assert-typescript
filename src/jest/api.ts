@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The jest adapter: the standard's assertions on jest's `expect`, and
  * `expect.soft`.

@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 /**
  * The types of the standard's assertions on jest's `expect`, and of
  * `expect.soft`.
