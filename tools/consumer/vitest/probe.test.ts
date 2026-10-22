@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 // One passing and one failing call of a matcher in a consumer project.
 import { expect, it } from "vitest";
 

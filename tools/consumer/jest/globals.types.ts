@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 // Calls matchers on the expect of @jest/globals, and marks each call that
 // the declarations must refuse. tsc compiles it, and nothing runs it.
 import "@dokimi/assert/jest";

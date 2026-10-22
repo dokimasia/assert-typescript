@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright Dokimasia B.V. 2026
+# SPDX-License-Identifier: MIT
+
 # Installs the packed library into an empty project beside one runner, as a
 # consumer installs it, and checks the project: tsc compiles the type probes
 # of the runner with skipLibCheck off, and the runner runs one test file

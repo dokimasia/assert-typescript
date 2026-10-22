@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 // One passing and one failing call of a matcher in a consumer project.
 const { expect, test } = require("@jest/globals");
 const { check, Recorder } = require("@dokimi/assert");

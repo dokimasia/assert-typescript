@@ -1,3 +1,6 @@
+// Copyright Dokimasia B.V. 2026
+// SPDX-License-Identifier: MIT
+
 // Calls every matcher once on vitest's chain, and marks each call that
 // the declarations must refuse. tsc compiles it, and nothing runs it.
 import { expect } from "vitest";
