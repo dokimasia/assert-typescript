@@ -5,7 +5,7 @@
 
 import { describe } from "vitest";
 import { check } from "../../src/index.js";
-import { integer, list } from "../../src/prop/generators.js";
+import { composite, integer, list } from "../../src/prop/generators.js";
 import { values } from "../../src/prop/values.js";
 import { test as it } from "../../src/vitest.js";
 import { thrown } from "../helpers.js";
@@ -89,6 +89,17 @@ describe("values", () => {
         thrown(() => values(never, 7, 2)),
         "prop: values(generator, 7, 2) stops after the generator rejects 21 cases for 2 values",
         "values gives up",
+      );
+    });
+
+    it("throws at a case that the generator skips", ({ seat }) => {
+      const skipping = composite((c) => c.skip("the generator skips"));
+
+      check.isEqualTo(
+        seat,
+        thrown(() => values(skipping, 7, 1)),
+        "prop: values(generator, 7, 1) stops at a case that the generator skips: the generator skips",
+        "values stops",
       );
     });
 

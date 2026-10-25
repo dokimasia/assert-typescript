@@ -6,17 +6,21 @@
  *
  * A body spec draws one value, labelled `value`, from its `draw` generator.
  * It then classifies the case under each `classify` label whose predicate
- * is true, rejects the case when `rejects-when` is true, and fails it with
- * the identity of the first `fails` entry whose predicate is true, in that
- * order.
+ * is true, rejects the case when `rejects-when` is true, skips the run with
+ * the reason of the first `skips` entry whose predicate is true, and fails
+ * it with the identity of the first `fails` entry whose predicate is true,
+ * in that order.
  *
- * Three named bodies state what no predicate can:
+ * Four named bodies state what no predicate can:
  *
  * - `draws-nothing` requests no input.
  * - `diverges` draws an integer in [0, 9] on its first call and a boolean on
  *   every later call.
  * - `fails-once` draws an integer in [0, 10^9] and fails with identity
  *   `once` the first time that it draws a value above 1,000.
+ * - `fails-then-skips` draws an integer in [0, 10^9] and fails with
+ *   identity `once` the first time that it draws a value above 1,000. Every
+ *   later call draws its value and then skips with the reason `after`.
  */
 
 import type { Case } from "../../prop/engine/case.js";
@@ -30,13 +34,18 @@ export const DRAWN = "value";
 /** A body's JSON object. */
 type Spec = Readonly<Record<string, unknown>>;
 
-/** Returns a label or an identity, which a spec states as a string. */
+/** Returns a label, an identity or a reason, which a spec states as a string. */
 function nameOf(value: unknown): string {
   if (typeof value !== "string") {
-    throw new Error(`prop: ${JSON.stringify(value)} is no label and no identity`);
+    throw new Error(
+      `prop: ${JSON.stringify(value)} is no label, no identity and no reason`,
+    );
   }
   return value;
 }
+
+/** The generator of the integer that `fails-once` and `fails-then-skips` draw. */
+const WIDE = { gen: "integer", min: 0, max: 1_000_000_000 } as const;
 
 /** Returns the body that requests no input. */
 function nothing(): Body {
@@ -51,25 +60,49 @@ function diverging(): Body {
   return (c: Case) => {
     c.draw(calls > 0 ? coin : digit, DRAWN);
     calls += 1;
-    return undefined;
   };
 }
 
 /** Returns a body that fails only the first time it draws above 1,000. */
 function failingOnce(): Body {
   let failed = false;
-  const wide = build({ gen: "integer", min: 0, max: 1_000_000_000 });
+  const wide = build(WIDE);
   return (c: Case) => {
     const value = c.draw(wide, DRAWN) as bigint;
     if (value > 1000n && !failed) {
       failed = true;
       c.fail("once");
     }
-    return undefined;
   };
 }
 
-/** Returns a body that draws once, then classifies, rejects and fails. */
+/** Returns a body that fails above 1,000 once, then skips every call. */
+function failingThenSkipping(): Body {
+  let failed = false;
+  const wide = build(WIDE);
+  return (c: Case) => {
+    const value = c.draw(wide, DRAWN) as bigint;
+    if (failed) c.skip("after");
+    if (value > 1000n) {
+      failed = true;
+      c.fail("once");
+    }
+  };
+}
+
+/** Returns the entries of the list key of a spec, each its string under name and its predicate. */
+function entriesOf(
+  spec: Spec,
+  key: string,
+  name: string,
+): (readonly [string, Predicate])[] {
+  const entries = spec[key] ?? [];
+  if (!Array.isArray(entries))
+    throw new Error(`prop: ${key} is ${JSON.stringify(entries)}, not a list`);
+  return entries.map((entry: Spec) => [nameOf(entry[name]), predicate(entry["when"])]);
+}
+
+/** Returns a body that draws once, then classifies, rejects, skips and fails. */
 function drawing(spec: Spec): Body {
   const generator = build(spec["draw"]);
   const classify = spec["classify"] ?? {};
@@ -80,19 +113,14 @@ function drawing(spec: Spec): Body {
     ([label, when]) => [label, predicate(when)] as const,
   );
   const rejects = "rejects-when" in spec ? predicate(spec["rejects-when"]) : undefined;
-  const entries = spec["fails"] ?? [];
-  if (!Array.isArray(entries))
-    throw new Error(`prop: fails is ${JSON.stringify(entries)}, not a list`);
-  const fails: (readonly [string, Predicate])[] = entries.map((entry: Spec) => [
-    nameOf(entry["identity"]),
-    predicate(entry["when"]),
-  ]);
+  const skips = entriesOf(spec, "skips", "reason");
+  const fails = entriesOf(spec, "fails", "identity");
   return (c: Case) => {
     const value = c.draw(generator, DRAWN);
     for (const [label, test] of labels) if (test(value)) c.classify(label);
     if (rejects !== undefined) c.assume(!rejects(value));
+    for (const [reason, test] of skips) if (test(value)) c.skip(reason);
     for (const [identity, test] of fails) if (test(value)) c.fail(identity);
-    return undefined;
   };
 }
 
@@ -111,6 +139,8 @@ export function buildBody(spec: Spec): Body {
       return diverging();
     case "fails-once":
       return failingOnce();
+    case "fails-then-skips":
+      return failingThenSkipping();
     case undefined:
       return drawing(spec);
     default:

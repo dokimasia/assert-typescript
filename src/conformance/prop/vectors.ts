@@ -49,6 +49,12 @@ type Compute = (raw: Raw) => Promise<Record<string, unknown>>;
 /** The identity that a shrinking vector's body fails with. */
 const FAILS_WHEN = "fails-when";
 
+/** The verdict of the call record of a run that passed or skipped. Every other run fails. */
+const VERDICTS: Readonly<Partial<Record<string, string>>> = {
+  passed: "pass",
+  skipped: "skip",
+};
+
 /** Returns the corpus forms of a case's recorded choices. */
 function recordedOf(c: Case): unknown[] {
   return c.choices.map(choiceLiteral);
@@ -190,7 +196,6 @@ async function recordingOf(raw: Raw): Promise<Record<string, unknown>> {
       throw err;
     }
     made.push("pass");
-    return undefined;
   };
   const calls: Record<string, unknown>[] = [];
   let runs = 0;
@@ -201,7 +206,7 @@ async function recordingOf(raw: Raw): Promise<Record<string, unknown>> {
       made.length = 0;
     }),
   );
-  return { verdict: outcome.kind === "passed" ? "pass" : "fail", calls };
+  return { verdict: VERDICTS[outcome.kind] ?? "fail", calls };
 }
 
 /** The function that computes each kind's outputs. */

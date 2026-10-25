@@ -30,6 +30,7 @@
  */
 
 import { relative, sep } from "node:path";
+import process from "node:process";
 import { test as base, chai, expect } from "vitest";
 import { type Call, Pending } from "../expect/guard.js";
 import { matchers, NAMES, type State } from "../expect/matchers.js";
@@ -210,15 +211,40 @@ export interface SeatFixture {
   seat: Collector;
 }
 
+/** The seat of a fixture's test, which skips the test through skip of the test's context. */
+class TestSeat extends Collector {
+  readonly #skip: (note?: string) => never;
+
+  /**
+   * Returns the seat of a test whose context skips it with skip.
+   *
+   * @param skip - The skip of the test's context.
+   */
+  constructor(skip: (note?: string) => never) {
+    super();
+    this.#skip = skip;
+  }
+
+  /**
+   * Skips the test, and does not return.
+   *
+   * @param reason - Why the test skips.
+   */
+  skip(reason: string): never {
+    this.#skip(reason);
+  }
+}
+
 /**
  * A vitest `test` that supplies a seat.
  *
  * Everything `soft` records on the seat is thrown when the body ends,
- * so a test that records two failures reports both at once.
+ * so a test that records two failures reports both at once. A property
+ * whose run skips skips the test through the seat.
  */
 export const test = base.extend<SeatFixture>({
-  seat: async ({ task, signal }, use) => {
-    const collector = new Collector().withSignal(signal);
+  seat: async ({ task, signal, skip }, use) => {
+    const collector = new TestSeat(skip).withSignal(signal);
     nameTest(collector, pathOf(task.file.filepath, task));
     const read = reading();
     if ("on" in read && read.on) {

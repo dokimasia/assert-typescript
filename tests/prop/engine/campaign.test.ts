@@ -42,7 +42,6 @@ const HIGH = 900_000_000n;
 function body(fn: (c: Case) => void): Body {
   return (c) => {
     fn(c);
-    return undefined;
   };
 }
 
@@ -298,6 +297,51 @@ describe("campaign", () => {
         [outcome.kind, outcome.divergence?.what, outcome.stored.length],
         ["flaky", "verdict", 1],
         "the replay passes",
+      );
+    });
+
+    it("returns skipped at a case that skips before the first failure", async ({
+      seat,
+    }) => {
+      const [outcome] = await explored(
+        body((c) => {
+          c.draw(WIDE, "n");
+          c.skip("the environment lacks a capability");
+        }),
+        ticks(10, { stored: [integers(5n)] }),
+      );
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.reason, outcome.stored.length],
+        ["skipped", "the environment lacks a capability", 1],
+        "the stored case skips",
+      );
+    });
+
+    it("counts neither a valid nor a rejected case at a skip after the first failure", async ({
+      seat,
+    }) => {
+      let failed = false;
+      let passed = 0;
+      const [outcome] = await explored(
+        body((c) => {
+          const n = c.draw(WIDE, "n");
+          if (n <= HIGH && failed) c.skip("the case skips after the failure");
+          if (n > HIGH) {
+            failed = true;
+            c.fail("high");
+          }
+          passed += 1;
+        }),
+        ticks(100),
+      );
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.cases, outcome.rejected],
+        ["counterexample", passed, 0],
+        "the passes before the failure",
       );
     });
 

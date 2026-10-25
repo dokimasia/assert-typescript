@@ -42,9 +42,10 @@ describe("verdict", () => {
     fault(seat, Mode.Soft, "true", "it faults", new Error("a fault"));
     Running.of(seat).passRun(Mode.Soft, "prop-for-all", "a run", undefined, {});
     Running.of(seat).failRun(Mode.Soft, new Failure("prop-for-all", "a run", {}), {});
+    Running.of(seat).skipRun(Mode.Soft, "prop-for-all", "a run", undefined, {}, "why");
 
     expect(seat.faults.map((f) => f.message)).toEqual(
-      Array(5).fill(`${VARIABLE}: "yes" is neither 0 nor 1`),
+      Array(6).fill(`${VARIABLE}: "yes" is neither 0 nor 1`),
     );
   });
 
@@ -307,6 +308,55 @@ describe("verdict", () => {
         file: "verdict.test.ts",
         line: expect.any(Number),
       });
+    });
+  });
+
+  describe("Running.skipRun", () => {
+    const run = { outcome: "skipped", cases: 2, rejected: 0, seed: "7" };
+
+    it("writes the detail of the run in the call record of the skip", () => {
+      const seat = new Recorder();
+      Running.of(seat).skipRun(
+        Mode.Fatal,
+        "prop-for-all",
+        "the run skips",
+        { file: "/a/p.test.ts", line: 5 },
+        run,
+        "the environment lacks a capability",
+      );
+
+      expect(records(seat).map((r) => [r["verdict"], r["detail"], r["where"]])).toEqual(
+        [["skip", run, { file: "p.test.ts", line: 5 }]],
+      );
+      expect(seat.failed).toBe(false);
+    });
+
+    it("skips the test of a seat that skips its test after the call record", () => {
+      class Skipping extends Recorder {
+        readonly reasons: string[] = [];
+
+        skip(reason: string): never {
+          this.reasons.push(reason);
+          throw new Error(`the test skips: ${reason}`);
+        }
+      }
+      const seat = new Skipping();
+      const err = thrownBy(() =>
+        Running.of(seat).skipRun(
+          Mode.Fatal,
+          "prop-for-all",
+          "c",
+          undefined,
+          run,
+          "why",
+        ),
+      );
+
+      expect([
+        (err as Error).message,
+        seat.reasons,
+        records(seat).map((r) => r["verdict"]),
+      ]).toEqual(["the test skips: why", ["why"], ["skip"]]);
     });
   });
 

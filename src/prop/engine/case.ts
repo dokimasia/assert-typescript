@@ -12,8 +12,9 @@
  * the bridge. The case records every value with its request and the spans
  * of the generators that asked for it. The shrinker edits that record.
  *
- * The signals that the members raise, Rejected and Failed, and the signals
- * of the case tree end the body, which must let them pass.
+ * The signals that the members raise, Rejected and Failed, the signal
+ * Skipped and the signals of the case tree end the body, which must let them
+ * pass.
  */
 
 import {
@@ -77,6 +78,27 @@ export class Failed extends Error {
     this.name = "Failed";
     this.identity = identity;
     this.record = record;
+  }
+}
+
+/**
+ * The signal of a case that skips the run of its property. Before the run
+ * finds a failing case, the run ends as skipped with the reason. After it,
+ * the case counts as a case that does not fail.
+ */
+export class Skipped extends Error {
+  /** Why the case skips. */
+  readonly reason: string;
+
+  /**
+   * Returns the skip of reason.
+   *
+   * @param reason - Why the case skips.
+   */
+  constructor(reason: string) {
+    super(`prop: the case skips the run: ${reason}`);
+    this.name = "Skipped";
+    this.reason = reason;
   }
 }
 
@@ -614,5 +636,15 @@ export class Case {
    */
   fail(identity: string, record?: unknown): never {
     throw new Failed(identity, record);
+  }
+
+  /**
+   * Skips the run of the case's property.
+   *
+   * @param reason - Why the case skips.
+   * @throws Skipped always.
+   */
+  skip(reason: string): never {
+    throw new Skipped(reason);
   }
 }

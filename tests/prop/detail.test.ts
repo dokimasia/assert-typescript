@@ -98,8 +98,20 @@ describe("detail", () => {
           others: null,
           divergence: null,
           coverage: null,
+          reason: null,
         },
         "the detail of a pass",
+      );
+    });
+
+    it("returns the reason of a run that skipped", ({ seat }) => {
+      check.isEqualTo(
+        seat,
+        detailOf(outcome("skipped", { reason: "the case needs a capability" }))[
+          "reason"
+        ],
+        "the case needs a capability",
+        "the reason",
       );
     });
 
@@ -594,7 +606,7 @@ describe("detail", () => {
             recorded: keyOf(ofRecord(RECORD)),
             replayed: undefined,
           },
-          want: "\ndivergence: the verdict at 3, recorded equal at total.test.ts:9, replayed a pass",
+          want: "\ndivergence: the verdict at 3, recorded equal at total.test.ts:9, replayed no failure",
         },
       ] as const;
       for (const tt of tests) {

@@ -36,7 +36,6 @@ const BITS: Decoder<bigint> = { [DECODE]: (c: Case) => c.integer(BIT) };
 /** A body that draws a digit and passes. */
 const draws: Body = (c) => {
   c.draw(DIGITS, "n");
-  return undefined;
 };
 
 /** Returns integer choices of values. */
@@ -98,17 +97,40 @@ describe("execution", () => {
     it("rejects a body that assumes false", async ({ seat }) => {
       const execution = await run((c) => {
         c.assume(false);
-        return undefined;
       });
 
       check.isEqualTo(seat, execution.status, "rejected", "a rejection");
+    });
+
+    it("skips a body that skips with the skip's reason", async ({ seat }) => {
+      const execution = await run((c) => c.skip("the case needs a capability"));
+
+      check.isEqualTo(
+        seat,
+        [execution.status, execution.reason, identityOf(execution)],
+        ["skipped", "the case needs a capability", undefined],
+        "the skip",
+      );
+    });
+
+    it("skips a case without a leaf", async ({ seat }) => {
+      const tree = new Tree();
+      await run(
+        (c) => {
+          c.draw(DIGITS, "n");
+          c.skip("the case skips");
+        },
+        integers(5n),
+        tree,
+      );
+
+      check.isNil(seat, tree.root.children.get("5")?.ending, "the skip leaves no leaf");
     });
 
     it("rejects a case past its cap", async ({ seat }) => {
       const two: Body = (c) => {
         c.draw(DIGITS, "a");
         c.draw(DIGITS, "b");
-        return undefined;
       };
 
       check.isEqualTo(
@@ -124,7 +146,6 @@ describe("execution", () => {
       const two: Body = (c) => {
         c.draw(DIGITS, "a");
         c.draw(DIGITS, "b");
-        return undefined;
       };
       await run(two, integers(5n), tree, 1);
 
@@ -166,7 +187,6 @@ describe("execution", () => {
       const other = await run(
         (c) => {
           c.draw(BITS, "b");
-          return undefined;
         },
         [],
         tree,
@@ -197,7 +217,6 @@ describe("execution", () => {
         (c) => {
           c.place = { part: "sequential", position: 3 };
           c.draw(BITS, "b");
-          return undefined;
         },
         [],
         tree,
@@ -240,7 +259,6 @@ describe("execution", () => {
         (c) => {
           c.draw(DIGITS, "n");
           c.assume(false);
-          return undefined;
         },
         integers(3n),
         tree,

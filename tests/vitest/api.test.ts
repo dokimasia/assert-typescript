@@ -15,6 +15,7 @@ import { afterAll, beforeAll, chai, describe, expect, onTestFinished } from "vit
 import * as check from "../../src/check.js";
 import { NAMES } from "../../src/expect/matchers.js";
 import type { Failure } from "../../src/failure.js";
+import { takesSkips } from "../../src/matcher/seat.js";
 import { Collector, Recorder } from "../../src/seat.js";
 import * as soft from "../../src/soft.js";
 import { test as it, RECORDS, register } from "../../src/vitest/api.js";
@@ -480,6 +481,24 @@ describe("api", () => {
         seat.cleanup(() => {
           throw new Error("the directory is busy");
         });
+      });
+    });
+
+    describe("with a skip", () => {
+      it("skips the test through the seat", ({ seat }) => {
+        if (takesSkips(seat)) seat.skip("the environment lacks a capability");
+      });
+
+      it("ends the test that the seat skipped as skipped with the reason", ({
+        task,
+      }) => {
+        const result = task.suite?.tasks[0]?.result;
+        const note = result !== undefined && "note" in result ? result.note : undefined;
+
+        expect([result?.state, note]).toEqual([
+          "skip",
+          "the environment lacks a capability",
+        ]);
       });
     });
 

@@ -21,6 +21,7 @@ import {
   Rejected,
   Replaying,
   type Request,
+  Skipped,
   Valuing,
 } from "../../../src/prop/engine/case.js";
 import {
@@ -111,6 +112,23 @@ describe("case", () => {
           "prop: the case fails as true@a.ts:1",
           "true@a.ts:1",
           { assertion: "true" },
+        ],
+        "the fields",
+      );
+    });
+  });
+
+  describe("new Skipped", () => {
+    it("returns the skip of a reason", ({ seat }) => {
+      const skipped = new Skipped("the case needs a capability");
+
+      check.isEqualTo(
+        seat,
+        [skipped.name, skipped.message, skipped.reason],
+        [
+          "Skipped",
+          "prop: the case skips the run: the case needs a capability",
+          "the case needs a capability",
         ],
         "the fields",
       );
@@ -898,6 +916,23 @@ describe("case", () => {
         [(err as Failed).identity, (err as Failed).record],
         ["raises@a.ts:3", "the record"],
         "the failure",
+      );
+    });
+  });
+
+  describe("Case.skip", () => {
+    it("throws the skip of a reason", ({ seat }) => {
+      const err = check.doesThrow(
+        seat,
+        () => new Case(new Replaying([])).skip("the case needs a capability"),
+        "skip throws",
+      );
+
+      check.isEqualTo(
+        seat,
+        (err as Skipped).reason,
+        "the case needs a capability",
+        "the reason",
       );
     });
   });

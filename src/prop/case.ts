@@ -7,8 +7,9 @@
  *
  * A case keeps each failure record in call order, and its first record is
  * the case's failure. A failure that stops ends the case with a signal of
- * the engine, as an aborting assertion ends a test. assume, a draw that
- * repeats a tested case and a draw past the cap end it with a signal too.
+ * the engine, as an aborting assertion ends a test. assume, skip, a draw
+ * that repeats a tested case and a draw past the cap end it with a signal
+ * too.
  * Every later call of the case throws the signal again, so a body that
  * catches a signal cannot run on past the end of its case.
  *
@@ -24,7 +25,7 @@ import { History } from "../history/history.js";
 import { clockOf, type Reporter, type Seat, signalOf } from "../matcher/seat.js";
 import { own, run, type Slot } from "../record/calls.js";
 import { Standard } from "../seat.js";
-import { type Case as Engine, Failed, Rejected } from "./engine/case.js";
+import { type Case as Engine, Failed, Rejected, Skipped } from "./engine/case.js";
 import type { Generator } from "./engine/generator.js";
 import { TraceError } from "./engine/trace.js";
 import { Diverged, Repeated } from "./engine/tree.js";
@@ -80,6 +81,7 @@ function isSignal(err: unknown): boolean {
   return (
     err instanceof Rejected ||
     err instanceof Failed ||
+    err instanceof Skipped ||
     err instanceof Repeated ||
     err instanceof Diverged ||
     err instanceof TraceError
@@ -237,6 +239,31 @@ export class Case implements Seat, Reporter {
   }
 
   /**
+   * Ends the run of the property as skipped, with reason. The case ends at
+   * the call and runs its cleanups. Once the run has found a failing case, a
+   * case that skips ends as a case that does not fail, and the run goes on.
+   *
+   * The seat of the fixture of `@dokimi/assert/vitest` skips its test with
+   * reason. On every other seat, the seat of a jest test included, the test
+   * passes, and the call record of the property states the verdict skip.
+   *
+   * @param reason - Why the case skips, such as a capability that the
+   *   environment lacks.
+   * @example
+   * test("writes with direct I/O", async ({ seat }) => {
+   *   await prop.forAll(seat, "a write reads back", (c) => {
+   *     if (!supportsDirectIo()) c.skip("the file system refuses direct I/O");
+   *     // ...
+   *   });
+   * });
+   */
+  skip(reason: string): never {
+    const state = stateOf(this);
+    check(state);
+    stop(state, new Skipped(reason));
+  }
+
+  /**
    * Counts the case under label, for the coverage requirements that
    * prop.require states. A label counted twice in one case counts once.
    *
@@ -295,11 +322,11 @@ export class Case implements Seat, Reporter {
 
   /**
    * Registers fn to run when the case ends: after its body returns, fails,
-   * throws, rejects the case or stops at a draw. The cleanups run the last
-   * registered first, and each that returns a promise is awaited. A failure
-   * in a cleanup fails the case as one in the body does, and the later
-   * cleanups still run. A cleanup that a cleanup registers runs before the
-   * case ends.
+   * throws, rejects the case, skips or stops at a draw. The cleanups run the
+   * last registered first, and each that returns a promise is awaited. A
+   * failure in a cleanup fails the case as one in the body does, and the
+   * later cleanups still run. A cleanup that a cleanup registers runs before
+   * the case ends.
    *
    * @param fn - The cleanup.
    */
@@ -417,8 +444,9 @@ function failureOf(state: State): Failed | undefined {
  * case's signal and runs its cleanups, then throws how the case ended. A case
  * that repeats a tested case, diverges, or follows a trace that it cannot
  * follow throws that signal. A case that failed, in the body or in a
- * cleanup, throws its failure, also when it was rejected or passed its cap.
- * A rejected case throws its rejection, and a case that passed returns.
+ * cleanup, throws its failure, also when it was rejected, skipped or passed
+ * its cap. A rejected case throws its rejection, a case that skipped throws
+ * its skip, and a case that passed returns.
  *
  * @param c - The case.
  * @param body - The body, which may return a promise.

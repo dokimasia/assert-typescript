@@ -39,6 +39,12 @@
  * ten times as many cases as were valid, when no case requested an input,
  * or when a coverage requirement is refuted or unmet, checked in that order.
  *
+ * A case that skips before the run finds a failing case ends the run as
+ * skipped, in every phase. Once the run has found a failing case, a case
+ * that skips counts as a case that does not fail: a replay that skips makes
+ * the run flaky, a shrink candidate that skips is not accepted, and an
+ * explain run that skips neither fails the way the failure fails nor passes.
+ *
  * A campaign shares the counts, the known cases and the conclusion of a
  * failure with a run, and this module exports them for it.
  */
@@ -87,14 +93,18 @@ const MAX_PREFIX_CASES = 50;
 /** A random case has a prefix case only when it made at least this many choices. */
 const MIN_PREFIXED_CHOICES = 2;
 
-/** How a run ended. Every kind but passed fails the test. */
+/**
+ * How a run ended. passed passes the test, skipped skips it where the seat
+ * can skip a running test, and every other kind fails it.
+ */
 export type Kind =
   | "passed"
   | "counterexample"
   | "flaky"
   | "rejected"
   | "coverage-unmet"
-  | "vacuous";
+  | "vacuous"
+  | "skipped";
 
 /** A label that must count at least share of the valid cases. */
 export interface Requirement {
@@ -158,7 +168,8 @@ export interface Shortfall {
  * requirement that a coverage-unmet run missed. runs counts the runs that
  * shrinking and explaining spent. valued is set for a counterexample that
  * an example of values found, which has no token. stored are the runs of
- * the stored cases, in order, up to the one that ended the run.
+ * the stored cases, in order, up to the one that ended the run. reason is
+ * the reason of the case that skipped a skipped run.
  */
 export interface Outcome {
   readonly kind: Kind;
@@ -168,6 +179,7 @@ export interface Outcome {
   readonly failing?: Execution | undefined;
   readonly divergence?: Divergence | undefined;
   readonly shortfall?: Shortfall | undefined;
+  readonly reason?: string | undefined;
   readonly others: readonly Execution[];
   readonly explanation: readonly Explained[];
   readonly token?: string | undefined;
@@ -200,8 +212,9 @@ export class Tally {
 
   /**
    * Counts one execution, and returns the outcome when it ends the run: a
-   * counterexample for a failed case, and flaky for a diverged one. A case
-   * that repeated an earlier one counts nowhere.
+   * counterexample for a failed case, flaky for a diverged one, and skipped
+   * with its reason for a skipped one. A case that repeated an earlier one
+   * counts nowhere.
    *
    * @param execution - The execution.
    * @returns The outcome, or undefined for a case that does not end the run.
@@ -213,6 +226,9 @@ export class Tally {
       return this.outcome("counterexample", { failing: execution });
     if (execution.status === "diverged") {
       return this.outcome("flaky", { divergence: execution.divergence });
+    }
+    if (execution.status === "skipped") {
+      return this.outcome("skipped", { reason: execution.reason });
     }
     if (execution.status === "rejected") this.rejected += 1;
     else if (execution.status === "passed") {
@@ -227,12 +243,13 @@ export class Tally {
    * Returns an outcome of kind with the counts so far.
    *
    * @param kind - How the run ended.
-   * @param parts - The failing case, the divergence or the shortfall.
+   * @param parts - The failing case, the divergence, the shortfall or the
+   *   reason of a skip.
    * @returns The outcome, with no other failure, explanation or stored run.
    */
   outcome(
     kind: Kind,
-    parts: Pick<Outcome, "failing" | "divergence" | "shortfall"> = {},
+    parts: Pick<Outcome, "failing" | "divergence" | "shortfall" | "reason"> = {},
   ): Outcome {
     return {
       kind,
@@ -577,7 +594,7 @@ function* explore(body: Body, settings: Resolved, observer: Observer): Work<Outc
 /**
  * Runs the one case that choices record, and reports it as found. The case
  * runs outside a case tree, so it cannot diverge: an outcome that it ends
- * the run with is a counterexample.
+ * the run with is a counterexample, or skipped.
  */
 function* replayOnly(
   body: Body,
@@ -591,7 +608,15 @@ function* replayOnly(
   const outcome = tally.take(execution);
   if (outcome === undefined)
     return tally.failureWithoutCounterexample() ?? tally.outcome("passed");
-  return { ...outcome, token: encode(execution.case.choices) };
+  return withToken(outcome);
+}
+
+/** Returns outcome with the replay token of its failing case, and an outcome without one unchanged. */
+function withToken(outcome: Outcome): Outcome {
+  const failing = outcome.failing;
+  return failing === undefined
+    ? outcome
+    : { ...outcome, token: encode(failing.case.choices) };
 }
 
 /**
@@ -624,7 +649,7 @@ export function* run(
  * its other cases, and returns how they ended: a pass that counts them, or
  * the outcome of the first of them that does not pass. A failing stored
  * case is reported as found, with its token, and is neither shrunk nor
- * explained. The outcome states the runs of the stored cases up to the one
+ * explained. A stored case that skips ends the run as skipped. The outcome states the runs of the stored cases up to the one
  * that ended it. The settings' traces and examples do not run. A stored case
  * runs outside a case tree, so it cannot diverge.
  *
@@ -644,10 +669,7 @@ export function* runStored(
   const stored: Execution[] = [];
   const outcome = yield* tryKnown(body, resolved, tally, observer, stored);
   if (outcome === undefined) return { ...tally.outcome("passed"), stored };
-  return {
-    ...outcome,
-    token: encode((outcome.failing as Execution).case.choices),
-  };
+  return withToken(outcome);
 }
 
 /**

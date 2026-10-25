@@ -26,7 +26,7 @@ export const DEFINITION = readFileSync(
 ).trim();
 
 /** How a call ended. */
-export type Verdict = "pass" | "fail" | "error";
+export type Verdict = "pass" | "fail" | "skip" | "error";
 
 /** The kind of a property's case that a call ran in. */
 export type Phase =

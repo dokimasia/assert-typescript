@@ -21,6 +21,7 @@ const REJECTED = {
   others: null,
   divergence: null,
   coverage: null,
+  reason: null,
 };
 
 describe("index", () => {

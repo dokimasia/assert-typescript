@@ -83,8 +83,8 @@ describe("vector", () => {
       expect(VECTORS.filter((v) => HISTORY_KINDS.includes(v.kind))).toHaveLength(80);
     });
 
-    it("returns the 430 property vectors of the definition", () => {
-      expect(VECTORS.filter((v) => PROP_KINDS.includes(v.kind))).toHaveLength(430);
+    it("returns the 435 property vectors of the definition", () => {
+      expect(VECTORS.filter((v) => PROP_KINDS.includes(v.kind))).toHaveLength(435);
     });
 
     it("returns the 14 machines vectors of the definition", () => {

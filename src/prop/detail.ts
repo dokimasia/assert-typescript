@@ -4,11 +4,11 @@
 /**
  * The record of a property's run, and its sentence.
  *
- * The record's detail has the ten fields of prop-for-all: outcome, cases,
- * rejected, seed, counterexample, failure, choices, others, divergence and
- * coverage. A field that the outcome does not use is null. The call record
- * of a property states the same detail as JSON, each drawn value as a typed
- * literal of its generator's type.
+ * The record's detail has the eleven fields of prop-for-all: outcome,
+ * cases, rejected, seed, counterexample, failure, choices, others,
+ * divergence, coverage and reason. A field that the outcome does not use is
+ * null. The call record of a property states the same detail as JSON, each
+ * drawn value as a typed literal of its generator's type.
  */
 
 import { basename } from "node:path";
@@ -72,7 +72,7 @@ export interface Divergence {
   readonly what: "request" | "fingerprint" | "verdict";
   /** The position of the request or the fingerprint, or the choices of the case for a verdict. */
   readonly index: number;
-  /** The recorded version, and null for an end, no fingerprint, or a pass. */
+  /** The recorded version, and null for an end, no fingerprint, or a case that did not fail. */
   readonly recorded: unknown;
   /** The replayed version, as recorded states it. */
   readonly replayed: unknown;
@@ -156,7 +156,7 @@ function stepOf(step: EngineStep): Step {
 /**
  * Returns one side of a divergence as the record states it: the bounds of a
  * request, a fingerprint, the text of a failure's identity, or null for an
- * end, no fingerprint or a pass.
+ * end, no fingerprint or a case that did not fail.
  */
 function sideOf(side: EngineDivergence["recorded"]): unknown {
   if (side === undefined) return null;
@@ -226,6 +226,7 @@ export function detailOf(outcome: Outcome): Record<string, unknown> {
             valid: shortfall.valid,
             verdict: shortfall.verdict,
           },
+    reason: outcome.reason ?? null,
   };
 }
 
@@ -382,9 +383,11 @@ function replayLine(token: string): string {
 /** Returns the text of one side of a divergence, and the words for its absence. */
 function sideText(what: Divergence["what"], side: unknown): string {
   if (side !== null) return typeof side === "string" ? side : show(side, DIGITS);
-  return { request: "no request", fingerprint: "no fingerprint", verdict: "a pass" }[
-    what
-  ];
+  return {
+    request: "no request",
+    fingerprint: "no fingerprint",
+    verdict: "no failure",
+  }[what];
 }
 
 /**

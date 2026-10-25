@@ -50,6 +50,10 @@ async function start(
  * cases for every valid one, when no case requested an input, or when it
  * refuted or left unmet a coverage requirement, checked in that order.
  *
+ * A case that calls skip before the run finds a failing case ends the run
+ * as skipped. The seat of the fixture of `@dokimi/assert/vitest` skips its
+ * test with the reason. On every other seat the test passes.
+ *
  * Under the campaign profile, which DOKIMI_ASSERT_PROP_PROFILE=campaign
  * names, forAll runs a campaign for as long as DOKIMI_ASSERT_PROP_BUDGET
  * states in whole seconds, on the platform clock. It explores the cases
@@ -58,13 +62,13 @@ async function start(
  * identity of its own as it finds it. A hermetic run and a run in a process
  * of a mutation run run no campaign.
  *
- * The record's detail states the ten fields of prop-for-all: outcome,
+ * The record's detail states the eleven fields of prop-for-all: outcome,
  * cases, rejected, seed, counterexample, failure, choices, others,
- * divergence and coverage. A field that the outcome does not use is null.
- * A seat that takes records receives the record, and any other seat its
- * sentence, which states the failing case's notes. The call's record states
- * the detail of the run on a pass as well, and the calls of each case are
- * recorded under it, with the phase of the case.
+ * divergence, coverage and reason. A field that the outcome does not use is
+ * null. A seat that takes records receives the record, and any other seat
+ * its sentence, which states the failing case's notes. The call's record
+ * states the detail of the run on a pass and on a skip as well, and the
+ * calls of each case are recorded under it, with the phase of the case.
  *
  * forAll ends the call with a fault, without a run, for a profile other than
  * default, ci and campaign, a seed variable that is no decimal number below

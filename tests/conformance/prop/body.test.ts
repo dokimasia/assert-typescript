@@ -88,6 +88,53 @@ describe("body", () => {
       );
     });
 
+    it("returns a body that fails once above 1000 and then skips for fails-then-skips", async ({
+      seat,
+    }) => {
+      const body = buildBody({ kind: "fails-then-skips" });
+      const runs = [
+        await executed(body, 5n),
+        await executed(body, 2000n),
+        await executed(body, 3000n),
+        await executed(body, 5n),
+      ];
+
+      check.isEqualTo(
+        seat,
+        runs.map((run) => [run.status, run.reason]),
+        [
+          ["passed", undefined],
+          ["failed", undefined],
+          ["skipped", "after"],
+          ["skipped", "after"],
+        ],
+        "one failure, then skips",
+      );
+    });
+
+    it("returns a body that skips with the reason whose predicate is true", async ({
+      seat,
+    }) => {
+      const body = buildBody({
+        draw: { gen: "integer", min: 0, max: 9 },
+        skips: [
+          {
+            reason: "seven",
+            when: { kind: "equals", value: { type: "int", value: 7 } },
+          },
+        ],
+        fails: [{ identity: "big", when: { kind: "at-least", n: 7 } }],
+      });
+      const execution = await executed(body, 7n);
+
+      check.isEqualTo(
+        seat,
+        [execution.status, execution.reason],
+        ["skipped", "seven"],
+        "the skip comes before the failure",
+      );
+    });
+
     const tests = [
       {
         name: "passes an even digit under the label even",
@@ -174,7 +221,20 @@ describe("body", () => {
           draw: { gen: "boolean" },
           fails: [{ identity: 5, when: { kind: "always" } }],
         },
-        want: "prop: 5 is no label and no identity",
+        want: "prop: 5 is no label, no identity and no reason",
+      },
+      {
+        name: "skips that are no list",
+        give: { draw: { gen: "boolean" }, skips: 1 },
+        want: "prop: skips is 1, not a list",
+      },
+      {
+        name: "a reason that is no string",
+        give: {
+          draw: { gen: "boolean" },
+          skips: [{ reason: true, when: { kind: "always" } }],
+        },
+        want: "prop: true is no label, no identity and no reason",
       },
       {
         name: "a kind that names no body",

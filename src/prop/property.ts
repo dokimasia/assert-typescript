@@ -145,7 +145,7 @@ function entriesOf(text: string): Entry[] {
   } catch (err) {
     throw new Fault(DRAWS, "the entries are no JSON array of objects", err);
   }
-  if (!Array.isArray(stated) || !stated.every(isObject)) {
+  if (!(Array.isArray(stated) && stated.every(isObject))) {
     throw new Fault(DRAWS, "the entries are no JSON array of objects");
   }
   return stated.map((entry, i): Entry => {
@@ -391,9 +391,9 @@ export class Property {
   /**
    * Runs the case that the fuzz bridge decodes from data as a call of the
    * property on seat, as the call running, and reports it. A passing case
-   * counts one valid or one rejected case. A failing case is replayed,
-   * shrunk and explained as a run concludes it, and the store keeps each
-   * failure of the counterexample.
+   * counts one valid or one rejected case, and a case that skips counts
+   * none. A failing case is replayed, shrunk and explained as a run
+   * concludes it, and the store keeps each failure of the counterexample.
    *
    * @param seat - The seat of the input's call.
    * @param running - The call.
@@ -414,7 +414,8 @@ export class Property {
       const execution = yield* execute(cases, new Bridging(data), settings.maxChoices);
       observer("fuzz", execution);
       const tally = new Tally(settings.seed);
-      if (tally.take(execution) === undefined) return tally.outcome("passed");
+      const ended = tally.take(execution);
+      if (ended?.kind !== "counterexample") return ended ?? tally.outcome("passed");
       return yield* concludeCase(cases, settings, execution, observer);
     }
     const outcome = await this.#drive(running, bridged());
@@ -559,7 +560,10 @@ export class Property {
     return [...skipped, ...differences];
   }
 
-  /** Reports the outcome as the verdict of the call running. */
+  /**
+   * Reports the outcome as the verdict of the call running. A skipped run
+   * skips the test of a seat that skips its test.
+   */
   #report(running: Running, outcome: Outcome): void {
     const { assertion, contract, where } = this.call;
     if (outcome.kind === "passed") {
@@ -569,6 +573,17 @@ export class Property {
         contract,
         where,
         detailJson(outcome, detailOf(outcome)),
+      );
+      return;
+    }
+    if (outcome.kind === "skipped") {
+      running.skipRun(
+        Mode.Fatal,
+        assertion,
+        contract,
+        where,
+        detailJson(outcome, detailOf(outcome)),
+        outcome.reason as string,
       );
       return;
     }

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * The verdict of every assertion call: a pass, a failure or a fault.
+ * The verdict of every assertion call: a pass, a failure, a skip of a
+ * property or a fault.
  *
  * Each verdict writes the call's record when its seat records calls. A
  * failure then sends its record to a seat that takes records, and the
@@ -13,11 +14,18 @@
  */
 
 import { callSite, Failure, render, type Where } from "../failure.js";
-import type { Call, Site } from "../record/call.js";
+import type { Call, Site, Verdict } from "../record/call.js";
 import { add, callsOf, Slot } from "../record/calls.js";
 import { detail as literalOf } from "../record/literal.js";
 import { reading } from "../record/switch.js";
-import { Mode, report, type Seat, takesFaults, takesRecords } from "./seat.js";
+import {
+  Mode,
+  report,
+  type Seat,
+  takesFaults,
+  takesRecords,
+  takesSkips,
+} from "./seat.js";
 
 /**
  * Returns the text of a fault.
@@ -224,18 +232,59 @@ export class Running {
     where: Site | undefined,
     run: Readonly<Record<string, unknown>>,
   ): void {
-    if (!this.#switched()) return;
+    this.#writeRun("pass", mode, assertion, contract, where, run);
+  }
+
+  /**
+   * Reports that a property skipped, at where. The call's record states
+   * run, the detail of the property's run. A seat that skips its test then
+   * skips it with reason, and does not return. Any other seat receives
+   * nothing, and its test passes.
+   *
+   * @param mode - The surface of the call.
+   * @param assertion - The canonical id.
+   * @param contract - The caller's message.
+   * @param where - The call site of the property.
+   * @param run - The detail of the run, as JSON values.
+   * @param reason - Why the run skipped.
+   */
+  skipRun(
+    mode: Mode,
+    assertion: string,
+    contract: string,
+    where: Site | undefined,
+    run: Readonly<Record<string, unknown>>,
+    reason: string,
+  ): void {
+    if (!this.#writeRun("skip", mode, assertion, contract, where, run)) return;
+    if (takesSkips(this.#seat)) this.#seat.skip(reason);
+  }
+
+  /**
+   * Writes the call record of a property's run with verdict, and returns
+   * whether the process's switch of recording states a value.
+   */
+  #writeRun(
+    verdict: Verdict,
+    mode: Mode,
+    assertion: string,
+    contract: string,
+    where: Site | undefined,
+    run: Readonly<Record<string, unknown>>,
+  ): boolean {
+    if (!this.#switched()) return false;
     this.#write(
       {
         assertion,
         contract,
-        verdict: "pass",
+        verdict,
         aborting: mode === Mode.Fatal,
         ...(where === undefined ? {} : { where }),
       },
       undefined,
       run,
     );
+    return true;
   }
 
   /**

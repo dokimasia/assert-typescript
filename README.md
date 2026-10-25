@@ -391,6 +391,7 @@ prop.forAll(seat: Seat, contract: string, body: (c: Case) => void | Promise<void
 prop.fuzz(seat: Seat, contract: string, body: (c: Case) => void | Promise<void>, ...options: Option[]): Promise<Target>
 Case.draw<T>(generator: Generator<T>, label: string): T
 Case.assume(condition: boolean): void
+Case.skip(reason: string): never
 Case.classify(label: string): void
 Case.note(message: string): void
 Case.rand(): () => bigint
@@ -872,7 +873,7 @@ definition and holds itself to it:
 - 195 corpus cases state what each assertion must report, run against
   both surfaces and the matchers of `expect`, with the call record of
   each call. They are the same cases every other implementation runs.
-- 430 property vectors, 80 history vectors, 14 machine vectors and 57
+- 435 property vectors, 80 history vectors, 14 machine vectors and 57
   file vectors pin the property engine, the history checks, machines and
   the assertions of files.
 - A completeness gate checks that every assertion is present under the
@@ -897,6 +898,12 @@ A run of `prop.forAll` and `prop.fuzz` and a call of `prop.values` do not
 take `prop.using`, because the body or the caller states each generator
 that it draws from. A property form takes the option for the generator of
 its input.
+
+`Case.skip` skips the test through the seat of the `test` of
+`@dokimi/assert/vitest`, which calls `skip` of the test's context. jest
+has no call that skips a running test. On the seat of a jest test, and on
+every other seat, the test passes, and the call record of the property
+states the verdict `skip`.
 
 `doesThrow` refuses a callable that answers a promise. An unawaited
 rejection is not a throw, and passing there would make the assertion lie

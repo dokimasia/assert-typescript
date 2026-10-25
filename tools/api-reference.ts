@@ -16,6 +16,7 @@
 
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -446,6 +447,7 @@ async function reference(): Promise<string> {
         ...methods("prop/case.d.ts", "Case", [
           "draw",
           "assume",
+          "skip",
           "classify",
           "note",
           "rand",
@@ -494,12 +496,10 @@ async function reference(): Promise<string> {
 }
 
 const section = await reference();
-if (!process.argv.includes("--write")) {
-  console.log(section);
-} else {
+if (process.argv.includes("--write")) {
   const path = join(ROOT, "README.md");
   const text = readFileSync(path, "utf8");
-  if (!text.includes(START) || !text.includes(END)) {
+  if (!(text.includes(START) && text.includes(END))) {
     console.error(`api-reference: README.md has no ${START} block`);
     process.exit(1);
   }
@@ -507,4 +507,6 @@ if (!process.argv.includes("--write")) {
   const tail = text.slice(text.indexOf(END));
   writeFileSync(path, `${head}${START}\n\n${section}\n\n${tail}`);
   console.log("README.md: api reference written");
+} else {
+  console.log(section);
 }

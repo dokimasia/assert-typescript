@@ -70,6 +70,12 @@ const BELOW_FIVE: PropertyBody = (c: Case) => {
   check.isTrue(c, c.draw(integer(0, 9), "x") < 5, "x is below 5");
 };
 
+/** A body that draws a digit and skips. */
+const SKIPS: PropertyBody = (c: Case) => {
+  c.draw(integer(0, 9), "x");
+  c.skip("the environment lacks a capability");
+};
+
 /** Returns the property of options on seat, hermetic, of the seed 1 and without a store unless an option states one. */
 function propertyOf(seat: Seat, ...options: Option[]): Property {
   return Property.of(
@@ -221,6 +227,20 @@ describe("property", () => {
         ],
         [[], "pass", "passed"],
         "a pass",
+      );
+    });
+
+    it("records a skip with its reason for a case that skips", async ({ seat }) => {
+      const recorder = new Recorder();
+      await runOn(recorder, SKIPS);
+      const [call] = records(recorder);
+      const detail = call?.["detail"] as Record<string, unknown> | undefined;
+
+      check.isEqualTo(
+        seat,
+        [recorder.failed, call?.["verdict"], detail?.["outcome"], detail?.["reason"]],
+        [false, "skip", "skipped", "the environment lacks a capability"],
+        "a skip",
       );
     });
 
@@ -749,6 +769,26 @@ describe("property", () => {
       check.isEqualTo(seat, recorder.faults.length, 1, "the difference is noted");
     });
 
+    it("records a skip for a stored case that skips", async ({ seat }) => {
+      setVariable(MUTANT, undefined);
+      const dir = temporary();
+      await runOn(new Recorder(), BELOW_FIVE, store(dir));
+      const recorder = new Recorder();
+      await propertyOf(recorder, store(dir)).replayStored(
+        recorder,
+        Running.begin(recorder, WHERE),
+        SKIPS,
+      );
+      const [call] = records(recorder);
+
+      check.isEqualTo(
+        seat,
+        [recorder.failed, call?.["verdict"]],
+        [false, "skip"],
+        "the stored case skips",
+      );
+    });
+
     it("ends the call with a fault for a second claim", async ({ seat }) => {
       const kept = new Kept();
       const dir = temporary();
@@ -881,6 +921,27 @@ describe("property", () => {
         ],
         1,
         "one rejected case",
+      );
+    });
+
+    it("records a skip that counts no case for an input whose case skips", async ({
+      seat,
+    }) => {
+      const recorder = new Recorder();
+      await propertyOf(recorder).input(
+        recorder,
+        Running.begin(recorder, WHERE),
+        SKIPS,
+        Uint8Array.of(1),
+      );
+      const [call] = records(recorder);
+      const detail = call?.["detail"] as Record<string, unknown> | undefined;
+
+      check.isEqualTo(
+        seat,
+        [call?.["verdict"], detail?.["cases"], detail?.["rejected"]],
+        ["skip", 0, 0],
+        "a skip of no case",
       );
     });
 

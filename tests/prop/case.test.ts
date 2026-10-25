@@ -21,6 +21,7 @@ import {
   Failed,
   Rejected,
   Replaying,
+  Skipped,
 } from "../../src/prop/engine/case.js";
 import { TraceError } from "../../src/prop/engine/trace.js";
 import { Diverged, Repeated } from "../../src/prop/engine/tree.js";
@@ -318,6 +319,51 @@ describe("case", () => {
       const { c } = caseOn();
 
       check.isNil(seat, await ending(c, (one) => one.assume(true)), "the case passes");
+    });
+  });
+
+  describe("Case.skip", () => {
+    it("ends the case with a skip of the reason", async ({ seat }) => {
+      const { c } = caseOn();
+      let after = false;
+      const thrown = await ending(c, (one) => {
+        one.skip("the file system refuses direct I/O");
+        after = true;
+      });
+
+      check.isEqualTo(
+        seat,
+        [thrown instanceof Skipped ? thrown.reason : thrown, after],
+        ["the file system refuses direct I/O", false],
+        "the skip ends the case",
+      );
+    });
+
+    it("runs the cleanups of the case", async ({ seat }) => {
+      const { c } = caseOn();
+      let ran = false;
+      await ending(c, (one) => {
+        one.cleanup(() => {
+          ran = true;
+        });
+        one.skip("the case skips");
+      });
+
+      check.isTrue(seat, ran, "the cleanup runs");
+    });
+
+    it("raises the signal of an ended case again", async ({ seat }) => {
+      const { c } = caseOn();
+      const ended = await ending(c, (one) => {
+        try {
+          one.assume(false);
+        } catch {
+          // The body catches the rejection and calls on.
+        }
+        one.skip("a skip after the end");
+      });
+
+      check.isTrue(seat, ended instanceof Rejected, "the rejection");
     });
   });
 
@@ -639,6 +685,21 @@ describe("case", () => {
       const thrown = await ending(c, (one) => {
         one.record("first");
         one.assume(false);
+      });
+
+      check.isEqualTo(
+        seat,
+        recordOf(thrown).failure.contract,
+        "first",
+        "the failure has priority",
+      );
+    });
+
+    it("throws the failure of a case that a later skip ends", async ({ seat }) => {
+      const { c } = caseOn();
+      const thrown = await ending(c, (one) => {
+        one.record("first");
+        one.skip("a skip after the failure");
       });
 
       check.isEqualTo(

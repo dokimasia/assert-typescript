@@ -17,6 +17,7 @@ import {
   signalOf,
   takesFaults,
   takesRecords,
+  takesSkips,
 } from "../../src/matcher/seat.js";
 import { Collector, Recorder } from "../../src/seat.js";
 import { Plain } from "../helpers.js";
@@ -68,6 +69,22 @@ describe("seat", () => {
 
     it("returns false for a seat without a reportFault method", () => {
       expect(takesFaults(new Collector())).toBe(false);
+    });
+  });
+
+  describe("takesSkips", () => {
+    it("returns true for a seat with a skip method", () => {
+      const seat = Object.assign(new Plain(), {
+        skip(reason: string): never {
+          throw new Error(reason);
+        },
+      });
+
+      expect(takesSkips(seat)).toBe(true);
+    });
+
+    it("returns false for a seat without a skip method", () => {
+      expect(takesSkips(new Collector())).toBe(false);
     });
   });
 

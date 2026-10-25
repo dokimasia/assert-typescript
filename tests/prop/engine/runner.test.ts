@@ -69,7 +69,6 @@ const MILLION = 1_000_000n;
 function body(fn: (c: Case) => void): Body {
   return (c) => {
     fn(c);
-    return undefined;
   };
 }
 
@@ -575,6 +574,107 @@ describe("runner", () => {
       );
     });
 
+    it("returns flaky for a failure whose replay skips", async ({ seat }) => {
+      let failed = false;
+      const outcome = await ran(
+        body((c) => {
+          const n = c.draw(WIDE, "n");
+          if (failed) c.skip("the case skips after the failure");
+          if (n > MILLION) {
+            failed = true;
+            c.fail("big");
+          }
+        }),
+        { seed: SEED },
+      );
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.divergence?.what, outcome.divergence?.replayed],
+        ["flaky", "verdict", undefined],
+        "the replay does not fail",
+      );
+    });
+
+    it("skips the run at a case that skips before a failing case", async ({ seat }) => {
+      const seen = new Seen();
+      const outcome = await ran(
+        body((c) => {
+          if (c.draw(WIDE, "n") > MILLION) c.skip("the case needs a small n");
+        }),
+        { seed: SEED },
+        seen,
+      );
+
+      const passed = seen.calls.filter(([, status]) => status === "passed").length;
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.reason, outcome.cases, seen.calls.at(-1)?.[1]],
+        ["skipped", "the case needs a small n", passed, "skipped"],
+        "the skip ends the run",
+      );
+    });
+
+    it("keeps the failure at a shrink candidate that skips", async ({ seat }) => {
+      const outcome = await ran(
+        body((c) => {
+          const n = c.draw(WIDE, "n");
+          if (n === 0n) c.skip("the case skips at 0");
+          if (n > MILLION) c.fail("big");
+        }),
+        { seed: SEED, examples: [integers(MILLION * 5n)] },
+      );
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.failing?.case.draws[0]?.value],
+        ["counterexample", MILLION + 1n],
+        "the candidate 0 skips",
+      );
+    });
+
+    it("explains a draw whose filling skips as a draw at which not every value fails", async ({
+      seat,
+    }) => {
+      const outcome = await ran(
+        body((c) => {
+          if (c.draw(WIDE, "n") % 2n === 1n) c.skip("the case skips at an odd n");
+          c.fail("always");
+        }),
+        { seed: SEED, examples: [integers(0n)] },
+      );
+
+      check.isEqualTo(
+        seat,
+        outcome.explanation[0]?.anyValueFails,
+        false,
+        "a filling that skips does not fail the same way",
+      );
+    });
+
+    it("states no nearest passing value that skips", async ({ seat }) => {
+      const outcome = await ran(
+        body((c) => {
+          const n = c.draw(DIGIT, "n");
+          if (n === 4n) c.skip("the case skips at 4");
+          if (n >= 5n) c.fail("big");
+        }),
+        { seed: SEED, examples: [integers(9n)] },
+      );
+
+      check.isEqualTo(
+        seat,
+        [
+          outcome.failing?.case.draws[0]?.value,
+          outcome.explanation[0]?.anyValueFails,
+          outcome.explanation[0]?.nearest,
+        ],
+        [5n, false, undefined],
+        "the step to 4 skips",
+      );
+    });
+
     it("passes a requirement that the share meets", async ({ seat }) => {
       const even = body((c) => {
         if (c.draw(WIDE, "n") % 2n === 0n) c.classify("even");
@@ -885,6 +985,23 @@ describe("runner", () => {
       );
     });
 
+    it("skips the run at a replay that skips", async ({ seat }) => {
+      const outcome = await ran(
+        body((c) => {
+          c.draw(WIDE, "n");
+          c.skip("the replay skips");
+        }),
+        { seed: SEED, replay: integers(1n) },
+      );
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.reason, outcome.token],
+        ["skipped", "the replay skips", undefined],
+        "a skip without a token",
+      );
+    });
+
     it("passes a replay that passes", async ({ seat }) => {
       check.isEqualTo(
         seat,
@@ -1051,6 +1168,24 @@ describe("runner", () => {
         [outcome.kind, outcome.stored.length, outcome.token === undefined, seen.phases],
         ["counterexample", 2, false, ["stored", "stored"]],
         "no shrink",
+      );
+    });
+
+    it("ends at a stored case that skips without a token", async ({ seat }) => {
+      const outcome = await drive(
+        runStored(
+          body((c) => {
+            if (c.draw(WIDE, "n") > 1n) c.skip("the stored case skips");
+          }),
+          { seed: SEED, stored: [integers(1n), integers(2n), integers(3n)] },
+        ),
+      );
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.reason, outcome.stored.length, outcome.token],
+        ["skipped", "the stored case skips", 2, undefined],
+        "the second stored case skips",
       );
     });
 

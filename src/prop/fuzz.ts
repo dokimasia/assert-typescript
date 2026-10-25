@@ -85,7 +85,8 @@ async function prepare(
  * with a failing case, its failures are written to the store, and the
  * target rejects with an AssertionFailed whose message is the record's
  * sentence, with its replay token. The record of a passing input counts one
- * valid or one rejected case.
+ * valid or one rejected case. A stored case or an input whose case skips
+ * ends its call as skipped, and the call does not fail.
  *
  * fuzz ends the call with a fault for each fault for which forAll ends its
  * call without a run, and for seed files that cannot be read. The target of

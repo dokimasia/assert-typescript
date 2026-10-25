@@ -8,7 +8,7 @@
  * same inputs, and the inputs cover more paths than one literal does.
  */
 
-import { Case, DECODE, Generating, Rejected } from "./engine/case.js";
+import { Case, DECODE, Generating, Rejected, Skipped } from "./engine/case.js";
 import type { Generator } from "./engine/generator.js";
 import { caseSource } from "./engine/source.js";
 import { seedValue } from "./option.js";
@@ -35,7 +35,8 @@ const REJECTIONS_PER_VALUE = 10;
  * @throws RangeError for an n that is no whole number of 0 or more, and for
  *   a seed outside [0, 2^64).
  * @throws Error when the generator rejects more than ten cases for each of
- *   the n values.
+ *   the n values, and at a case that the generator skips, because values
+ *   runs no test that a skip could skip.
  * @example
  * const ids = prop.values(prop.integer(0, 1_000_000), 42, 100);
  * bench("get", () => {
@@ -59,6 +60,11 @@ export function values<T>(
     try {
       out.push(generator[DECODE](c));
     } catch (err) {
+      if (err instanceof Skipped) {
+        throw new Error(
+          `prop: ${call} stops at a case that the generator skips: ${err.reason}`,
+        );
+      }
       if (!(err instanceof Rejected)) throw err;
       rejected += 1;
       if (rejected > REJECTIONS_PER_VALUE * n) {

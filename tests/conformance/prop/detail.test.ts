@@ -21,7 +21,6 @@ const WIDE = new Integer(new IntegerBounds(0n, 1_000_000_000n));
 function body(fn: (c: Case) => void): Body {
   return (c) => {
     fn(c);
-    return undefined;
   };
 }
 
@@ -80,8 +79,26 @@ describe("detail", () => {
           others: null,
           divergence: null,
           coverage: null,
+          reason: null,
         },
         "a pass",
+      );
+    });
+
+    it("writes the reason of a run that skipped", async ({ seat }) => {
+      const skipped = await ran(
+        body((c) => {
+          c.draw(WIDE, "n");
+          c.skip("the case needs a capability");
+        }),
+        10,
+      );
+
+      check.isEqualTo(
+        seat,
+        [detail(skipped)["outcome"], detail(skipped)["reason"]],
+        ["skipped", "the case needs a capability"],
+        "a skip",
       );
     });
 

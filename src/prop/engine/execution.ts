@@ -21,6 +21,7 @@ import {
   type Place,
   type Provider,
   Rejected,
+  Skipped,
   type Where,
 } from "./case.js";
 import type { Bounds } from "./choice.js";
@@ -54,7 +55,13 @@ export type Phase =
   | "fuzz";
 
 /** How one case ended. */
-export type Status = "passed" | "failed" | "rejected" | "repeated" | "diverged";
+export type Status =
+  | "passed"
+  | "failed"
+  | "rejected"
+  | "repeated"
+  | "diverged"
+  | "skipped";
 
 /**
  * The first difference between two runs of the same choices. what is the
@@ -64,8 +71,9 @@ export type Status = "passed" | "failed" | "rejected" | "repeated" | "diverged";
  *   case ended before the request.
  * - `fingerprint`: an observed fingerprint differs. undefined means that the
  *   run observed no fingerprint there.
- * - `verdict`: a replay passed or failed another way. The two sides are the
- *   identities of the failures, and undefined means a pass.
+ * - `verdict`: a replay passed, skipped or failed another way. The two sides
+ *   are the identities of the failures, and undefined means a case that did
+ *   not fail.
  *
  * index is the position of the request or the fingerprint that differs.
  * For a verdict, it is the number of choices that the recorded case made.
@@ -97,6 +105,8 @@ export interface Execution {
   readonly failure?: Failed | undefined;
   /** The divergence of a diverged case. */
   readonly divergence?: Divergence | undefined;
+  /** The reason of a skipped case. */
+  readonly reason?: string | undefined;
 }
 
 /**
@@ -138,7 +148,8 @@ function divergenceOf(diverged: Diverged, c: Case): Divergence {
 /**
  * Calls the body once on a case whose values come from provider. With a
  * tree, the case walks it, and a repeat or a divergence ends the case early.
- * A case that overruns its cap is rejected without a leaf.
+ * A case that overruns its cap is rejected without a leaf, and a case that
+ * skips leaves no leaf either.
  *
  * @param body - The body.
  * @param provider - Where the case's values come from.
@@ -166,6 +177,8 @@ export function* execute(
       return { case: c, status: "diverged", divergence: divergenceOf(err, c) };
     }
     if (err instanceof Overrun) return { case: c, status: "rejected" };
+    if (err instanceof Skipped)
+      return { case: c, status: "skipped", reason: err.reason };
     if (err instanceof Rejected) ending = "rejected";
     else if (err instanceof Failed) {
       ending = "failed";

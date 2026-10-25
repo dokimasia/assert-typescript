@@ -209,13 +209,17 @@ class Exploration {
 
   /**
    * Counts an execution, concludes a failure, admits a valid case to the
-   * pool, and returns the outcome that ends the campaign. valued states a
-   * case of an example of values.
+   * pool, and returns the outcome that ends the campaign: a skip before the
+   * first failure, with the runs of the stored cases, or the flaky outcome
+   * of a failure whose replay differs. valued states a case of an example of
+   * values.
    */
   *#take(execution: Execution, valued: boolean): Work<Outcome | undefined> {
-    this.#tally.take(execution);
+    const ended = this.#tally.take(execution);
     if (execution.status === "failed") return yield* this.#fail(execution, valued);
     if (execution.status === "passed") this.#admit(execution);
+    if (ended?.kind === "skipped" && this.#found === undefined)
+      return { ...ended, stored: this.#stored };
     return undefined;
   }
 
@@ -314,7 +318,9 @@ class Exploration {
  * A failing case whose identity no earlier failure had is replayed, shrunk
  * and explained as a run concludes its failure, settings.concluded receives
  * the outcome, and the campaign goes on. A replay that differs ends the
- * campaign as flaky.
+ * campaign as flaky. A case that skips before the first failure ends the
+ * campaign as skipped. After the first failure, a case that skips counts as
+ * neither a valid nor a rejected case, and the campaign goes on.
  *
  * When the budget has passed, the campaign returns a counterexample of the
  * first failure that it concluded, with every later one among its others,
