@@ -1,3 +1,4 @@
+"use strict";
 // The matchers, expect.soft and the guard of unawaited matchers. The title
 // of each test states the status that tests/jest.test.ts expects.
 const { describe, expect, test } = require("@jest/globals");

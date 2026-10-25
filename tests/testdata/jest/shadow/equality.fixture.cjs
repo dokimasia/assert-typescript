@@ -1,3 +1,4 @@
+"use strict";
 // Seven calls of jest's equality matchers. Three of them get another
 // verdict from the standard's equality, and one fails in jest.
 const { expect, test } = require("@jest/globals");

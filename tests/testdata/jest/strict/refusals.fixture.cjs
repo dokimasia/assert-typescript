@@ -1,3 +1,4 @@
+"use strict";
 // The calls that strict mode refuses, and two that it keeps.
 const { expect, test } = require("@jest/globals");
 

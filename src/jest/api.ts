@@ -85,7 +85,7 @@ const MATCHERS = matchers({ seat: () => new Recorder(), start });
 
 /** Keeps the failure of a matcher on a soft chain, and throws any other error. */
 function keep(err: unknown): void {
-  if (!(err instanceof Error) || !("matcherResult" in err)) throw err;
+  if (!(err instanceof Error && "matcherResult" in err)) throw err;
   expect.getState().suppressedErrors.push(err);
 }
 
@@ -99,13 +99,13 @@ function softly(chain: object): object {
       }
       if (typeof value !== "function") return value;
       return (...args: unknown[]) => {
+        let result: unknown;
         try {
-          const result: unknown = value(...args);
-          return result instanceof Promise ? result.catch(keep) : result;
+          result = value(...args);
         } catch (err) {
           keep(err);
-          return undefined;
         }
+        return result instanceof Promise ? result.catch(keep) : result;
       };
     },
   });

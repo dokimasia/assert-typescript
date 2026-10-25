@@ -1,3 +1,4 @@
+"use strict";
 // Registers the matchers in shadow mode, with the log that the spec names.
 require("../../../../dist/cjs/jest.js").register({
   mode: "shadow",

@@ -13,6 +13,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import process from "node:process";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as check from "../src/check.js";
 import { NAMES } from "../src/expect/matchers.js";

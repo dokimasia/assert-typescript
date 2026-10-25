@@ -1,3 +1,4 @@
+"use strict";
 // The fixture suites of tests/jest.test.ts, which runs jest on them as a
 // consumer's suite runs. Each project registers the matchers in one mode
 // from its setup file, except names, which registers nothing.

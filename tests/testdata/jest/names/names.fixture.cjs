@@ -1,3 +1,4 @@
+"use strict";
 // Writes the names of jest's chain and of the properties of jest's expect,
 // with nothing registered, to the file that the spec names.
 const { writeFileSync } = require("node:fs");
