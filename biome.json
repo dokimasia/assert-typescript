@@ -124,6 +124,309 @@
           "expand": "always"
         }
       }
+    },
+    {
+      "includes": [
+        "src/**"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "useMaxParams": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/files/**",
+        "src/history/search.ts",
+        "src/prop/**",
+        "tests/files/**",
+        "tests/prop/**"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noBitwiseOperators": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/check.ts",
+        "src/conformance/index.ts",
+        "src/files/index.ts",
+        "src/golden.ts",
+        "src/history/index.ts",
+        "src/index.ts",
+        "src/jest.ts",
+        "src/option.ts",
+        "src/prop/engine/generator.ts",
+        "src/prop/forms.ts",
+        "src/prop/index.ts",
+        "src/seat.ts",
+        "src/soft.ts",
+        "src/stateful/index.ts",
+        "src/vitest.ts",
+        "src/vitest/vitest4.d.ts",
+        "src/vitest/vitest5.d.ts"
+      ],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noBarrelFile": "off",
+            "noReExportAll": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/golden.ts",
+        "src/prop/environment.ts",
+        "src/record/switch.ts",
+        "tests/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**"
+      ],
+      "linter": {
+        "rules": {
+          "security": {
+            "noSecrets": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "tools/consumer/**"
+      ],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnresolvedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noTernary": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/**",
+        "tests/**"
+      ],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noNamespaceImport": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/bench.ts",
+        "src/matcher/refusal.ts",
+        "src/matcher/relation.ts",
+        "src/matcher/repeat.ts",
+        "src/matcher/waiting.ts",
+        "src/prop/**",
+        "src/stateful/**",
+        "tests/**"
+      ],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noAwaitInLoops": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/matcher/fault.ts",
+        "tools/**"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "vitest.config.ts",
+        "tools/consumer/vitest/vitest.config.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/jest/types.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNamespace": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/vitest/api.ts",
+        "tests/**",
+        "tools/consumer/**"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noMisplacedAssertion": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "tools/consumer/jest/global.types.ts"
+      ],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUndeclaredVariables": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "tests/prop/case/execute.test.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "useThrowOnlyError": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "tests/**"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noVoid": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "tests/**"
+      ],
+      "linter": {
+        "rules": {
+          "performance": {
+            "useTopLevelRegex": "off"
+          },
+          "suspicious": {
+            "useAwait": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/conformance/**",
+        "tools/consumer/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noMagicNumbers": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveClassesPerFile": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/history/spec.ts",
+        "src/stateful/machine.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "useConsistentMethodSignatures": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/conformance/files/golden.ts",
+        "src/conformance/files/vector.ts",
+        "src/conformance/history/script.ts",
+        "src/conformance/prop/vectors.ts",
+        "src/files/reader.ts",
+        "src/files/writer.ts",
+        "src/history/search.ts",
+        "src/prop/directory.ts",
+        "src/prop/form.ts",
+        "src/prop/property/body.ts",
+        "src/prop/property/replay.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "useErrorCause": "off"
+          }
+        }
+      }
     }
   ]
 }
