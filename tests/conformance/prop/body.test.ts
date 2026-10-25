@@ -6,7 +6,8 @@
 import { describe } from "vitest";
 import { buildBody, DRAWN } from "../../../src/conformance/prop/body.js";
 import { check } from "../../../src/index.js";
-import { MAX_CHOICES, Replaying } from "../../../src/prop/engine/case.js";
+import { Replaying } from "../../../src/prop/engine/case/providers.js";
+import { MAX_CHOICES } from "../../../src/prop/engine/case.js";
 import {
   type Body,
   type Execution,

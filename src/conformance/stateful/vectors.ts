@@ -26,7 +26,7 @@ import {
   swarm,
 } from "../../stateful/option.js";
 import { pct, type Strategy, uniform } from "../../stateful/strategy.js";
-import { sameJson } from "../literal.js";
+import { sameJson } from "../equality.js";
 import { type Setup, SUBJECTS } from "./subjects.js";
 
 /** A vector's JSON object. */
@@ -45,7 +45,9 @@ function isObject(value: unknown): value is Raw {
 
 /** Returns the strategy that a setup states: uniform, or the PCT of a depth that `{"pct": depth}` states. */
 function strategyOf(written: unknown): Strategy {
-  if (written === "uniform") return uniform();
+  if (written === "uniform") {
+    return uniform();
+  }
   if (isObject(written) && Object.keys(written).join() === "pct") {
     return pct(Number(written["pct"]));
   }
@@ -55,9 +57,15 @@ function strategyOf(written: unknown): Strategy {
 /** Returns the options that a vector's setup states, with the clients of the definition's setup for a setup that states none. */
 function setupOf(written: Raw): Setup {
   const steps: StepsOption[] = [];
-  if (written["mean"] !== undefined) steps.push(mean(Number(written["mean"])));
-  if (written["max"] !== undefined) steps.push(max(Number(written["max"])));
-  if (written["swarm"] !== undefined) steps.push(swarm(written["swarm"] === true));
+  if (written["mean"] !== undefined) {
+    steps.push(mean(Number(written["mean"])));
+  }
+  if (written["max"] !== undefined) {
+    steps.push(max(Number(written["max"])));
+  }
+  if (written["swarm"] !== undefined) {
+    steps.push(swarm(written["swarm"] === true));
+  }
   const section = [clients(Number(written["clients"] ?? SETUP_CLIENTS))];
   if (written["concurrent"] !== undefined) {
     section.push(concurrent(Number(written["concurrent"])));
@@ -69,9 +77,13 @@ function setupOf(written: Raw): Setup {
 function settingsOf(written: Raw): Option[] {
   const options: Option[] = [hermetic(), store("")];
   for (const [name, value] of Object.entries(written)) {
-    if (name === "seed") options.push(seed(BigInt(String(value))));
-    else if (name === "cases") options.push(cases(Number(value)));
-    else throw new Fault(`settings.${name}`, "the runner takes no such setting");
+    if (name === "seed") {
+      options.push(seed(BigInt(String(value))));
+    } else if (name === "cases") {
+      options.push(cases(Number(value)));
+    } else {
+      throw new Fault(`settings.${name}`, "the runner takes no such setting");
+    }
   }
   return options;
 }
@@ -120,7 +132,9 @@ async function checkMachines(raw: Raw): Promise<void> {
   }
   const setup = setupOf((raw["setup"] ?? {}) as Raw);
   const options = settingsOf((raw["settings"] ?? {}) as Raw);
-  if (raw["trace"] !== undefined) options.push(draws(JSON.stringify(raw["trace"])));
+  if (raw["trace"] !== undefined) {
+    options.push(draws(JSON.stringify(raw["trace"])));
+  }
   const subject = make();
   const recorder = new Recorder();
   await forAll(recorder, CONTRACT, (c) => subject(c, setup), ...options);

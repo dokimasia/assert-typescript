@@ -12,7 +12,9 @@
 
 /** Returns the elements of a list or the characters of a string after the first. */
 function dropFirst(x: unknown): unknown {
-  if (typeof x === "string") return [...x].slice(1).join("");
+  if (typeof x === "string") {
+    return [...x].slice(1).join("");
+  }
   return (x as readonly unknown[]).slice(1);
 }
 
@@ -23,11 +25,17 @@ function sorted(x: unknown): unknown[] {
       const left = [...a].map((c) => c.codePointAt(0) as number);
       const right = [...b].map((c) => c.codePointAt(0) as number);
       for (let i = 0; i < Math.min(left.length, right.length); i += 1) {
-        if (left[i] !== right[i]) return (left[i] as number) - (right[i] as number);
+        if (left[i] !== right[i]) {
+          return (left[i] as number) - (right[i] as number);
+        }
       }
       return left.length - right.length;
     }
-    return (a as number) < (b as number) ? -1 : (a as number) > (b as number) ? 1 : 0;
+    const [first, second] = [a as number, b as number];
+    if (first < second) {
+      return -1;
+    }
+    return first > second ? 1 : 0;
   });
 }
 

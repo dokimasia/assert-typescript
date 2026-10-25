@@ -9,63 +9,15 @@
  * from a small fixed set instead, and this builds each one natively.
  */
 
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { CONTENT_LIMIT } from "../files/literal.js";
 import type { Seat } from "../matcher/seat.js";
+import { leavesFilesAlone, rewritesFiles, writesFile } from "./subject/files.js";
 
 /** What a subject throws when it fails on its own terms. */
-export class SubjectError extends Error {}
+class SubjectError extends Error {}
 
 /** What a closed subject of failsAfterClose throws. */
 const CLOSED = new SubjectError("the subject is closed");
-
-/**
- * One built behaviour, as a function of each shape that an assertion
- * calls. A shape that the behaviour does not have is absent.
- */
-export interface Subject {
-  /** The call that takes a cancellation handle, as the cancellation assertions make it. */
-  readonly signalled?: (signal?: AbortSignal) => Promise<unknown>;
-  /** The call that throws or returns, as throws and doesNotThrow make it. */
-  readonly bare?: () => unknown;
-  /** The body that eventually runs. */
-  readonly seated?: (trial: Seat) => void;
-  /** The operation of an input: it changes the count that observe reads, or throws. */
-  readonly call?: (input: unknown) => unknown;
-  /** Reads the count that call and advance change. */
-  readonly observe?: () => number;
-  /** The input that an assertion passes to call, compute and render. */
-  readonly input?: unknown;
-  /** The computation that isDeterministic calls. */
-  readonly compute?: (input: unknown) => unknown;
-  /** The operation that isCommutative and isAssociative combine operands with. */
-  readonly combine?: (a: unknown, b: unknown) => unknown;
-  /** The operands a, b and c that an assertion passes to combine. */
-  readonly operands?: readonly [unknown, unknown, unknown];
-  /** Renders an input as decimal text, which roundTrip parses back. */
-  readonly render?: (input: unknown) => string;
-  /** Returns one iteration of the sequence that hasStableOrder and noDuplicates read. */
-  readonly iterate?: () => readonly unknown[];
-  /** Moves the count that isMonotonic reads through observe. */
-  readonly advance?: () => void;
-  /** How many times isMonotonic calls advance. */
-  readonly steps?: number;
-  /** The inputs that isTotal calls call with. */
-  readonly domain?: readonly unknown[];
-  /** Closes the subject of failsAfterClose. */
-  readonly close?: () => void;
-  /** The call that failsAfterClose makes once close has run. */
-  readonly use?: () => unknown;
-  /** What use throws once the subject is closed. */
-  readonly sentinel?: unknown;
-  /** Induces the failure that isPoisoned then reads through read. */
-  readonly induce?: () => void;
-  /** One reading of the subject of isPoisoned. */
-  readonly read?: () => unknown;
-  /** Reads or writes the files of the tree in a directory, as the callable of unchanged. */
-  readonly files?: (dir: string) => void;
-}
 
 /** A subject that does the work and succeeds. Its input is 1, and its domain 1, 2 and 3. */
 function returnsOk(): Subject {
@@ -82,10 +34,10 @@ function returnsOk(): Subject {
 /** A subject that throws the reason of an aborted handle. */
 function readsHandle(): Subject {
   return {
-    signalled: async (signal?: AbortSignal) => {
-      signal?.throwIfAborted();
-      return "did the work";
-    },
+    signalled: (signal?: AbortSignal) =>
+      signal?.aborted === true
+        ? Promise.reject(signal.reason)
+        : Promise.resolve("did the work"),
   };
 }
 
@@ -118,11 +70,9 @@ function failsOtherwise(): Subject {
 /** A subject that reads a handle without checking it is there. */
 function dereferencesHandle(): Subject {
   return {
-    signalled: async (signal?: AbortSignal) => {
-      // Reading a member of an absent handle is the behaviour under
-      // test: the assertion asks whether a subject survives one.
-      return (signal as AbortSignal).aborted;
-    },
+    // Reading a member of an absent handle is the behaviour under test: the
+    // assertion asks whether a subject survives one.
+    signalled: async (signal?: AbortSignal) => (signal as AbortSignal).aborted,
   };
 }
 
@@ -149,11 +99,15 @@ function settlesAfter(): Subject {
   };
   return {
     seated: (trial: Seat) => {
-      if (!settled()) trial.record("not yet");
+      if (!settled()) {
+        trial.record("not yet");
+      }
     },
     induce: () => undefined,
     read: () => {
-      if (!settled()) throw new SubjectError("not yet");
+      if (!settled()) {
+        throw new SubjectError("not yet");
+      }
     },
   };
 }
@@ -251,7 +205,9 @@ function closes(refuses: boolean): Subject {
       closed = true;
     },
     use: () => {
-      if (closed && refuses) throw CLOSED;
+      if (closed && refuses) {
+        throw CLOSED;
+      }
     },
     sentinel: CLOSED,
   };
@@ -259,38 +215,57 @@ function closes(refuses: boolean): Subject {
 
 /** A subject that yields one object twice, an object whose value is 1. */
 function oneObjectTwice(): Subject {
-  const object = Object(1);
+  const object = new Object(1);
   return yields(object, object);
 }
 
-/** The mode that a subject creates a file with. */
-const NEW_FILE_MODE = 0o644;
+export { SubjectError };
 
-/** Calls fn with the path of each file of the tree in dir. It follows no link. */
-function eachFile(dir: string, fn: (path: string) => void): void {
-  for (const entry of readdirSync(dir, { recursive: true, withFileTypes: true })) {
-    if (entry.isFile()) fn(join(entry.parentPath, entry.name));
-  }
-}
-
-/** A subject that reads every file of the tree in a directory, and writes nothing. */
-function leavesFilesAlone(): Subject {
-  return { files: (dir) => eachFile(dir, (path) => readFileSync(path)) };
-}
-
-/** A subject that writes every file of the tree in a directory again, with the bytes that the file has. */
-function rewritesFiles(): Subject {
-  // A file that exists keeps its mode.
-  return {
-    files: (dir) => eachFile(dir, (path) => writeFileSync(path, readFileSync(path))),
-  };
-}
-
-/** A subject that writes a file of content at name, at the root of the tree in a directory. */
-function writesFile(name: string, content: string): Subject {
-  return {
-    files: (dir) => writeFileSync(join(dir, name), content, { mode: NEW_FILE_MODE }),
-  };
+/**
+ * One built behaviour, as a function of each shape that an assertion
+ * calls. A shape that the behaviour does not have is absent.
+ */
+export interface Subject {
+  /** The call that takes a cancellation handle, as the cancellation assertions make it. */
+  readonly signalled?: (signal?: AbortSignal) => Promise<unknown>;
+  /** The call that throws or returns, as throws and doesNotThrow make it. */
+  readonly bare?: () => unknown;
+  /** The body that eventually runs. */
+  readonly seated?: (trial: Seat) => void;
+  /** The operation of an input: it changes the count that observe reads, or throws. */
+  readonly call?: (input: unknown) => unknown;
+  /** Reads the count that call and advance change. */
+  readonly observe?: () => number;
+  /** The input that an assertion passes to call, compute and render. */
+  readonly input?: unknown;
+  /** The computation that isDeterministic calls. */
+  readonly compute?: (input: unknown) => unknown;
+  /** The operation that isCommutative and isAssociative combine operands with. */
+  readonly combine?: (a: unknown, b: unknown) => unknown;
+  /** The operands a, b and c that an assertion passes to combine. */
+  readonly operands?: readonly [unknown, unknown, unknown];
+  /** Renders an input as decimal text, which roundTrip parses back. */
+  readonly render?: (input: unknown) => string;
+  /** Returns one iteration of the sequence that hasStableOrder and noDuplicates read. */
+  readonly iterate?: () => readonly unknown[];
+  /** Moves the count that isMonotonic reads through observe. */
+  readonly advance?: () => void;
+  /** How many times isMonotonic calls advance. */
+  readonly steps?: number;
+  /** The inputs that isTotal calls call with. */
+  readonly domain?: readonly unknown[];
+  /** Closes the subject of failsAfterClose. */
+  readonly close?: () => void;
+  /** The call that failsAfterClose makes once close has run. */
+  readonly use?: () => unknown;
+  /** What use throws once the subject is closed. */
+  readonly sentinel?: unknown;
+  /** Induces the failure that isPoisoned then reads through read. */
+  readonly induce?: () => void;
+  /** One reading of the subject of isPoisoned. */
+  readonly read?: () => unknown;
+  /** Reads or writes the files of the tree in a directory, as the callable of unchanged. */
+  readonly files?: (dir: string) => void;
 }
 
 /**
@@ -321,7 +296,7 @@ export const SUBJECTS: Record<string, () => Subject> = {
   "refuses-after-close": () => closes(true),
   "serves-after-close": () => closes(false),
   "yields-one-object-twice": oneObjectTwice,
-  "yields-two-equal-objects": () => yields(Object(1), Object(1)),
+  "yields-two-equal-objects": () => yields(new Object(1), new Object(1)),
   "leaves-files-alone": leavesFilesAlone,
   "rewrites-files": rewritesFiles,
   "writes-a-file": () => writesFile("new.txt", "new"),

@@ -47,31 +47,18 @@
  */
 
 import { Failure } from "../../failure.js";
-import type { Operation, Spec } from "../../history/spec.js";
+import type { Spec } from "../../history/spec.js";
 import type { Case } from "../../prop/case.js";
 import { integer } from "../../prop/generators.js";
 import { type Option, tasks } from "../../stateful/option.js";
 import { Scheduler } from "../../stateful/scheduler.js";
 import { steps } from "../../stateful/steps.js";
 import type { Strategy } from "../../stateful/strategy.js";
+import { queue } from "./queue.js";
 
-/** The options of a subject's steps, those of a concurrent section, and the strategy of a subject's scheduler. */
-export interface Setup {
-  /** The options that every subject takes: mean, max and swarm. */
-  readonly steps: readonly Option[];
-  /** The options of a concurrent section: clients and concurrent. */
-  readonly section: readonly Option[];
-  /** The strategy of the scheduler that a subject with a concurrent section makes in each case. */
-  readonly strategy: Strategy;
-}
-
-/** A subject: it builds its subject and runs its machine in a case. */
-export type Subject = (c: Case, setup: Setup) => Promise<void>;
-
-/** The draws of the subjects. */
-const CAPACITIES = integer(1, 8);
-const VALUES = integer(0, 1000);
-const KEYS = integer(0, 3);
+/** The largest key of store-loses-on-crash, and the draw of its keys. */
+const MAX_KEY = 3;
+const KEYS = integer(0, MAX_KEY);
 
 /** The count at which counter-overflows sets its count to 0. */
 const OVERFLOW = 3;
@@ -87,64 +74,6 @@ const LIMIT = 3;
 const LOST = "lost-write";
 const DURABLE = "the store keeps every acknowledged put";
 
-/** A bounded queue in a ring of slots. A ring that loses on wrap writes the value of a put at the last slot into the first slot. */
-class Ring {
-  readonly #slots: (number | null)[];
-  readonly #losesOnWrap: boolean;
-  #head = 0;
-  #tail = 0;
-  #size = 0;
-
-  constructor(capacity: number, losesOnWrap: boolean) {
-    this.#slots = new Array<number | null>(capacity).fill(null);
-    this.#losesOnWrap = losesOnWrap;
-  }
-
-  /** Adds value, and reports whether the ring had room for it. */
-  put(value: number): boolean {
-    const capacity = this.#slots.length;
-    if (this.#size === capacity) return false;
-    const last = this.#tail === capacity - 1;
-    this.#slots[last && this.#losesOnWrap ? 0 : this.#tail] = value;
-    this.#tail = last ? 0 : this.#tail + 1;
-    this.#size += 1;
-    return true;
-  }
-
-  /** Removes and returns the oldest value, or null for an empty ring. */
-  get(): number | null {
-    if (this.#size === 0) return null;
-    const value = this.#slots[this.#head] as number | null;
-    this.#head = (this.#head + 1) % this.#slots.length;
-    this.#size -= 1;
-    return value;
-  }
-}
-
-/** A state of the spec of a bounded queue: its values, the oldest first. */
-type Queued = readonly number[];
-
-/**
- * Returns the spec of a queue of at most capacity values: put appends its
- * value while the queue has room, and get returns the oldest value and
- * removes it, and leaves an empty queue empty. It specifies the calls of the
- * queue subjects, whose put reports the room that the spec counts, and whose
- * get of an empty queue returns null.
- */
-function boundedQueue(capacity: number): Spec<Queued> {
-  const put = (state: Queued, op: Operation): Queued[] => [
-    state.length === capacity ? state : [...state, op.args[0] as number],
-  ];
-  const get = (state: Queued, op: Operation): Queued[] => {
-    if (state.length === 0) return [state];
-    return op.returned(state[0]) ? [state.slice(1)] : [];
-  };
-  return {
-    initial: () => [],
-    next: (state, op) => (op.name === "put" ? put(state, op) : get(state, op)),
-  };
-}
-
 /**
  * The spec of a counter: increment returns the new count, reset sets the
  * count to 0, and read returns the count.
@@ -152,41 +81,13 @@ function boundedQueue(capacity: number): Spec<Queued> {
 const COUNTER: Spec<number> = {
   initial: () => 0,
   next: (state, op) => {
-    if (op.name === "reset") return [0];
+    if (op.name === "reset") {
+      return [0];
+    }
     const after = op.name === "read" ? state : state + 1;
     return op.returned(after) ? [after] : [];
   },
 };
-
-/** Runs the queue machine over a ring of a drawn capacity. */
-async function queue(c: Case, setup: Setup, losesOnWrap: boolean): Promise<void> {
-  const capacity = c.draw(CAPACITIES, "capacity");
-  const ring = new Ring(capacity, losesOnWrap);
-  await steps(
-    c,
-    {
-      spec: boundedQueue(capacity),
-      actions: [
-        {
-          name: "put",
-          input: (c) => c.draw(VALUES, "v"),
-          run: (c, client, value) => {
-            const call = c.history().invoke(client, "put", [value]);
-            call.ok(ring.put(value as number));
-          },
-        },
-        {
-          name: "get",
-          run: (c, client) => {
-            const call = c.history().invoke(client, "get", []);
-            call.ok(ring.get());
-          },
-        },
-      ],
-    },
-    ...setup.steps,
-  );
-}
 
 /** Runs the counter machine over a counter that overflows at OVERFLOW. */
 async function counterOverflows(c: Case, setup: Setup): Promise<void> {
@@ -198,16 +99,16 @@ async function counterOverflows(c: Case, setup: Setup): Promise<void> {
       actions: [
         {
           name: "increment",
-          run: (c, client) => {
-            const call = c.history().invoke(client, "increment", []);
+          run: (step, client) => {
+            const call = step.history().invoke(client, "increment", []);
             count = (count + 1) % OVERFLOW;
             call.ok(count);
           },
         },
         {
           name: "reset",
-          run: (c, client) => {
-            const call = c.history().invoke(client, "reset", []);
+          run: (step, client) => {
+            const call = step.history().invoke(client, "reset", []);
             count = 0;
             call.ok(null);
           },
@@ -230,14 +131,14 @@ async function storeLosesOnCrash(c: Case, setup: Setup): Promise<void> {
       actions: [
         {
           name: "put",
-          input: (c) => {
-            const key = c.draw(KEYS, "key");
+          input: (step) => {
+            const key = step.draw(KEYS, "key");
             written += 1;
             return [key, written];
           },
-          run: (c, client, input) => {
+          run: (step, client, input) => {
             const [key, stored] = input as [number, number];
-            const call = c.history().invoke(client, "put", [key, stored]);
+            const call = step.history().invoke(client, "put", [key, stored]);
             buffer.set(key, stored);
             call.ok(null);
             acknowledged.set(key, stored);
@@ -248,16 +149,18 @@ async function storeLosesOnCrash(c: Case, setup: Setup): Promise<void> {
           enabled: () => buffer.size > 0,
           drain: true,
           run: () => {
-            for (const [key, stored] of buffer) durable.set(key, stored);
+            for (const [key, stored] of buffer) {
+              durable.set(key, stored);
+            }
             buffer.clear();
           },
         },
         { name: "crash", run: () => buffer.clear() },
       ],
-      settle: (c) => {
+      settle: (after) => {
         for (const [key, stored] of acknowledged) {
           if (durable.get(key) !== stored) {
-            c.report(new Failure(LOST, DURABLE, { key, lost: stored }), true);
+            after.report(new Failure(LOST, DURABLE, { key, lost: stored }), true);
           }
         }
       },
@@ -277,10 +180,12 @@ async function sharedCounter(c: Case, setup: Setup, racy: boolean): Promise<void
       actions: [
         {
           name: "increment",
-          run: async (c, client) => {
-            const call = c.history().invoke(client, "increment", []);
+          run: async (step, client) => {
+            const call = step.history().invoke(client, "increment", []);
             const read = count;
-            if (racy) await scheduler.yield();
+            if (racy) {
+              await scheduler.yield();
+            }
             count = read + 1;
             call.ok(count);
           },
@@ -306,8 +211,8 @@ function refusingCounter(): Subject {
           {
             name: "increment",
             enabled: (state) => state < LIMIT,
-            run: (c, client) => {
-              const call = c.history().invoke(client, "increment", []);
+            run: (step, client) => {
+              const call = step.history().invoke(client, "increment", []);
               increments += 1;
               if (increments % REFUSAL === 0) {
                 call.fail(REFUSED);
@@ -319,7 +224,7 @@ function refusingCounter(): Subject {
           },
           {
             name: "read",
-            run: (c, client) => c.history().invoke(client, "read", []).ok(count),
+            run: (step, client) => step.history().invoke(client, "read", []).ok(count),
           },
         ],
       },
@@ -327,6 +232,19 @@ function refusingCounter(): Subject {
     );
   };
 }
+
+/** The options of a subject's steps, those of a concurrent section, and the strategy of a subject's scheduler. */
+export interface Setup {
+  /** The options that every subject takes: mean, max and swarm. */
+  readonly steps: readonly Option[];
+  /** The options of a concurrent section: clients and concurrent. */
+  readonly section: readonly Option[];
+  /** The strategy of the scheduler that a subject with a concurrent section makes in each case. */
+  readonly strategy: Strategy;
+}
+
+/** A subject: it builds its subject and runs its machine in a case. */
+export type Subject = (c: Case, setup: Setup) => Promise<void>;
 
 /** The subjects of the definition, by name. Each entry returns a subject for one run. */
 export const SUBJECTS: ReadonlyMap<string, () => Subject> = new Map<

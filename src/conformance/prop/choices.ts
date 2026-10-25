@@ -11,7 +11,11 @@
  */
 
 import type { Bounds, Choice } from "../../prop/engine/choice.js";
+import { plain } from "../../prop/engine/encoding.js";
 import * as literal from "../../prop/engine/literal.js";
+
+/** The text of a seed: decimal digits. */
+const DIGITS = /^[0-9]+$/;
 
 /**
  * Returns the corpus form of one choice.
@@ -22,9 +26,9 @@ import * as literal from "../../prop/engine/literal.js";
 export function choiceLiteral(choice: Choice): unknown {
   switch (choice.kind) {
     case "integer":
-      return literal.plain(choice.value);
+      return plain(choice.value);
     case "float":
-      return { float: literal.plain(choice.value) };
+      return { float: plain(choice.value) };
     default:
       return { sequence: [...choice.value] };
   }
@@ -67,8 +71,9 @@ export function parseChoice(written: unknown): Choice {
  * @throws Error for a value that is no list of choices.
  */
 export function parseChoices(written: unknown): Choice[] {
-  if (!Array.isArray(written))
+  if (!Array.isArray(written)) {
     throw new Error(`prop: ${JSON.stringify(written)} is no list of choices`);
+  }
   return written.map(parseChoice);
 }
 
@@ -80,7 +85,7 @@ export function parseChoices(written: unknown): Choice[] {
  * @throws Error for a value that is no decimal string.
  */
 export function seedOf(seed: unknown): bigint {
-  if (typeof seed !== "string" || !/^[0-9]+$/.test(seed)) {
+  if (typeof seed !== "string" || !DIGITS.test(seed)) {
     throw new Error(`prop: the seed ${JSON.stringify(seed)} is no decimal string`);
   }
   return BigInt(seed);
@@ -97,14 +102,14 @@ export function boundsLiteral(bounds: Bounds): Record<string, unknown> {
     case "integer":
       return {
         kind: "integer",
-        min: literal.plain(bounds.lo),
-        max: literal.plain(bounds.hi),
+        min: plain(bounds.lo),
+        max: plain(bounds.hi),
       };
     case "float":
       return {
         kind: "float",
-        min: literal.plain(bounds.lo),
-        max: literal.plain(bounds.hi),
+        min: plain(bounds.lo),
+        max: plain(bounds.hi),
         allow_nan: bounds.allowNan,
         width: bounds.width,
       };

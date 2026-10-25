@@ -26,6 +26,12 @@ const CORPUS = join(dirname(fileURLToPath(import.meta.url)), "corpus");
 /** The directories of the corpus whose files state the vectors that this library runs. */
 const FAMILIES = ["files", "history", "prop", "stateful"];
 
+/** A vector file, as the definition states it. */
+interface VectorFile {
+  readonly kind: string;
+  readonly cases: readonly Readonly<Record<string, unknown>>[];
+}
+
 /**
  * Returns the reason that the definition states for this language to skip
  * a vector, or undefined for a vector that this language runs.
@@ -47,12 +53,6 @@ export interface Vector {
   readonly id: string;
   /** The case's JSON object, as the vector file states it. */
   readonly raw: Readonly<Record<string, unknown>>;
-}
-
-/** A vector file, as the definition states it. */
-interface VectorFile {
-  readonly kind: string;
-  readonly cases: readonly Readonly<Record<string, unknown>>[];
 }
 
 /**
@@ -95,13 +95,19 @@ export async function checkVector(
   const history = HISTORY.get(vector.kind);
   const stateful = STATEFUL.get(vector.kind);
   const prop = KINDS.has(vector.kind);
-  if (files === undefined && history === undefined && stateful === undefined && !prop)
+  if (files === undefined && history === undefined && stateful === undefined && !prop) {
     return `${vector.id}: ${JSON.stringify(vector.kind)} is no vector kind`;
+  }
   try {
-    if (files !== undefined) await files(vector.raw, dir);
-    else if (history !== undefined) history(vector.raw);
-    else if (stateful === undefined) await checkProp(vector.kind, vector.raw);
-    else await stateful(vector.raw);
+    if (files !== undefined) {
+      await files(vector.raw, dir);
+    } else if (history !== undefined) {
+      history(vector.raw);
+    } else if (stateful === undefined) {
+      await checkProp(vector.kind, vector.raw);
+    } else {
+      await stateful(vector.raw);
+    }
   } catch (err) {
     return (err as Fault).within(vector.id).message;
   }

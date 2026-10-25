@@ -28,9 +28,6 @@ import type { Body } from "../../prop/engine/execution.js";
 import { build } from "./generator.js";
 import { type Predicate, predicate } from "./predicate.js";
 
-/** The label of a body's one draw. */
-export const DRAWN = "value";
-
 /** A body's JSON object. */
 type Spec = Readonly<Record<string, unknown>>;
 
@@ -46,6 +43,9 @@ function nameOf(value: unknown): string {
 
 /** The generator of the integer that `fails-once` and `fails-then-skips` draw. */
 const WIDE = { gen: "integer", min: 0, max: 1_000_000_000 } as const;
+
+/** The value above which `fails-once` and `fails-then-skips` fail. */
+const FAILS_ABOVE = 1000n;
 
 /** Returns the body that requests no input. */
 function nothing(): Body {
@@ -69,7 +69,7 @@ function failingOnce(): Body {
   const wide = build(WIDE);
   return (c: Case) => {
     const value = c.draw(wide, DRAWN) as bigint;
-    if (value > 1000n && !failed) {
+    if (value > FAILS_ABOVE && !failed) {
       failed = true;
       c.fail("once");
     }
@@ -82,8 +82,10 @@ function failingThenSkipping(): Body {
   const wide = build(WIDE);
   return (c: Case) => {
     const value = c.draw(wide, DRAWN) as bigint;
-    if (failed) c.skip("after");
-    if (value > 1000n) {
+    if (failed) {
+      c.skip("after");
+    }
+    if (value > FAILS_ABOVE) {
       failed = true;
       c.fail("once");
     }
@@ -97,9 +99,18 @@ function entriesOf(
   name: string,
 ): (readonly [string, Predicate])[] {
   const entries = spec[key] ?? [];
-  if (!Array.isArray(entries))
+  if (!Array.isArray(entries)) {
     throw new Error(`prop: ${key} is ${JSON.stringify(entries)}, not a list`);
+  }
   return entries.map((entry: Spec) => [nameOf(entry[name]), predicate(entry["when"])]);
+}
+
+/** Returns the string of the first entry whose predicate is true of value, or undefined. */
+function firstOf(
+  entries: readonly (readonly [string, Predicate])[],
+  value: unknown,
+): string | undefined {
+  return entries.find(([, test]) => test(value))?.[0];
 }
 
 /** Returns a body that draws once, then classifies, rejects, skips and fails. */
@@ -117,12 +128,27 @@ function drawing(spec: Spec): Body {
   const fails = entriesOf(spec, "fails", "identity");
   return (c: Case) => {
     const value = c.draw(generator, DRAWN);
-    for (const [label, test] of labels) if (test(value)) c.classify(label);
-    if (rejects !== undefined) c.assume(!rejects(value));
-    for (const [reason, test] of skips) if (test(value)) c.skip(reason);
-    for (const [identity, test] of fails) if (test(value)) c.fail(identity);
+    for (const [label, test] of labels) {
+      if (test(value)) {
+        c.classify(label);
+      }
+    }
+    if (rejects !== undefined) {
+      c.assume(!rejects(value));
+    }
+    const reason = firstOf(skips, value);
+    if (reason !== undefined) {
+      c.skip(reason);
+    }
+    const identity = firstOf(fails, value);
+    if (identity !== undefined) {
+      c.fail(identity);
+    }
   };
 }
+
+/** The label of a body's one draw. */
+export const DRAWN = "value";
 
 /**
  * Returns a fresh body for a spec. A named body keeps its own state.

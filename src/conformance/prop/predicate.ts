@@ -30,15 +30,14 @@
 import * as literal from "../../prop/engine/literal.js";
 import { canonical, Pairs } from "../../prop/engine/value.js";
 
-/** A condition on a decoded value. */
-export type Predicate = (value: unknown) => boolean;
-
 /** A predicate's JSON object. */
 type Spec = Readonly<Record<string, unknown>>;
 
 /** Returns a predicate's numeric parameter: an integer as a bigint, and any other number as itself. */
 function numberOf(value: unknown): bigint | number {
-  if (typeof value === "number" && !Number.isInteger(value)) return value;
+  if (typeof value === "number" && !Number.isInteger(value)) {
+    return value;
+  }
   return literal.integer(value);
 }
 
@@ -62,7 +61,9 @@ function below(a: unknown, b: unknown): boolean {
     const left = [...a].map((c) => c.codePointAt(0) as number);
     const right = [...b].map((c) => c.codePointAt(0) as number);
     for (let i = 0; i < Math.min(left.length, right.length); i += 1) {
-      if (left[i] !== right[i]) return (left[i] as number) < (right[i] as number);
+      if (left[i] !== right[i]) {
+        return (left[i] as number) < (right[i] as number);
+      }
     }
     return left.length < right.length;
   }
@@ -114,8 +115,12 @@ const PREDICATES: ReadonlyMap<string, (spec: Spec) => Predicate> = new Map<
     (spec) => {
       const n = Number(literal.integer(spec["n"]));
       return (value) => {
-        if (value instanceof Pairs) return value.items.length >= n;
-        if (typeof value === "string") return [...value].length >= n;
+        if (value instanceof Pairs) {
+          return value.items.length >= n;
+        }
+        if (typeof value === "string") {
+          return [...value].length >= n;
+        }
         return (
           (Array.isArray(value) || value instanceof Uint8Array) && value.length >= n
         );
@@ -128,9 +133,12 @@ const PREDICATES: ReadonlyMap<string, (spec: Spec) => Predicate> = new Map<
       const wanted = literal.decode(spec["value"]);
       const key = canonical(wanted);
       return (value) => {
-        if (Array.isArray(value)) return value.some((item) => canonical(item) === key);
-        if (typeof value === "string" && typeof wanted === "string")
+        if (Array.isArray(value)) {
+          return value.some((item) => canonical(item) === key);
+        }
+        if (typeof value === "string" && typeof wanted === "string") {
           return value.includes(wanted);
+        }
         if (value instanceof Uint8Array && wanted instanceof Uint8Array) {
           return containsBytes(value, wanted);
         }
@@ -154,7 +162,9 @@ const PREDICATES: ReadonlyMap<string, (spec: Spec) => Predicate> = new Map<
     (spec) => {
       const n = numberOf(spec["n"]);
       return (value) => {
-        if (!Array.isArray(value) || value.length === 0) return false;
+        if (!Array.isArray(value) || value.length === 0) {
+          return false;
+        }
         const index = value.at(-1);
         const earlier = value.slice(0, -1);
         if (
@@ -170,6 +180,9 @@ const PREDICATES: ReadonlyMap<string, (spec: Spec) => Predicate> = new Map<
     },
   ],
 ]);
+
+/** A condition on a decoded value. */
+export type Predicate = (value: unknown) => boolean;
 
 /**
  * Returns the predicate that a spec states.

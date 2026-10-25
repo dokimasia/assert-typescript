@@ -14,32 +14,13 @@ import {
   type Subject,
 } from "../../../src/conformance/stateful/subjects.js";
 import { check } from "../../../src/index.js";
-import { forAll } from "../../../src/prop/forall.js";
-import { hermetic, seed, store } from "../../../src/prop/option.js";
-import { Recorder } from "../../../src/seat.js";
-import { clients, swarm } from "../../../src/stateful/option.js";
-import { uniform } from "../../../src/stateful/strategy.js";
+import { swarm } from "../../../src/stateful/option.js";
 import { test as it } from "../../../src/vitest.js";
-import { records } from "../../helpers.js";
-
-/** The setup of a vector that states none. */
-const DEFAULT: Setup = { steps: [], section: [clients(2)], strategy: uniform() };
+import { MACHINE_SETUP as DEFAULT, machineOutcome } from "../../helpers.js";
 
 /** Returns the outcome of a run of the subject of name under setup and seed 1, and the assertion of its failure. */
-async function outcomeOf(name: string, setup: Setup): Promise<[unknown, unknown]> {
-  const subject = (SUBJECTS.get(name) as () => Subject)();
-  const recorder = new Recorder();
-  await forAll(
-    recorder,
-    "the subject",
-    (c) => subject(c, setup),
-    seed(1n),
-    hermetic(),
-    store(""),
-  );
-  const detail = records(recorder)[0]?.["detail"] as Record<string, unknown>;
-  const failure = detail["failure"] as Record<string, unknown> | null;
-  return [detail["outcome"], failure?.["assertion"] ?? null];
+function outcomeOf(name: string, setup: Setup): Promise<[unknown, unknown]> {
+  return machineOutcome((SUBJECTS.get(name) as () => Subject)(), setup);
 }
 
 describe("subjects", () => {

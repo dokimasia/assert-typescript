@@ -16,6 +16,7 @@ import * as check from "../check.js";
 import { type Matcher, matchers, NAMES, SUBJECTS } from "../expect/matchers.js";
 import type { Option } from "../matcher/option.js";
 import * as option from "../option.js";
+import { compareText } from "../order.js";
 import { DEFINITION } from "../record/call.js";
 import type { Recorder } from "../seat.js";
 import * as soft from "../soft.js";
@@ -26,13 +27,140 @@ import {
   names,
   relaxationNames,
 } from "./definition.js";
-import { canonical, decode, type Literal, Objects } from "./literal.js";
+import { canonical } from "./equality.js";
+import { decode, type Literal, Objects } from "./literal.js";
 
 /** The corpus of the vendored definition, beside this module. */
 const CORPUS = join(dirname(fileURLToPath(import.meta.url)), "corpus");
 
 /** An assertion as a corpus case calls it: a seat, then its arguments. */
 type Invoker = (seat: Recorder, ...args: unknown[]) => unknown;
+
+/**
+ * Returns the matchers of the expect chain, each called as the function
+ * form of its assertion is called: with a seat, then its arguments. A
+ * call reports to that seat. The function form of noTaskLeaks takes no
+ * subject, so the chain has no member of that name here.
+ */
+function chained(): Record<string, Invoker> {
+  return Object.fromEntries(
+    NAMES.filter((name) => name !== "noTaskLeaks").map((name) => [
+      name,
+      (seat: Recorder, ...args: unknown[]) => {
+        const at = SUBJECTS[name] ?? 0;
+        const table = matchers({ seat: () => seat, start: () => undefined });
+        const matcher = table[name] as Matcher;
+        return matcher.call({}, args[at], ...args.slice(0, at), ...args.slice(at + 1));
+      },
+    ]),
+  );
+}
+
+/** A corpus file, as the definition states it. */
+interface CorpusFile {
+  readonly assertion: string;
+  readonly cases: readonly {
+    readonly id: string;
+    readonly args?: readonly Literal[];
+    readonly options?: readonly string[];
+    readonly expect: "pass" | "fail";
+    readonly detail?: Readonly<Record<string, Literal>>;
+    readonly subject?: { readonly kind: string };
+    readonly skip?: Readonly<Record<string, string>>;
+  }[];
+}
+
+/** Whether a reported value is the value that a case states. */
+function same(held: unknown, want: unknown): boolean {
+  return canonical(held) === canonical(want);
+}
+
+/** Returns how the names of a detail differ from the fields that a case's assertion declares. */
+function fieldsMismatch(whose: string, detail: object, one: Case): string | undefined {
+  const stated = JSON.stringify(Object.keys(detail).sort(compareText));
+  const declared = JSON.stringify([...one.fields].sort(compareText));
+  return stated === declared
+    ? undefined
+    : `${whose} states the fields ${stated}, want ${declared}`;
+}
+
+/** Holds the first failure record of a failing case to what the case states. */
+function recordMismatch(one: Case, recorder: Recorder): string | undefined {
+  if (!recorder.failed) {
+    return "expected a failure, got a pass";
+  }
+  const [record] = recorder.failures;
+  if (record === undefined) {
+    return "reported no record; the assertion did not report one";
+  }
+  if (record.assertion !== one.assertion) {
+    return `the record is of ${record.assertion}, want ${one.assertion}`;
+  }
+  if (record.contract !== one.id) {
+    return `the record states the contract ${JSON.stringify(record.contract)}, want ${JSON.stringify(one.id)}`;
+  }
+  const fields = fieldsMismatch("the record", record.detail, one);
+  if (fields !== undefined) {
+    return fields;
+  }
+  for (const [name, want] of Object.entries(one.detail)) {
+    if (!same(record.detail[name], want)) {
+      return `detail "${name}" is ${canonical(record.detail[name])}, want ${canonical(want)}`;
+    }
+  }
+  return undefined;
+}
+
+/** Holds the one call record that a recorder keeps to what a case states. */
+function callMismatch(
+  one: Case,
+  recorder: Recorder,
+  aborting: boolean,
+): string | undefined {
+  const lines = recorder.records;
+  if (lines.length !== 1) {
+    return `the recorder keeps ${lines.length} call records, want 1`;
+  }
+  const {
+    where: _where,
+    detail,
+    ...call
+  } = JSON.parse(lines[0] as string) as Record<string, unknown>;
+  const want = {
+    definition: DEFINITION,
+    seq: 1,
+    assertion: one.assertion,
+    contract: one.id,
+    verdict: one.expect,
+    aborting,
+  };
+  if (JSON.stringify(call) !== JSON.stringify(want)) {
+    return `the call record is ${JSON.stringify(call)}, want ${JSON.stringify(want)}`;
+  }
+  if (one.expect === "pass") {
+    return detail === undefined
+      ? undefined
+      : `a passing call record states the detail ${JSON.stringify(detail)}`;
+  }
+  const fields = detail as Record<string, Literal>;
+  const named = fieldsMismatch("the call record", fields, one);
+  if (named !== undefined) {
+    return named;
+  }
+  for (const [name, stated] of Object.entries(one.detail)) {
+    const literal = fields[name] as Literal;
+    let held: unknown;
+    try {
+      held = decode(literal);
+    } catch (err) {
+      return `the call record's ${name} is no typed literal: ${(err as Error).message}`;
+    }
+    if (!same(held, stated)) {
+      return `the call record's ${name} is ${JSON.stringify(literal)}, want ${canonical(stated)}`;
+    }
+  }
+  return undefined;
+}
 
 /** One corpus case: what an assertion is given, and what it must report. */
 export interface Case {
@@ -64,26 +192,6 @@ export interface Case {
 }
 
 /**
- * Returns the matchers of the expect chain, each called as the function
- * form of its assertion is called: with a seat, then its arguments. A
- * call reports to that seat. The function form of noTaskLeaks takes no
- * subject, so the chain has no member of that name here.
- */
-function chained(): Record<string, Invoker> {
-  return Object.fromEntries(
-    NAMES.filter((name) => name !== "noTaskLeaks").map((name) => [
-      name,
-      (seat: Recorder, ...args: unknown[]) => {
-        const at = SUBJECTS[name] ?? 0;
-        const table = matchers({ seat: () => seat, start: () => undefined });
-        const matcher = table[name] as Matcher;
-        return matcher.call({}, args[at], ...args.slice(0, at), ...args.slice(at + 1));
-      },
-    ]),
-  );
-}
-
-/**
  * The surfaces, so every case is driven through each: check, soft, and
  * the matchers of the expect chain, whose calls report as check's do.
  */
@@ -92,20 +200,6 @@ export const SURFACES: Record<string, Record<string, Invoker>> = {
   expect: chained(),
   soft: soft as unknown as Record<string, Invoker>,
 };
-
-/** A corpus file, as the definition states it. */
-interface CorpusFile {
-  readonly assertion: string;
-  readonly cases: readonly {
-    readonly id: string;
-    readonly args?: readonly Literal[];
-    readonly options?: readonly string[];
-    readonly expect: "pass" | "fail";
-    readonly detail?: Readonly<Record<string, Literal>>;
-    readonly subject?: { readonly kind: string };
-    readonly skip?: Readonly<Record<string, string>>;
-  }[];
-}
 
 /**
  * Answer every case the vendored corpus states.
@@ -116,9 +210,10 @@ interface CorpusFile {
 export function cases(): Case[] {
   const declared = assertions();
   const found: Case[] = [];
-  for (const file of readdirSync(CORPUS).sort()) {
-    if (!file.endsWith(".json")) continue;
-
+  const files = readdirSync(CORPUS)
+    .filter((file) => file.endsWith(".json"))
+    .sort(compareText);
+  for (const file of files) {
     const document = JSON.parse(readFileSync(join(CORPUS, file), "utf8")) as CorpusFile;
     for (const one of document.cases) {
       const objects = new Objects();
@@ -174,45 +269,11 @@ export function optionsOf(one: Case): Option[] {
   const named = relaxationNames();
   return one.options.map((id) => {
     const make = (option as unknown as Record<string, () => Option>)[named[id] ?? ""];
-    if (make === undefined) throw new Error(`${one.id}: no option names ${id}`);
+    if (make === undefined) {
+      throw new Error(`${one.id}: no option names ${id}`);
+    }
     return make();
   });
-}
-
-/** Whether a reported value is the value that a case states. */
-function same(held: unknown, want: unknown): boolean {
-  return canonical(held) === canonical(want);
-}
-
-/** Returns how the names of a detail differ from the fields that a case's assertion declares. */
-function fieldsMismatch(whose: string, detail: object, one: Case): string | undefined {
-  const stated = JSON.stringify(Object.keys(detail).sort());
-  const declared = JSON.stringify([...one.fields].sort());
-  return stated === declared
-    ? undefined
-    : `${whose} states the fields ${stated}, want ${declared}`;
-}
-
-/** Holds the first failure record of a failing case to what the case states. */
-function recordMismatch(one: Case, recorder: Recorder): string | undefined {
-  if (!recorder.failed) return "expected a failure, got a pass";
-  const [record] = recorder.failures;
-  if (record === undefined)
-    return "reported no record; the assertion did not report one";
-  if (record.assertion !== one.assertion) {
-    return `the record is of ${record.assertion}, want ${one.assertion}`;
-  }
-  if (record.contract !== one.id) {
-    return `the record states the contract ${JSON.stringify(record.contract)}, want ${JSON.stringify(one.id)}`;
-  }
-  const fields = fieldsMismatch("the record", record.detail, one);
-  if (fields !== undefined) return fields;
-  for (const [name, want] of Object.entries(one.detail)) {
-    if (!same(record.detail[name], want)) {
-      return `detail "${name}" is ${canonical(record.detail[name])}, want ${canonical(want)}`;
-    }
-  }
-  return undefined;
 }
 
 /**
@@ -242,52 +303,4 @@ export function mismatch(
   }
   const record = one.expect === "fail" ? recordMismatch(one, recorder) : undefined;
   return record ?? callMismatch(one, recorder, aborting);
-}
-
-/** Holds the one call record that a recorder keeps to what a case states. */
-function callMismatch(
-  one: Case,
-  recorder: Recorder,
-  aborting: boolean,
-): string | undefined {
-  const lines = recorder.records;
-  if (lines.length !== 1)
-    return `the recorder keeps ${lines.length} call records, want 1`;
-  const { where, detail, ...call } = JSON.parse(lines[0] as string) as Record<
-    string,
-    unknown
-  >;
-  void where;
-  const want = {
-    definition: DEFINITION,
-    seq: 1,
-    assertion: one.assertion,
-    contract: one.id,
-    verdict: one.expect,
-    aborting,
-  };
-  if (JSON.stringify(call) !== JSON.stringify(want)) {
-    return `the call record is ${JSON.stringify(call)}, want ${JSON.stringify(want)}`;
-  }
-  if (one.expect === "pass") {
-    return detail === undefined
-      ? undefined
-      : `a passing call record states the detail ${JSON.stringify(detail)}`;
-  }
-  const fields = detail as Record<string, Literal>;
-  const named = fieldsMismatch("the call record", fields, one);
-  if (named !== undefined) return named;
-  for (const [name, want] of Object.entries(one.detail)) {
-    const literal = fields[name] as Literal;
-    let held: unknown;
-    try {
-      held = decode(literal);
-    } catch (err) {
-      return `the call record's ${name} is no typed literal: ${(err as Error).message}`;
-    }
-    if (!same(held, want)) {
-      return `the call record's ${name} is ${JSON.stringify(literal)}, want ${canonical(want)}`;
-    }
-  }
-  return undefined;
 }

@@ -6,13 +6,14 @@
 import { describe } from "vitest";
 import * as conformance from "../../src/conformance/index.js";
 import { check } from "../../src/index.js";
+import { compareText } from "../../src/order.js";
 import { test as it } from "../../src/vitest.js";
 
 describe("index", () => {
   it("exports the names of the conformance entry point", ({ seat }) => {
     check.isEqualTo(
       seat,
-      Object.keys(conformance).sort(),
+      Object.keys(conformance).sort(compareText),
       [
         "LANGUAGE",
         "Objects",

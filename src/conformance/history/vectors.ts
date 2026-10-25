@@ -16,8 +16,7 @@
 import { eventJson } from "../../history/event.js";
 import {
   budget,
-  type Call,
-  History,
+  type History,
   hasSnapshotIsolation,
   isLinearizable,
   isSerializable,
@@ -25,15 +24,12 @@ import {
   type Option,
   workers,
 } from "../../history/index.js";
-import {
-  fromIntervals,
-  type Interval,
-  type IntervalError,
-} from "../../history/interval.js";
 import { Fault } from "../../matcher/fault.js";
 import type { Seat } from "../../matcher/seat.js";
+import { compareText } from "../../order.js";
 import { Recorder } from "../../seat.js";
-import { decode, type Literal, sameJson } from "../literal.js";
+import { sameJson } from "../equality.js";
+import { intervals, record } from "./script.js";
 import { SPECS } from "./specs.js";
 
 /** A vector's JSON object. */
@@ -44,143 +40,6 @@ const LINEARIZABLE_CONTRACT = "the history of the vector is linearizable";
 
 /** The contract of the check of an isolation vector. */
 const ISOLATION_CONTRACT = "the transactions of the vector are isolated";
-
-/** The completion kinds that an interval entry may state. */
-const COMPLETIONS: ReadonlySet<unknown> = new Set(["ok", "fail", "unknown"]);
-
-/** Returns the values that a list of typed literals states, and a fault at member for a value that does not decode. */
-function values(raw: unknown, member: string): unknown[] {
-  if (!Array.isArray(raw)) throw new Fault(member, "the member is no list");
-  return raw.map((literal, i) => {
-    try {
-      return decode(literal as Literal);
-    } catch (err) {
-      throw new Fault(`${member}[${i}]`, "the value is no typed literal", err);
-    }
-  });
-}
-
-/** Returns the value of a typed literal, and a fault at member for one that does not decode. */
-function value(raw: unknown, member: string): unknown {
-  try {
-    return decode(raw as Literal);
-  } catch (err) {
-    throw new Fault(member, "the value is no typed literal", err);
-  }
-}
-
-/** Reports whether apply, a call of the seam, throws. */
-function refuses(apply: () => void): boolean {
-  try {
-    apply();
-  } catch {
-    return true;
-  }
-  return false;
-}
-
-/**
- * Records script through a history, and returns the history and the entry
- * whose call of the seam throws, or undefined when the seam refuses none.
- * It records no entry after the refused one.
- */
-function record(
-  script: unknown,
-  member: string,
-): {
-  readonly history: History;
-  readonly refused: number | undefined;
-} {
-  if (!Array.isArray(script)) throw new Fault(member, "the script is no list");
-  const history = new History();
-  const calls = new Map<unknown, Call>();
-  for (const [i, raw] of (script as Raw[]).entries()) {
-    const at = `${member}[${i}]`;
-    const completing = (
-      number: unknown,
-      complete: (call: Call) => void,
-    ): (() => void) => {
-      const call = calls.get(number);
-      if (call === undefined) {
-        throw new Fault(
-          at,
-          `the entry completes call ${String(number)}, which the script does not open`,
-        );
-      }
-      return () => complete(call);
-    };
-    let apply: () => void;
-    if ("invoke" in raw) {
-      const args = values(raw["args"], `${at}.args`);
-      const keys = values(raw["keys"], `${at}.keys`);
-      apply = () => {
-        calls.set(
-          raw["invoke"],
-          history.invoke(
-            Number(raw["client"]),
-            String(raw["operation"]),
-            args,
-            ...keys,
-          ),
-        );
-      };
-    } else if ("ok" in raw) {
-      const output = value(raw["output"], `${at}.output`);
-      apply = completing(raw["ok"], (call) => call.ok(output));
-    } else if ("fail" in raw) {
-      apply = completing(raw["fail"], (call) => call.fail(raw["error"]));
-    } else if ("unknown" in raw) {
-      apply = completing(raw["unknown"], (call) => call.unknown(raw["error"]));
-    } else {
-      throw new Fault(at, "the entry states no call of the seam");
-    }
-    if (refuses(apply)) return { history, refused: i };
-  }
-  return { history, refused: undefined };
-}
-
-/** Returns the interval that one entry of a seam vector states, and a fault at member for one it cannot read. */
-function intervalOf(raw: Raw, member: string): Interval {
-  const kind = raw["kind"];
-  const end = raw["end"];
-  if (
-    (end === undefined) !== (kind === undefined) ||
-    (kind !== undefined && !COMPLETIONS.has(kind))
-  ) {
-    throw new Fault(
-      member,
-      "the entry states a completion kind and an end, or neither",
-    );
-  }
-  return {
-    client: Number(raw["client"]),
-    operation: String(raw["operation"]),
-    args: values(raw["args"], `${member}.args`),
-    keys: values(raw["keys"], `${member}.keys`),
-    start: raw["start"] as number,
-    end: end as number | undefined,
-    kind: kind as Interval["kind"],
-    output: kind === "ok" ? value(raw["output"], `${member}.output`) : undefined,
-    error: kind === "ok" ? undefined : raw["error"],
-  };
-}
-
-/** Returns the history of a seam vector's intervals and the entry that fromIntervals refuses, or undefined. */
-function intervals(raw: unknown): {
-  readonly history: History | undefined;
-  readonly refused: number | undefined;
-} {
-  if (!Array.isArray(raw)) throw new Fault("intervals", "the intervals are no list");
-  const entries = (raw as Raw[]).map((entry, i) =>
-    intervalOf(entry, `intervals[${i}]`),
-  );
-  try {
-    return { history: fromIntervals(entries), refused: undefined };
-  } catch (err) {
-    // fromIntervals throws an IntervalError alone.
-    return { history: undefined, refused: (err as IntervalError).entry };
-  }
-}
 
 /** Compares the events of a history, or the entry that its seam refused, with the ones a seam vector states. */
 function checkSeam(raw: Raw): void {
@@ -196,10 +55,14 @@ function checkSeam(raw: Raw): void {
       `the seam refuses ${refused === undefined ? "no entry" : `entry ${refused}`}, want ${JSON.stringify(want)}`,
     );
   }
-  if (refused !== undefined) return;
+  if (refused !== undefined) {
+    return;
+  }
   const events = (history as History).events().map(eventJson);
   const stated = raw["events"];
-  if (!Array.isArray(stated)) throw new Fault("events", "the events are no list");
+  if (!Array.isArray(stated)) {
+    throw new Fault("events", "the events are no list");
+  }
   events.forEach((event, i) => {
     if (i < stated.length && !sameJson(event, stated[i])) {
       throw new Fault(
@@ -219,8 +82,9 @@ function checkSeam(raw: Raw): void {
 /** Returns the history of a check vector's script, and a fault at the entry that the seam refuses. */
 function historyOf(raw: Raw): History {
   const { history, refused } = record(raw["history"], "history");
-  if (refused !== undefined)
+  if (refused !== undefined) {
     throw new Fault(`history[${refused}]`, "the seam refuses the entry");
+  }
   return history;
 }
 
@@ -246,10 +110,12 @@ function compareVerdict(call: Raw, raw: Raw): void {
       `the check ends as ${String(call["verdict"])}, want ${expect}`,
     );
   }
-  if (expect === "pass") return;
+  if (expect === "pass") {
+    return;
+  }
   const detail = call["detail"] as Raw;
   const stated = raw["detail"] as Raw;
-  for (const name of Object.keys(stated).sort()) {
+  for (const name of Object.keys(stated).sort(compareText)) {
     if (!(name in detail)) {
       throw new Fault(
         `detail.${name}`,
@@ -275,14 +141,15 @@ function optionsOf(raw: Raw): Option[] {
   ];
   for (const [member, option] of stated) {
     const n = raw[member];
-    if (n === undefined) continue;
-    if (!Number.isSafeInteger(n) || (n as number) < 1) {
-      throw new Fault(
-        member,
-        `the ${member} is ${JSON.stringify(n)}, no integer of 1 or more`,
-      );
+    if (n !== undefined) {
+      if (!Number.isSafeInteger(n) || (n as number) < 1) {
+        throw new Fault(
+          member,
+          `the ${member} is ${JSON.stringify(n)}, no integer of 1 or more`,
+        );
+      }
+      options.push(option(n as number));
     }
-    options.push(option(n as number));
   }
   return options;
 }
@@ -296,8 +163,9 @@ function optionsOf(raw: Raw): Option[] {
  */
 function checkLinearizable(raw: Raw): void {
   const spec = SPECS.get(String(raw["spec"]));
-  if (spec === undefined)
+  if (spec === undefined) {
     throw new Fault("spec", `${JSON.stringify(raw["spec"])} is no named spec`);
+  }
   const history = historyOf(raw);
   const options = optionsOf(raw);
   const checked = (...more: Option[]) =>
@@ -306,7 +174,9 @@ function checkLinearizable(raw: Raw): void {
     );
   const call = checked();
   compareVerdict(call, raw);
-  if (raw["expect"] === "fail") return;
+  if (raw["expect"] === "fail") {
+    return;
+  }
   const stated = raw["detail"] as Raw;
   const steps = stated["steps"];
   if (

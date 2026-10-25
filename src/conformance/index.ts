@@ -34,5 +34,6 @@ export {
   surfaceNames,
   version,
 } from "./definition.js";
-export { canonical, decode, type Literal, Objects, sameJson } from "./literal.js";
+export { canonical, sameJson } from "./equality.js";
+export { decode, type Literal, Objects } from "./literal.js";
 export { checkVector, type Vector, vectors } from "./vector.js";

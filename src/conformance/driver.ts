@@ -176,7 +176,9 @@ export async function runSubject(
   const build = SUBJECTS[kind];
   const drive = DRIVERS[assertion];
   const held = SURFACES[surface];
-  if (build === undefined || drive === undefined || held === undefined) return false;
+  if (build === undefined || drive === undefined || held === undefined) {
+    return false;
+  }
 
   await drive(held, seat, build(), msg, options);
   return true;

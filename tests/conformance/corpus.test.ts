@@ -24,9 +24,13 @@ import { runSubject } from "../../src/conformance/driver.js";
 import { Failure } from "../../src/failure.js";
 import { Mode } from "../../src/matcher/seat.js";
 import { Running } from "../../src/matcher/verdict.js";
+import { compareText } from "../../src/order.js";
 import { Recorder } from "../../src/seat.js";
 
 const CASES = cases();
+
+/** The members of one surface, by name. */
+type Chain = (typeof SURFACES)[string];
 
 /** A failing case of equal, which states the detail want 2. */
 const FAILING: Case = {
@@ -123,25 +127,26 @@ describe("corpus", () => {
 
   describe("SURFACES", () => {
     it("contains the three surfaces", () => {
-      expect(Object.keys(SURFACES).sort()).toEqual(["check", "expect", "soft"]);
+      expect(Object.keys(SURFACES).sort(compareText)).toEqual([
+        "check",
+        "expect",
+        "soft",
+      ]);
     });
 
     it("contains a member of the chain for each assertion besides noTaskLeaks", () => {
-      expect(Object.keys(SURFACES["expect"] ?? {})).toEqual(
+      expect(Object.keys(SURFACES["expect"] as Chain)).toEqual(
         Object.keys(check)
           .filter((name) => name !== "noTaskLeaks")
-          .sort(),
+          .sort(compareText),
       );
     });
 
     it("hands the chain the subject in its place among the arguments", async () => {
       const seat = new Recorder().withClock(new Controlled(0));
-      await SURFACES["expect"]?.["completesWithin"]?.(
-        seat,
-        1000,
-        () => undefined,
-        "in time",
-      );
+      const chain = SURFACES["expect"] as Chain;
+      const completesWithin = chain["completesWithin"] as Chain[string];
+      await completesWithin(seat, 1000, () => undefined, "in time");
 
       expect([seat.failed, seat.records.length]).toEqual([false, 1]);
     });
@@ -312,7 +317,7 @@ describe("corpus", () => {
       );
     });
 
-    for (const surface of Object.keys(SURFACES).sort()) {
+    for (const surface of Object.keys(SURFACES).sort(compareText)) {
       for (const one of CASES) {
         const run = skipReason(one) === undefined ? it : it.skip;
         run(`returns undefined for case ${one.id} on ${surface}`, async () => {

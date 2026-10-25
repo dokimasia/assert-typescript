@@ -31,7 +31,9 @@ function fault(kind: string, raw: Raw): [string, string] {
   try {
     (RUNNERS.get(kind) as (raw: Raw) => void)(raw);
   } catch (err) {
-    if (err instanceof Fault) return [err.at, err.reason];
+    if (err instanceof Fault) {
+      return [err.at, err.reason];
+    }
     throw err;
   }
   return ["", ""];

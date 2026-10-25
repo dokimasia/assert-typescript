@@ -12,6 +12,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CONTRACT, RUNNERS, type Runner } from "../../src/conformance/files.js";
+import { compareText } from "../../src/order.js";
 import { enter, LONG_NAMES_ABSENT, temporary, UNENFORCED } from "../helpers.js";
 
 /** The tree of no entry. */
@@ -74,7 +75,7 @@ describe("files", () => {
 
   describe("RUNNERS", () => {
     it("contains a runner of each assertion that reads files", () => {
-      expect(Object.keys(RUNNERS).sort()).toEqual([
+      expect(Object.keys(RUNNERS).sort(compareText)).toEqual([
         "golden-match-tree",
         "has-content",
         "has-mode",

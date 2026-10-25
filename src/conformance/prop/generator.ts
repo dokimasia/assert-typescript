@@ -19,8 +19,10 @@ import {
 } from "../../prop/engine/choice.js";
 import { Sizes } from "../../prop/engine/collection.js";
 import type { Rational } from "../../prop/engine/draw.js";
+import { DOUBLE, type Width } from "../../prop/engine/float.js";
 import {
   Bool,
+  BYTE_VALUES,
   Bytes,
   Dict,
   Filter,
@@ -50,35 +52,26 @@ type Spec = Readonly<Record<string, unknown>>;
 /** The values that one recursive value may draw from its base when the spec states no max_leaves. */
 const DEFAULT_MAX_LEAVES = 100;
 
-/** A spec that names no generator, or misstates a parameter or a literal. */
-export class SpecError extends Error {
-  /**
-   * Returns the error of a spec.
-   *
-   * @param message - What is wrong with the spec.
-   */
-  constructor(message: string) {
-    super(message);
-    this.name = "SpecError";
-  }
-}
-
 /** Returns the JSON text of a value, for an error's message. */
 function shown(value: unknown): string {
-  return JSON.stringify(value) ?? String(value);
+  const json: string | undefined = JSON.stringify(value);
+  return json ?? String(value);
 }
 
 /** Returns the integer parameter key, as a typed literal states an int. */
 function intOf(spec: Spec, key: string): bigint {
-  if (!(key in spec)) throw new SpecError(`prop: ${shown(spec["gen"])} needs ${key}`);
+  if (!(key in spec)) {
+    throw new SpecError(`prop: ${shown(spec["gen"])} needs ${key}`);
+  }
   return literal.integer(spec[key]);
 }
 
 /** Returns the boolean parameter key, false when the spec does not state it. */
 function boolOf(spec: Spec, key: string): boolean {
   const value = spec[key] ?? false;
-  if (typeof value !== "boolean")
+  if (typeof value !== "boolean") {
     throw new SpecError(`prop: ${key} is ${shown(value)}, not a boolean`);
+  }
   return value;
 }
 
@@ -101,7 +94,9 @@ function gcd(a: bigint, b: bigint): bigint {
 /** Returns p, stated as [numerator, denominator], in lowest terms, or 1/2. */
 function probabilityOf(spec: Spec): Rational {
   const value = spec["p"];
-  if (value === undefined || value === null) return { num: 1n, den: 2n };
+  if (value === undefined || value === null) {
+    return { num: 1n, den: 2n };
+  }
   const refusal = new SpecError(
     `prop: p is ${shown(value)}, want [numerator, denominator]`,
   );
@@ -114,7 +109,9 @@ function probabilityOf(spec: Spec): Rational {
   }
   const num = BigInt(value[0] as number);
   const den = BigInt(value[1] as number);
-  if (num < 0n || num > den || den < 1n) throw refusal;
+  if (num < 0n || num > den || den < 1n) {
+    throw refusal;
+  }
   const divisor = gcd(num, den);
   return { num: num / divisor, den: den / divisor };
 }
@@ -122,8 +119,9 @@ function probabilityOf(spec: Spec): Rational {
 /** Returns the typed literals of the values parameter, decoded. */
 function valuesOf(spec: Spec): unknown[] {
   const values = spec["values"];
-  if (!Array.isArray(values))
+  if (!Array.isArray(values)) {
     throw new SpecError(`prop: values is ${shown(values)}, not a list`);
+  }
   return values.map(literal.decode);
 }
 
@@ -158,8 +156,9 @@ function textOf(spec: Spec): Text {
 /** Returns the pattern parameter. */
 function patternOf(spec: Spec): string {
   const text = spec["pattern"];
-  if (typeof text !== "string")
+  if (typeof text !== "string") {
     throw new SpecError(`prop: pattern is ${shown(text)}, not a string`);
+  }
   return text;
 }
 
@@ -167,7 +166,9 @@ function patternOf(spec: Spec): string {
 function recursiveOf(spec: Spec): Recursive<unknown> {
   const maxLeaves =
     "max_leaves" in spec ? Number(intOf(spec, "max_leaves")) : DEFAULT_MAX_LEAVES;
-  if (maxLeaves < 1) throw new SpecError(`prop: max_leaves is ${maxLeaves}, below 1`);
+  if (maxLeaves < 1) {
+    throw new SpecError(`prop: max_leaves is ${maxLeaves}, below 1`);
+  }
   return new Recursive(build(spec["base"]), maxLeaves, (self) =>
     build(spec["extend"], (self as Position<unknown>).owner),
   );
@@ -191,7 +192,7 @@ const LEAVES: ReadonlyMap<string, (spec: Spec) => Generator<unknown>> = new Map<
           literal.number(s["min"]),
           literal.number(s["max"]),
           boolOf(s, "allow_nan"),
-          "width" in s ? (Number(intOf(s, "width")) as 32 | 64) : 64,
+          "width" in s ? (Number(intOf(s, "width")) as Width) : DOUBLE,
         ),
       ),
   ],
@@ -201,8 +202,9 @@ const LEAVES: ReadonlyMap<string, (spec: Spec) => Generator<unknown>> = new Map<
     "sampled-from",
     (s) => {
       const values = valuesOf(s);
-      if (values.length === 0)
+      if (values.length === 0) {
         throw new SpecError("prop: sampled-from needs at least one value");
+      }
       return new SampledFrom(values);
     },
   ],
@@ -210,7 +212,10 @@ const LEAVES: ReadonlyMap<string, (spec: Spec) => Generator<unknown>> = new Map<
   ["string-matching", (s) => new Matching(piece(patternOf(s)))],
   [
     "bytes",
-    (s) => new Bytes(new SequenceBounds(256, sizesOf(s).minSize, sizesOf(s).maxSize)),
+    (s) =>
+      new Bytes(
+        new SequenceBounds(BYTE_VALUES, sizesOf(s).minSize, sizesOf(s).maxSize),
+      ),
   ],
   ["permutation", (s) => new Permutation(valuesOf(s))],
   ["recursive", recursiveOf],
@@ -252,12 +257,26 @@ const COMPOSITES: ReadonlyMap<
     (s, scope) => {
       const subject = s["subject"];
       const f = typeof subject === "string" ? FUNCTIONS.get(subject) : undefined;
-      if (f === undefined)
+      if (f === undefined) {
         throw new SpecError(`prop: the subject ${shown(subject)} has no function`);
+      }
       return new Mapped(build(s["of"], scope), f);
     },
   ],
 ]);
+
+/** A spec that names no generator, or misstates a parameter or a literal. */
+export class SpecError extends Error {
+  /**
+   * Returns the error of a spec.
+   *
+   * @param message - What is wrong with the spec.
+   */
+  constructor(message: string) {
+    super(message);
+    this.name = "SpecError";
+  }
+}
 
 /**
  * Returns the generator that a spec states.
@@ -284,8 +303,12 @@ export function build(spec: unknown, scope?: Recursive<unknown>): Generator<unkn
     return new Position(scope);
   }
   const leaf = typeof kind === "string" ? LEAVES.get(kind) : undefined;
-  if (leaf !== undefined) return leaf(stated);
+  if (leaf !== undefined) {
+    return leaf(stated);
+  }
   const composite = typeof kind === "string" ? COMPOSITES.get(kind) : undefined;
-  if (composite !== undefined) return composite(stated, scope);
+  if (composite !== undefined) {
+    return composite(stated, scope);
+  }
   throw new SpecError(`prop: ${shown(kind)} is no generator`);
 }

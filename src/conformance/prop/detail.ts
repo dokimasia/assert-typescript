@@ -10,29 +10,15 @@
  * there, and its nearest passing value.
  */
 
-import type { Step } from "../../prop/engine/case.js";
+import type { Step } from "../../prop/engine/case/record.js";
+import { encode as literalOf } from "../../prop/engine/encoding.js";
 import type { Divergence, Execution } from "../../prop/engine/execution.js";
 import { identityOf } from "../../prop/engine/execution.js";
-import * as literal from "../../prop/engine/literal.js";
-import type { Outcome } from "../../prop/engine/runner.js";
-import type { Explained } from "../../prop/engine/shrink.js";
+import type { Explained } from "../../prop/engine/shrink/explain.js";
+import type { Outcome } from "../../prop/engine/tally.js";
 import { encode } from "../../prop/engine/token.js";
 import { entries, isStep } from "../../prop/engine/trace.js";
 import { boundsLiteral } from "./choices.js";
-
-/**
- * Returns the corpus form of a step entry.
- *
- * @param step - The step.
- * @returns Its JSON object.
- */
-export function stepLiteral(step: Step): Record<string, unknown> {
-  return {
-    step: step.action,
-    ...(step.client === undefined ? {} : { client: step.client }),
-    ...(step.drain === true ? { drain: true } : {}),
-  };
-}
 
 /** Returns a failing case's steps and draws, each draw explained where it was. */
 function counterexampleOf(
@@ -41,15 +27,17 @@ function counterexampleOf(
 ): unknown[] {
   let index = 0;
   return entries(failing.case).map((entry) => {
-    if (isStep(entry)) return stepLiteral(entry);
+    if (isStep(entry)) {
+      return stepLiteral(entry);
+    }
     const explained = explanation[index];
     index += 1;
     const nearest = explained?.nearest;
     return {
       label: entry.label,
-      value: literal.encode(entry.value),
+      value: literalOf(entry.value),
       "any-value-fails": explained?.anyValueFails ?? null,
-      "nearest-passing": nearest === undefined ? null : literal.encode(nearest.value),
+      "nearest-passing": nearest === undefined ? null : literalOf(nearest.value),
     };
   });
 }
@@ -61,7 +49,7 @@ function otherOf(execution: Execution): Record<string, unknown> {
     counterexample: entries(execution.case).map((entry) =>
       isStep(entry)
         ? stepLiteral(entry)
-        : { label: entry.label, value: literal.encode(entry.value) },
+        : { label: entry.label, value: literalOf(entry.value) },
     ),
     choices: encode(execution.case.choices),
   };
@@ -69,15 +57,21 @@ function otherOf(execution: Execution): Record<string, unknown> {
 
 /** Returns one side of a divergence: bounds, a fingerprint, an identity or null. */
 function versionOf(version: Divergence["recorded"]): unknown {
-  if (version === undefined) return null;
-  if (typeof version === "bigint") return Number(version);
-  if (typeof version === "string") return version;
+  if (version === undefined) {
+    return null;
+  }
+  if (typeof version === "bigint") {
+    return Number(version);
+  }
+  if (typeof version === "string") {
+    return version;
+  }
   return boundsLiteral(version);
 }
 
 /** Returns a divergence in corpus form: its versions, its label and its step. */
 function divergenceOf(divergence: Divergence): Record<string, unknown> {
-  const step = divergence.step;
+  const { step } = divergence;
   return {
     what: divergence.what,
     index: divergence.index,
@@ -96,6 +90,20 @@ function divergenceOf(divergence: Divergence): Record<string, unknown> {
 }
 
 /**
+ * Returns the corpus form of a step entry.
+ *
+ * @param step - The step.
+ * @returns Its JSON object.
+ */
+export function stepLiteral(step: Step): Record<string, unknown> {
+  return {
+    step: step.action,
+    ...(step.client === undefined ? {} : { client: step.client }),
+    ...(step.drain === true ? { drain: true } : {}),
+  };
+}
+
+/**
  * Returns the detail fields of a run's outcome, each field that the outcome
  * does not use null.
  *
@@ -103,11 +111,10 @@ function divergenceOf(divergence: Divergence): Record<string, unknown> {
  * @returns The detail, a JSON object.
  */
 export function detail(outcome: Outcome): Record<string, unknown> {
-  const failing = outcome.failing;
+  const { failing, shortfall } = outcome;
   const concluded =
     failing !== undefined &&
     (outcome.kind === "counterexample" || outcome.kind === "flaky");
-  const shortfall = outcome.shortfall;
   const counterexample = outcome.kind === "counterexample";
   return {
     outcome: outcome.kind,

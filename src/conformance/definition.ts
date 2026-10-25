@@ -13,14 +13,30 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** This language's column in the naming table. */
-export const LANGUAGE = "typescript";
-
 /** The directory of the vendored definition, which is the directory of this module. */
 const ROOT = dirname(fileURLToPath(import.meta.url));
 
 /** The directory spec of the vendored definition. */
 const SPEC = join(ROOT, "spec");
+
+/** Read one file from the vendored definition. */
+function read(name: string): unknown {
+  return JSON.parse(readFileSync(join(SPEC, name), "utf8"));
+}
+
+/**
+ * Reports whether a list section of the overlay has an entry of id. A
+ * section that the overlay leaves out has none.
+ */
+function lists(section: "diverge" | "surface" | "relaxations", id: string): boolean {
+  const entries = (
+    overlay() as unknown as Record<string, { id: string }[] | undefined>
+  )[section];
+  return (entries ?? []).some((entry) => entry.id === id);
+}
+
+/** This language's column in the naming table. */
+export const LANGUAGE = "typescript";
 
 /** What one assertion's entry in the definition states. */
 export interface AssertionSpec {
@@ -56,11 +72,6 @@ export interface Overlay {
   readonly language: string;
   /** Every assertion this language does not supply. */
   readonly diverge: readonly Divergence[];
-}
-
-/** Read one file from the vendored definition. */
-function read(name: string): unknown {
-  return JSON.parse(readFileSync(join(SPEC, name), "utf8"));
 }
 
 /**
@@ -154,17 +165,6 @@ export function surfaceNames(): Record<string, string> {
     }
   }
   return mapped;
-}
-
-/**
- * Reports whether a list section of the overlay has an entry of id. A
- * section that the overlay leaves out has none.
- */
-function lists(section: "diverge" | "surface" | "relaxations", id: string): boolean {
-  const entries = (
-    overlay() as unknown as Record<string, { id: string }[] | undefined>
-  )[section];
-  return (entries ?? []).some((entry) => entry.id === id);
 }
 
 /**

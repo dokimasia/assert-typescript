@@ -117,20 +117,22 @@ describe("vector", () => {
 
     it("returns the fault at the part of a vector that the run contradicts", async () => {
       const [first] = VECTORS.filter((v) => v.kind === "path-absent");
-      const v = {
+      const contradicted = {
         ...(first as Vector),
         raw: { ...(first as Vector).raw, expect: "fail" },
       };
 
-      expect(await checkVector(v, temporary())).toBe(
-        `${v.id}.expect: the check ends as pass, want fail`,
+      expect(await checkVector(contradicted, temporary())).toBe(
+        `${contradicted.id}.expect: the check ends as pass, want fail`,
       );
     });
 
     for (const v of VECTORS) {
       it.skipIf(skipped(v))(`returns undefined for the vector ${v.id}`, async () => {
         const dir = temporary();
-        if (v.kind === "golden-match-tree") enter(dir);
+        if (v.kind === "golden-match-tree") {
+          enter(dir);
+        }
 
         expect(await checkVector(v, dir)).toBeUndefined();
       });

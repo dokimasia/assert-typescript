@@ -10,7 +10,8 @@ import type { Case } from "../../../src/prop/engine/case.js";
 import { IntegerBounds } from "../../../src/prop/engine/choice.js";
 import type { Body } from "../../../src/prop/engine/execution.js";
 import { Integer } from "../../../src/prop/engine/generator.js";
-import { type Outcome, run, Tally } from "../../../src/prop/engine/runner.js";
+import { run } from "../../../src/prop/engine/runner.js";
+import { type Outcome, Tally } from "../../../src/prop/engine/tally.js";
 import { drive } from "../../../src/prop/engine/work.js";
 import { test as it } from "../../../src/vitest.js";
 
@@ -108,7 +109,9 @@ describe("detail", () => {
           c.step({ action: "put" });
           const n = c.draw(WIDE, "n");
           c.draw(WIDE, "noise");
-          if (n > 1000n) c.fail("above");
+          if (n > 1000n) {
+            c.fail("above");
+          }
         }),
       );
       const written = detail(counterexample);
@@ -153,8 +156,12 @@ describe("detail", () => {
         body((c) => {
           c.step({ action: "check", client: 0 });
           const value = c.draw(small, "x");
-          if (value % 2n === 1n) c.fail("odd");
-          if (value > 50n) c.fail("big");
+          if (value % 2n === 1n) {
+            c.fail("odd");
+          }
+          if (value > 50n) {
+            c.fail("big");
+          }
         }),
       );
       const [other] = detail(counterexample)["others"] as Record<string, unknown>[];
@@ -270,7 +277,9 @@ describe("detail", () => {
         body((c) => {
           calls += 1;
           c.draw(WIDE, "n");
-          if (calls === 2) c.fail("second");
+          if (calls === 2) {
+            c.fail("second");
+          }
         }),
       );
       const written = detail(flaky);

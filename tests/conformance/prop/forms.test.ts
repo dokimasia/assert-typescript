@@ -29,7 +29,9 @@ async function fault(
   try {
     await formsOf(raw);
   } catch (err) {
-    if (err instanceof Fault) return [err.at, err.reason];
+    if (err instanceof Fault) {
+      return [err.at, err.reason];
+    }
     throw err;
   }
   return ["", ""];

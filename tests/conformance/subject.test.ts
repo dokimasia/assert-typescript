@@ -5,12 +5,15 @@
 
 import { join } from "node:path";
 import { describe } from "vitest";
+import {
+  leavesFilesAlone,
+  rewritesFiles,
+} from "../../src/conformance/subject/files.js";
 import { SUBJECTS, type Subject, SubjectError } from "../../src/conformance/subject.js";
 import { check, files } from "../../src/index.js";
 import type { Seat } from "../../src/matcher/seat.js";
 import { Recorder } from "../../src/seat.js";
 import { test as it } from "../../src/vitest.js";
-import { UNENFORCED } from "../helpers.js";
 
 /** Returns the subject of kind, built anew. */
 function build(kind: string): Subject {
@@ -35,7 +38,9 @@ function failedAttempts(subject: Subject, runs: number): number {
   for (let i = 0; i < runs; i += 1) {
     const trial = new Recorder();
     (subject.seated as (trial: Seat) => void)(trial);
-    if (trial.failed) failed += 1;
+    if (trial.failed) {
+      failed += 1;
+    }
   }
   return failed;
 }
@@ -339,7 +344,9 @@ describe("subject", () => {
     it("builds a wraps-around subject whose count returns to 0 after 3", ({ seat }) => {
       const subject = build("wraps-around");
       const advance = subject.advance as () => void;
-      for (let i = 0; i < 4; i += 1) advance();
+      for (let i = 0; i < 4; i += 1) {
+        advance();
+      }
 
       check.isEqualTo(
         seat,
@@ -395,75 +402,15 @@ describe("subject", () => {
       check.isEqualTo(seat, first, second, "of one value");
     });
 
-    it.skipIf(UNENFORCED)(
-      "builds a leaves-files-alone subject that reads every file",
-      ({ seat }) => {
-        const dir = files.workspace(seat, {
-          "docs/a.md": files.text("a").withMode(0o000),
-        });
-
-        check.doesThrow(
-          seat,
-          () => touch("leaves-files-alone", dir),
-          "the unreadable file is read",
-        );
-      },
-    );
-
-    it("builds a leaves-files-alone subject that writes nothing", async ({ seat }) => {
-      const dir = files.workspace(seat, {
-        "a.txt": files.text("a"),
-        b: files.link("a.txt"),
-      });
-
-      await files.unchanged(
-        seat,
-        dir,
-        () => touch("leaves-files-alone", dir),
-        "the tree",
-      );
-    });
-
-    it.skipIf(UNENFORCED)(
-      "builds a rewrites-files subject that writes every file",
-      ({ seat }) => {
-        const dir = files.workspace(seat, {
-          "docs/a.md": files.text("a").withMode(0o400),
-        });
-
-        check.doesThrow(
-          seat,
-          () => touch("rewrites-files", dir),
-          "the read-only file is written",
-        );
-      },
-    );
-
-    it.skipIf(UNENFORCED)(
-      "builds a rewrites-files subject that follows no link",
-      ({ seat }) => {
-        const outside = files.workspace(seat, {
-          "a.txt": files.text("a").withMode(0o400),
-        });
-        const dir = files.workspace(seat, { b: files.link(join(outside, "a.txt")) });
-
-        check.doesNotThrow(
-          seat,
-          () => touch("rewrites-files", dir),
-          "the link is not followed",
-        );
-      },
-    );
-
-    it("builds a rewrites-files subject that writes the bytes that each file has", async ({
+    it("builds the leaves-files-alone and rewrites-files subjects of the module files", ({
       seat,
     }) => {
-      const dir = files.workspace(seat, {
-        "a.txt": files.text("a"),
-        "keys/id": files.text("s"),
-      });
-
-      await files.unchanged(seat, dir, () => touch("rewrites-files", dir), "the tree");
+      check.isTrue(
+        seat,
+        SUBJECTS["leaves-files-alone"] === leavesFilesAlone &&
+          SUBJECTS["rewrites-files"] === rewritesFiles,
+        "the same builders",
+      );
     });
 
     it("builds a writes-a-file subject that writes new.txt", ({ seat }) => {

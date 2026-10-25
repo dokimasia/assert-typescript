@@ -12,33 +12,31 @@
 
 import { Fault } from "../../matcher/fault.js";
 import { Bridging } from "../../prop/engine/bridge.js";
-import {
-  Case,
-  DECODE,
-  Failed,
-  Generating,
-  Rejected,
-  Replaying,
-} from "../../prop/engine/case.js";
+import { Generating, Replaying } from "../../prop/engine/case/providers.js";
+import { Failed, Rejected } from "../../prop/engine/case/signals.js";
+import { Case, DECODE, MAX_CHOICES } from "../../prop/engine/case.js";
 import type { Choice } from "../../prop/engine/choice.js";
 import * as coverage from "../../prop/engine/coverage.js";
+import { encode } from "../../prop/engine/encoding.js";
 import type { Body } from "../../prop/engine/execution.js";
 import type { Generator } from "../../prop/engine/generator.js";
 import { inverseOf } from "../../prop/engine/inverse.js";
 import * as literal from "../../prop/engine/literal.js";
-import { type Requirement, run, type Settings } from "../../prop/engine/runner.js";
+import { run } from "../../prop/engine/runner.js";
+import { DEFAULT_CASES, type Settings } from "../../prop/engine/settings.js";
 import { read as readShape } from "../../prop/engine/shape.js";
 import { DEFAULT_BUDGET } from "../../prop/engine/shrink.js";
 import { caseSource } from "../../prop/engine/source.js";
-import * as store from "../../prop/engine/store.js";
+import type { Requirement } from "../../prop/engine/tally.js";
 import * as token from "../../prop/engine/token.js";
 import { drive } from "../../prop/engine/work.js";
-import { sameJson } from "../literal.js";
+import { sameJson } from "../equality.js";
 import { buildBody } from "./body.js";
 import { choiceLiteral, parseChoices, seedOf } from "./choices.js";
 import { detail } from "./detail.js";
 import { formsOf } from "./forms.js";
 import { build } from "./generator.js";
+import { storeOf, tokenOf } from "./replay.js";
 
 /** A vector's JSON object. */
 type Raw = Readonly<Record<string, unknown>>;
@@ -64,9 +62,11 @@ function recordedOf(c: Case): unknown[] {
 function decoded(c: Case, decode: () => unknown): Record<string, unknown> {
   try {
     const value = decode();
-    return { recorded: recordedOf(c), value: literal.encode(value), rejected: false };
+    return { recorded: recordedOf(c), value: encode(value), rejected: false };
   } catch (err) {
-    if (!(err instanceof Rejected)) throw err;
+    if (!(err instanceof Rejected)) {
+      throw err;
+    }
     return { recorded: recordedOf(c), value: null, rejected: true };
   }
 }
@@ -90,24 +90,6 @@ function generatorOf(raw: Raw): Generator<unknown> {
   return "shape" in raw ? readShape(raw["shape"]) : build(raw["generator"]);
 }
 
-/** Returns the settings of a run that a vector states. */
-export function settingsOf(written: Raw): Settings {
-  const replayed = written["replay"];
-  const requirements = (written["requirements"] ?? []) as readonly Raw[];
-  return {
-    seed: seedOf(written["seed"]),
-    cases: Number(written["cases"] ?? 100),
-    maxChoices: Number(written["max-choices"] ?? 8192),
-    requirements: requirements.map(
-      (r): Requirement => ({ label: String(r["label"]), share: Number(r["share"]) }),
-    ),
-    examples: ((written["examples"] ?? []) as unknown[]).map(parseChoices),
-    stored: ((written["stored"] ?? []) as unknown[]).map(parseChoices),
-    shrink: Number(written["shrink"] ?? DEFAULT_BUDGET),
-    replay: replayed === undefined ? undefined : token.decode(String(replayed)),
-  };
-}
-
 /** Returns the choices of a case whose draws decode to the entries that a vector states, and their values. */
 function drawsOf(raw: Raw): Record<string, unknown> {
   const body = (raw["draws"] as readonly Raw[]).map(
@@ -117,49 +99,50 @@ function drawsOf(raw: Raw): Record<string, unknown> {
   const choices: Choice[] = [];
   for (const [i, [label, generator]] of body.entries()) {
     const entry = stated[i];
-    if (entry === undefined) break;
+    if (entry === undefined) {
+      break;
+    }
     const error = { choices: null, values: null };
-    if (entry["label"] !== label)
+    if (entry["label"] !== label) {
       return { ...error, error: { label, reason: "label" } };
+    }
     const inverse = inverseOf(generator, literal.decode(entry["value"]));
-    if (inverse === undefined) return { ...error, error: { label, reason: "value" } };
+    if (inverse === undefined) {
+      return { ...error, error: { label, reason: "value" } };
+    }
     choices.push(...inverse);
   }
   const replayed = new Case(new Replaying(choices));
   const values = body.map(([label, generator]) => ({
     label,
-    value: literal.encode(replayed.draw(generator, label)),
+    value: encode(replayed.draw(generator, label)),
   }));
   return { choices: choices.map(choiceLiteral), values, error: null };
 }
 
-/** Returns the entry that a store vector writes and its name, or the verdict on its text. */
-function storeOf(raw: Raw): Record<string, unknown> {
-  const contract = String(raw["contract"]);
-  if ("text" in raw) {
-    const verdict = store.read(String(raw["text"]), contract);
-    const replay = verdict.verdict === "replay";
-    return {
-      verdict: verdict.verdict,
-      choices: replay ? verdict.choices.map(choiceLiteral) : null,
-    };
-  }
-  const choices = parseChoices(raw["choices"]);
-  const failure: store.Failure = {
-    contract,
-    choices,
-    identity: raw["identity"] as Readonly<Record<string, string | number>>,
-    counterexample: raw["counterexample"] as readonly Raw[],
-  };
-  const written = store.entry(failure, String(raw["definition"]), String(raw["found"]));
-  const back = store.read(JSON.stringify(written), contract);
-  if (
-    back.verdict !== "replay" ||
-    token.encode(back.choices) !== token.encode(choices)
-  ) {
-    throw new Fault("entry", "the entry does not read back as a replay of its choices");
-  }
-  return { name: store.name(contract, choices), entry: written };
+/** Returns the recorded choices and the value of a decoding vector, or that its case was rejected. */
+function decodingOf(raw: Raw): Record<string, unknown> {
+  const generator = build(raw["generator"]);
+  const c = new Case(new Replaying(parseChoices(raw["choices"])));
+  return decoded(c, () => generator[DECODE](c));
+}
+
+/** Returns the choices of an inverse vector's value, or that the value has no inverse. */
+function invertedOf(raw: Raw): Record<string, unknown> {
+  const choices = inverseOf(generatorOf(raw), literal.decode(raw["value"]));
+  return choices === undefined
+    ? { choices: null, error: true }
+    : { choices: choices.map(choiceLiteral), error: false };
+}
+
+/** Returns the choices and the value that a bridge vector's bytes decode to. */
+function bridgedOf(raw: Raw): Record<string, unknown> {
+  const generator = build(raw["generator"]);
+  const c = new Case(
+    new Bridging(Uint8Array.from(Buffer.from(String(raw["bytes"]), "hex"))),
+  );
+  const { recorded, ...rest } = decoded(c, () => generator[DECODE](c));
+  return { choices: recorded, ...rest };
 }
 
 /** Returns the outcome of a shrinking vector's run. */
@@ -170,11 +153,11 @@ async function shrinkingOf(raw: Raw): Promise<Record<string, unknown>> {
   });
   const budget = Number(raw["budget"] ?? DEFAULT_BUDGET);
   const outcome = await drive(run(body, { seed: seedOf(raw["seed"]), shrink: budget }));
-  const failing = outcome.failing;
+  const { failing } = outcome;
   return {
     outcome: outcome.kind,
     cases: outcome.cases,
-    value: failing === undefined ? null : literal.encode(failing.case.draws[0]?.value),
+    value: failing === undefined ? null : encode(failing.case.draws[0]?.value),
     choices: failing === undefined ? null : recordedOf(failing.case),
     token: outcome.token ?? null,
     runs: outcome.runs,
@@ -192,7 +175,9 @@ async function recordingOf(raw: Raw): Promise<Record<string, unknown>> {
     try {
       body(c);
     } catch (err) {
-      if (err instanceof Failed) made.push("fail");
+      if (err instanceof Failed) {
+        made.push("fail");
+      }
       throw err;
     }
     made.push("pass");
@@ -202,34 +187,39 @@ async function recordingOf(raw: Raw): Promise<Record<string, unknown>> {
   const outcome = await drive(
     run(asserting, settingsOf((raw["settings"] ?? {}) as Raw), (phase) => {
       runs += 1;
-      for (const verdict of made) calls.push({ run: runs, phase, verdict });
+      for (const verdict of made) {
+        calls.push({ run: runs, phase, verdict });
+      }
       made.length = 0;
     }),
   );
   return { verdict: VERDICTS[outcome.kind] ?? "fail", calls };
 }
 
+/** Returns the settings of a run that a vector states. */
+export function settingsOf(written: Raw): Settings {
+  const replayed = written["replay"];
+  const requirements = (written["requirements"] ?? []) as readonly Raw[];
+  return {
+    seed: seedOf(written["seed"]),
+    cases: Number(written["cases"] ?? DEFAULT_CASES),
+    maxChoices: Number(written["max-choices"] ?? MAX_CHOICES),
+    requirements: requirements.map(
+      (r): Requirement => ({ label: String(r["label"]), share: Number(r["share"]) }),
+    ),
+    examples: ((written["examples"] ?? []) as unknown[]).map(parseChoices),
+    stored: ((written["stored"] ?? []) as unknown[]).map(parseChoices),
+    shrink: Number(written["shrink"] ?? DEFAULT_BUDGET),
+    replay: replayed === undefined ? undefined : token.decode(String(replayed)),
+  };
+}
+
 /** The function that computes each kind's outputs. */
 export const KINDS: ReadonlyMap<string, Compute> = new Map<string, Compute>([
-  [
-    "decoding",
-    async (raw) => {
-      const generator = build(raw["generator"]);
-      const c = new Case(new Replaying(parseChoices(raw["choices"])));
-      return decoded(c, () => generator[DECODE](c));
-    },
-  ],
+  ["decoding", async (raw) => decodingOf(raw)],
   ["generation", async (raw) => generated(build(raw["generator"]), raw)],
   ["shapes", async (raw) => generated(readShape(raw["shape"]), raw)],
-  [
-    "inverse",
-    async (raw) => {
-      const choices = inverseOf(generatorOf(raw), literal.decode(raw["value"]));
-      return choices === undefined
-        ? { choices: null, error: true }
-        : { choices: choices.map(choiceLiteral), error: false };
-    },
-  ],
+  ["inverse", async (raw) => invertedOf(raw)],
   ["draws", async (raw) => drawsOf(raw)],
   ["shrinking", shrinkingOf],
   [
@@ -244,32 +234,8 @@ export const KINDS: ReadonlyMap<string, Compute> = new Map<string, Compute>([
       ),
     }),
   ],
-  [
-    "bridge",
-    async (raw) => {
-      const generator = build(raw["generator"]);
-      const c = new Case(
-        new Bridging(Uint8Array.from(Buffer.from(String(raw["bytes"]), "hex"))),
-      );
-      const { recorded, ...rest } = decoded(c, () => generator[DECODE](c));
-      return { choices: recorded, ...rest };
-    },
-  ],
-  [
-    "token",
-    async (raw) => {
-      if ("choices" in raw)
-        return { token: token.encode(parseChoices(raw["choices"])) };
-      try {
-        return {
-          decoded: token.decode(String(raw["token"])).map(choiceLiteral),
-          error: false,
-        };
-      } catch {
-        return { decoded: null, error: true };
-      }
-    },
-  ],
+  ["bridge", async (raw) => bridgedOf(raw)],
+  ["token", async (raw) => tokenOf(raw)],
   [
     "behaviour",
     async (raw) => {
@@ -300,8 +266,10 @@ export async function checkProp(kind: string, raw: Raw): Promise<void> {
   try {
     outputs = await compute(raw);
   } catch (err) {
-    if (err instanceof Fault) throw err;
-    throw new Fault("", "the vector does not run", err);
+    if (err instanceof Fault) {
+      throw err;
+    }
+    throw new Fault("", "the vector does not run", { cause: err });
   }
   for (const [name, got] of Object.entries(outputs)) {
     if (!sameJson(got, raw[name])) {

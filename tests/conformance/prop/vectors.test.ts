@@ -39,7 +39,9 @@ async function fault(
   try {
     await checkProp(kind, raw);
   } catch (err) {
-    if (err instanceof Fault) return [err.at, err.reason];
+    if (err instanceof Fault) {
+      return [err.at, err.reason];
+    }
     throw err;
   }
   return ["", ""];
@@ -138,26 +140,6 @@ describe("vectors", () => {
       });
     });
 
-    it("computes the verdict and the choices of a store file that a runner replays", async () => {
-      const written = vector("store/names-an-entry-by-its-contract-and-token");
-      const raw = {
-        contract: written["contract"],
-        text: JSON.stringify(written["entry"]),
-      };
-
-      expect(await outputs("store", raw)).toEqual({
-        verdict: "replay",
-        choices: [1, 0, 1, -1, 0],
-      });
-    });
-
-    it("computes the verdict of a store file that a runner does not replay", async () => {
-      expect(await outputs("store", { contract: "c", text: "{" })).toEqual({
-        verdict: "damaged",
-        choices: null,
-      });
-    });
-
     it("computes the calls of a recording vector whose body rejects every case", async () => {
       const raw = {
         body: { draw: DIGIT, "rejects-when": { kind: "always" } },
@@ -165,17 +147,6 @@ describe("vectors", () => {
       };
 
       expect(await outputs("recording", raw)).toEqual({ verdict: "fail", calls: [] });
-    });
-
-    it("computes the token of choices", async () => {
-      expect(await outputs("token", { choices: [1] })).toEqual({ token: "prop1:AAE" });
-    });
-
-    it("computes the error of a token that does not decode", async () => {
-      expect(await outputs("token", { token: "prop1:A" })).toEqual({
-        decoded: null,
-        error: true,
-      });
     });
 
     it("computes the inverse of a shape", async () => {
@@ -309,18 +280,6 @@ describe("vectors", () => {
       );
 
       expect(await fault("behaviour", raw)).toEqual(["", "the vector does not run"]);
-    });
-
-    it("rejects with a fault for a store entry that does not read back", async () => {
-      const raw = {
-        ...vector("store/names-an-entry-by-its-contract-and-token"),
-        identity: { assertion: "equal", file: "pkg/codec_test.go", line: 18 },
-      };
-
-      expect(await fault("store", raw)).toEqual([
-        "entry",
-        "the entry does not read back as a replay of its choices",
-      ]);
     });
   });
 });

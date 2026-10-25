@@ -34,7 +34,9 @@ async function fault(raw: Raw): Promise<[string, string]> {
   try {
     await MACHINES(raw);
   } catch (err) {
-    if (err instanceof Fault) return [err.at, err.reason];
+    if (err instanceof Fault) {
+      return [err.at, err.reason];
+    }
     throw err;
   }
   return ["", ""];

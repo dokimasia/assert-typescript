@@ -6,7 +6,8 @@
 import { describe } from "vitest";
 import { build, SpecError } from "../../../src/conformance/prop/generator.js";
 import { check } from "../../../src/index.js";
-import { Case, DECODE, Replaying } from "../../../src/prop/engine/case.js";
+import { Replaying } from "../../../src/prop/engine/case/providers.js";
+import { Case, DECODE } from "../../../src/prop/engine/case.js";
 import type { Choice, Value } from "../../../src/prop/engine/choice.js";
 import {
   Bool,
@@ -39,8 +40,12 @@ const TREE = {
 
 /** Returns a recorded choice of the kind that the type of value implies. */
 function choiceOf(value: Value): Choice {
-  if (typeof value === "bigint") return { kind: "integer", value };
-  if (typeof value === "number") return { kind: "float", value };
+  if (typeof value === "bigint") {
+    return { kind: "integer", value };
+  }
+  if (typeof value === "number") {
+    return { kind: "float", value };
+  }
   return { kind: "sequence", value };
 }
 
@@ -186,9 +191,13 @@ describe("generator", () => {
     });
 
     it("builds a float of a stated width that allows NaN", ({ seat }) => {
-      const bounds = (
-        build({ gen: "float", min: 0, max: 1, width: 32, allow_nan: true }) as Float
-      ).bounds;
+      const { bounds } = build({
+        gen: "float",
+        min: 0,
+        max: 1,
+        width: 32,
+        allow_nan: true,
+      }) as Float;
 
       check.isEqualTo(
         seat,
