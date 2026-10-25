@@ -11,6 +11,7 @@
  * none.
  */
 
+import process from "node:process";
 import { type Clock, wait } from "../clock.js";
 import { callSite } from "../failure.js";
 import { own } from "../record/calls.js";
@@ -87,7 +88,7 @@ export async function eventually(
     const trial = await runOn(new Attempt(seat, call.slot), body);
     call.slot?.take(own(trial));
     const { failed, message } = trial.outcome;
-    if (!failed && !(clock.now() > deadline)) {
+    if (!(failed || clock.now() > deadline)) {
       call.pass(mode, "eventually", msg);
       return;
     }

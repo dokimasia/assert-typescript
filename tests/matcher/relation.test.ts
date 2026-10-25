@@ -726,7 +726,7 @@ describe("relation", () => {
       },
       {
         name: "reports a repeat that an async iterable yields",
-        give: async function* () {
+        async *give() {
           yield 1;
           yield 1;
         },
