@@ -8,6 +8,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import process from "node:process";
 import { onTestFinished } from "vitest";
 import type * as check from "../src/check.js";
 import type { Controlled } from "../src/clock.js";
