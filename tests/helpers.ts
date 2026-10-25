@@ -9,16 +9,76 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
-import { onTestFinished } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
+import { isEmpty, isEqualTo, isTrue } from "../src/check/values.js";
 import type * as check from "../src/check.js";
-import type { Controlled } from "../src/clock.js";
+import { Controlled } from "../src/clock.js";
+import type { Setup, Subject } from "../src/conformance/stateful/subjects.js";
 import { unlock } from "../src/files/writer.js";
 import { type Call, History } from "../src/history/history.js";
 import type { Spec } from "../src/history/spec.js";
-import { Case } from "../src/prop/case.js";
-import { Case as Engine, type Provider, Replaying } from "../src/prop/engine/case.js";
+import { dropped } from "../src/matcher/pending.js";
+import { execute as executeCase } from "../src/prop/case/execute.js";
+import { Case, type Failing as CaseFailing, type Location } from "../src/prop/case.js";
+import { type Provider, Replaying } from "../src/prop/engine/case/providers.js";
+import type { Failed } from "../src/prop/engine/case/signals.js";
+import { DECODE, Case as Engine, MAX_CHOICES } from "../src/prop/engine/case.js";
+import type { Choice, Value } from "../src/prop/engine/choice.js";
+import { type Body, type Execution, execute } from "../src/prop/engine/execution.js";
+import type { Generator } from "../src/prop/engine/generator.js";
+import { CannotInvert } from "../src/prop/engine/inverse/refusal.js";
+import type { Emitted, Emitter } from "../src/prop/engine/inverse/steps.js";
+import { emit } from "../src/prop/engine/inverse.js";
+import { DEFAULT_BUDGET, Shrinker } from "../src/prop/engine/shrink.js";
+import { drive } from "../src/prop/engine/work.js";
+import { forAll } from "../src/prop/forall.js";
+import { hermetic, seed, store } from "../src/prop/option.js";
 import { VARIABLE } from "../src/record/switch.js";
 import { Recorder, type Seat } from "../src/seat.js";
+import { clients } from "../src/stateful/option.js";
+import { uniform } from "../src/stateful/strategy.js";
+import { test } from "../src/vitest.js";
+
+/** The key of `globalThis` under which the process keeps its reading of the switch. */
+const READING = Symbol.for("dokimi.assert.record.switch");
+
+/** Sets the variable of the switch, and drops the process's reading of it. */
+function assignRecording(value: string | undefined): void {
+  if (value === undefined) {
+    Reflect.deleteProperty(process.env, VARIABLE);
+  } else {
+    process.env[VARIABLE] = value;
+  }
+  Reflect.deleteProperty(globalThis, READING);
+}
+
+/** The contract that every failing call of the specs of `check` and `soft` passes. */
+const CONTRACT = "the stated contract";
+
+/** Returns a recorder that reads a clock the test controls, with the clock. */
+function seated(): [Recorder, Controlled] {
+  const clock = new Controlled(0);
+  return [new Recorder().withClock(clock), clock];
+}
+
+/** Declares the case of what the failing call of name on family returns. */
+function returnCase<K extends keyof Surface>(family: Pick<Surface, K>, name: K): void {
+  if (TRACKED.includes(name)) {
+    it("returns a promise that the forgotten-await guard tracks", async () => {
+      const [seat, clock] = seated();
+      const pending = FAILING[name](family, seat, clock, CONTRACT);
+
+      expect(dropped(seat)).toEqual([CONTRACT]);
+      await pending;
+    });
+  } else {
+    it("returns no promise", () => {
+      const [seat, clock] = seated();
+
+      expect(FAILING[name](family, seat, clock, CONTRACT)).not.toBeInstanceOf(Promise);
+    });
+  }
+}
 
 /** Whether the platform is Windows, whose file systems record no permission bits. */
 export const WINDOWS = process.platform === "win32";
@@ -69,8 +129,11 @@ export const UMASKS: readonly number[] = [0o022, 0o027, 0o077];
 export function setVariable(name: string, value: string | undefined): void {
   const before = process.env[name];
   const assign = (stated: string | undefined): void => {
-    if (stated === undefined) Reflect.deleteProperty(process.env, name);
-    else process.env[name] = stated;
+    if (stated === undefined) {
+      Reflect.deleteProperty(process.env, name);
+    } else {
+      process.env[name] = stated;
+    }
   };
   assign(value);
   onTestFinished(() => assign(before));
@@ -86,8 +149,15 @@ export function thrown(fn: () => unknown): string {
   return "";
 }
 
-/** The key of `globalThis` under which the process keeps its reading of the switch. */
-const READING = Symbol.for("dokimi.assert.record.switch");
+/** Returns what call throws, and undefined for a call that returns. */
+export function thrownBy(call: () => void): unknown {
+  try {
+    call();
+  } catch (err) {
+    return err;
+  }
+  return undefined;
+}
 
 /**
  * Sets `DOKIMI_ASSERT_RECORD` to value, or unsets it for undefined, and
@@ -99,15 +169,8 @@ const READING = Symbol.for("dokimi.assert.record.switch");
  */
 export function setRecording(value: string | undefined): () => void {
   const before = process.env[VARIABLE];
-  assign(value);
-  return () => assign(before);
-}
-
-/** Sets the variable of the switch, and drops the process's reading of it. */
-function assign(value: string | undefined): void {
-  if (value === undefined) Reflect.deleteProperty(process.env, VARIABLE);
-  else process.env[VARIABLE] = value;
-  Reflect.deleteProperty(globalThis, READING);
+  assignRecording(value);
+  return () => assignRecording(before);
 }
 
 /** A seat that takes sentences only, and keeps each with the member that received it. */
@@ -142,7 +205,9 @@ export function records(recorder: Recorder): Record<string, unknown>[] {
 export const REGISTER: Spec<unknown> = {
   initial: () => null,
   next: (state, op) => {
-    if (op.name === "write") return [op.args[0]];
+    if (op.name === "write") {
+      return [op.args[0]];
+    }
     return op.returned(state) ? [state] : [];
   },
 };
@@ -193,8 +258,11 @@ export function readSkew(
   const history = new History();
   const reader = invokeTxn(history, 0, readOf("x", null), readOf("y", null));
   const writer = invokeTxn(history, 1, append("x", 1), append("y", 2));
-  if (completes === "ok") writer.ok([append("x", 1), append("y", 2)]);
-  else if (completes === "unknown") writer.unknown("timed out");
+  if (completes === "ok") {
+    writer.ok([append("x", 1), append("y", 2)]);
+  } else if (completes === "unknown") {
+    writer.unknown("timed out");
+  }
   reader.ok([readOf("x", []), readOf("y", observed ? [2] : [])]);
   return history;
 }
@@ -209,6 +277,35 @@ export function writeSkew(): History {
   return history;
 }
 
+/** The setup of a machines vector that states none. */
+export const MACHINE_SETUP: Setup = {
+  steps: [],
+  section: [clients(2)],
+  strategy: uniform(),
+};
+
+/**
+ * Returns the outcome of a run of a machine subject under setup and seed 1,
+ * and the assertion of its failure.
+ */
+export async function machineOutcome(
+  subject: Subject,
+  setup: Setup,
+): Promise<[unknown, unknown]> {
+  const recorder = new Recorder();
+  await forAll(
+    recorder,
+    "the subject",
+    (c) => subject(c, setup),
+    seed(1n),
+    hermetic(),
+    store(""),
+  );
+  const detail = records(recorder)[0]?.["detail"] as Record<string, unknown>;
+  const failure = detail["failure"] as Record<string, unknown> | null;
+  return [detail["outcome"], failure?.["assertion"] ?? null];
+}
+
 /** Returns a case of a property's body on a recorder, whose engine case takes its values from provider, and that engine case. */
 export function bodyCase(provider: Provider): {
   readonly c: Case;
@@ -219,11 +316,142 @@ export function bodyCase(provider: Provider): {
   return { c: new Case(engine, new Recorder(), undefined, location), engine };
 }
 
+/** The call site of the property of the cases of the specs of a case. */
+export const CASE_SITE = { file: "/work/tests/total.test.ts", line: 4 };
+
+/**
+ * Returns a case on a recorder whose records location states, by default at
+ * the caller's frame, and whose engine case replays integer choices of
+ * values, with that engine case.
+ */
+export function caseAt(
+  location: Location = { site: CASE_SITE, pinned: false },
+  ...values: bigint[]
+): { c: Case; engine: Engine } {
+  const engine = new Engine(
+    new Replaying(values.map((value) => ({ kind: "integer", value }))),
+  );
+  return { c: new Case(engine, new Recorder(), undefined, location), engine };
+}
+
+/** Returns what the case throws when run runs on it, or undefined when it passes. */
+export async function ending(c: Case, run: (c: Case) => unknown): Promise<unknown> {
+  try {
+    await drive(executeCase(c, run));
+  } catch (err) {
+    return err;
+  }
+  return undefined;
+}
+
+/** Returns the record of the failure that a case ended with. */
+export function failingOf(signal: unknown): CaseFailing {
+  return (signal as Failed).record as CaseFailing;
+}
+
 /** Returns the provider that replays integer choices of values, in order. */
 export function replaying(...values: number[]): Replaying {
   return new Replaying(
     values.map((value) => ({ kind: "integer", value: BigInt(value) })),
   );
+}
+
+/** Returns a recorded choice of the kind that the type of value implies. */
+export function choiceOf(value: Value): Choice {
+  if (Array.isArray(value)) {
+    return { kind: "sequence", value };
+  }
+  if (typeof value === "number") {
+    return { kind: "float", value };
+  }
+  return { kind: "integer", value: value as bigint };
+}
+
+/** Returns the value that generator decodes from recorded values, and the engine's case. */
+export function decodeFrom<T>(
+  generator: Generator<T>,
+  ...values: Value[]
+): [T, Engine] {
+  const c = new Engine(new Replaying(values.map(choiceOf)));
+  return [generator[DECODE](c), c];
+}
+
+/** Returns integer choices of values. */
+export function integers(...values: bigint[]): Choice[] {
+  return values.map((value) => ({ kind: "integer", value }));
+}
+
+/** Returns the value that a case draws from generator on the recorded choices. */
+export function decoded<T>(generator: Generator<T>, ...choices: Choice[]): T {
+  return new Engine(new Replaying(choices)).draw(generator, "value");
+}
+
+/** Returns the choice of an integer. */
+export function int(value: bigint): Choice {
+  return { kind: "integer", value };
+}
+
+/** Returns the choice of a sequence. */
+export function seq(...value: number[]): Choice {
+  return { kind: "sequence", value };
+}
+
+/** Returns a body of a function that returns nothing. */
+export function body(fn: (c: Engine) => void): Body {
+  return (c) => {
+    fn(c);
+  };
+}
+
+/** Returns the execution of a body on recorded choices. */
+export function executed(of: Body, choices: readonly Choice[]): Promise<Execution> {
+  return drive(execute(of, new Replaying(choices), MAX_CHOICES));
+}
+
+/** Returns a shrinker that starts from the failing case of choices, with a budget of runs. */
+export async function shrinkerOf(
+  of: Body,
+  choices: readonly Choice[],
+  budget = DEFAULT_BUDGET,
+): Promise<Shrinker> {
+  return new Shrinker(of, await executed(of, choices), MAX_CHOICES, budget);
+}
+
+/**
+ * Returns the steps that the emitter of table for the class of generator
+ * emits for value, with the emit of the engine for the generators that it
+ * contains.
+ */
+export function emittedBy(
+  table: readonly (readonly [unknown, Emitter])[],
+  generator: Generator<unknown>,
+  value: unknown,
+): Emitted {
+  const emitter = new Map(table).get(generator.constructor);
+  if (emitter === undefined) {
+    throw new Error(`the table has no emitter of a ${generator.constructor.name}`);
+  }
+  return emitter(generator as never, value, emit);
+}
+
+/**
+ * Returns the message of the CannotInvert that the emitter of table for the
+ * class of generator throws for value, and undefined when it emits steps.
+ */
+export function refusedBy(
+  table: readonly (readonly [unknown, Emitter])[],
+  generator: Generator<unknown>,
+  value: unknown,
+): string | undefined {
+  try {
+    emittedBy(table, generator, value);
+  } catch (err) {
+    if (err instanceof CannotInvert) {
+      return err.message;
+    }
+    throw err;
+  }
+  return undefined;
 }
 
 /** A subject that never reads its signal. */
@@ -235,13 +463,14 @@ export async function ignores(): Promise<string> {
 export type Surface = Omit<typeof check, "doesReject">;
 
 /**
- * One failing call of an assertion on surface: on seat, with arguments
- * built against the clock that seat reads, and with the message msg.
+ * One failing call of the assertion name of a surface: on seat, with
+ * arguments built against the clock that seat reads, and with the message
+ * msg.
  *
  * @returns What the assertion returns.
  */
-export type Failing = (
-  surface: Surface,
+export type Failing<K extends keyof Surface> = (
+  surface: Pick<Surface, K>,
   seat: Seat,
   clock: Controlled,
   msg: string,
@@ -249,13 +478,13 @@ export type Failing = (
 
 /**
  * A failing call of each assertion that `check` and `soft` both export, by
- * name.
+ * name. Each call reads only its own assertion of the surface.
  *
  * Each entry builds its arguments again for each call. A stateful subject
  * starts clean, and a subject that takes time advances the clock that the
  * seat reads.
  */
-export const FAILING: Readonly<Record<keyof Surface, Failing>> = {
+export const FAILING: { readonly [K in keyof Surface]: Failing<K> } = {
   isEqualTo: (s, seat, _clock, msg) => s.isEqualTo(seat, 1, 2, msg),
   isNotEqualTo: (s, seat, _clock, msg) => s.isNotEqualTo(seat, 1, 1, msg),
   isTrue: (s, seat, _clock, msg) => s.isTrue(seat, false, msg),
@@ -319,7 +548,7 @@ export const FAILING: Readonly<Record<keyof Surface, Failing>> = {
     );
   },
   eventually: (s, seat, _clock, msg) =>
-    s.eventually(seat, 5, 1, (trial) => s.isTrue(trial, false, "it converges"), msg),
+    s.eventually(seat, 5, 1, (trial) => isTrue(trial, false, "it converges"), msg),
   eventuallyTrue: (s, seat, _clock, msg) => s.eventuallyTrue(seat, 5, () => false, msg),
   noTaskLeaks: (s, seat, _clock, msg) => {
     const done = s.noTaskLeaks(seat, msg);
@@ -459,3 +688,154 @@ export const TRACKED: readonly string[] = [
   "rejectsWith",
   "roundTrip",
 ];
+
+/**
+ * Declares the cases of each assertion of family, a module of `check`. Each
+ * assertion reports its failure through fail.
+ */
+export function abortingCases<K extends keyof Surface>(family: Pick<Surface, K>): void {
+  for (const name of Object.keys(family) as K[]) {
+    describe(name, () => {
+      it("reports its failure through fail", async () => {
+        const [seat, clock] = seated();
+        await FAILING[name](family, seat, clock, CONTRACT);
+
+        expect(seat.failures.map((f) => f.contract)).toEqual([CONTRACT]);
+        expect(seat.message).not.toBe("");
+        expect(seat.messages).toEqual([]);
+      });
+
+      returnCase(family, name);
+    });
+  }
+}
+
+/**
+ * Declares the cases of each assertion of family, a module of `soft`.
+ * aborting is the module of `check` with the same assertions. Each
+ * assertion reports its failure through record, with the record that the
+ * assertion of aborting reports.
+ */
+export function recordingCases<K extends keyof Surface>(
+  family: Pick<Surface, K>,
+  aborting: Pick<Surface, K>,
+): void {
+  for (const name of Object.keys(family) as K[]) {
+    describe(name, () => {
+      it("reports its failure through record", async () => {
+        const [seat, clock] = seated();
+        await FAILING[name](family, seat, clock, CONTRACT);
+
+        expect(seat.failures.map((f) => f.contract)).toEqual([CONTRACT]);
+        expect(seat.messages).toEqual([seat.message]);
+      });
+
+      it("reports the record of the failure that check reports", async () => {
+        const [abortingSeat, abortingClock] = seated();
+        const [recordingSeat, recordingClock] = seated();
+        await FAILING[name](aborting, abortingSeat, abortingClock, CONTRACT);
+        await FAILING[name](family, recordingSeat, recordingClock, CONTRACT);
+
+        expect(recordingSeat.failures).toEqual(abortingSeat.failures);
+      });
+
+      returnCase(family, name);
+    });
+  }
+}
+
+/** The contract that every call of the specs of the matchers of values and text passes. */
+export const VERDICT_CONTRACT = "the stated contract";
+
+/** One call of an assertion: its arguments, and the detail of its failure or undefined for a pass. */
+export interface VerdictCase {
+  readonly name: string;
+  readonly give: readonly unknown[];
+  readonly want?: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * Declares one case of each entry of tests, which calls call on a fresh
+ * recorder and compares its failure with the entry's. It uses vitest's
+ * `expect` alone, because the surfaces call the assertions under test.
+ */
+export function verdictCases(
+  assertion: string,
+  call: (seat: Recorder, args: readonly unknown[]) => void,
+  tests: readonly VerdictCase[],
+): void {
+  for (const tt of tests) {
+    it(tt.name, () => {
+      const seat = new Recorder();
+      call(seat, tt.give);
+
+      expect(seat.failures.map((f) => [f.assertion, f.contract, f.detail])).toEqual(
+        tt.want === undefined ? [] : [[assertion, VERDICT_CONTRACT, tt.want]],
+      );
+    });
+  }
+}
+
+/** One property form of a spec: its export, its assertion's id, a call that passes, and a call that fails. */
+export interface FormRow {
+  readonly name: string;
+  readonly assertion: string;
+  readonly passing: (seat: Seat) => Promise<void>;
+  readonly failing: (seat: Seat) => Promise<void>;
+  /** A call that passes only under the relaxation that it passes, for a form that takes relaxations. */
+  readonly relaxed?: (seat: Seat) => Promise<void>;
+}
+
+/** Returns a counter's state and its observation, which a call raises by one. */
+export function counter(): { raise: () => void; read: () => number } {
+  let count = 0;
+  return {
+    raise: () => {
+      count += 1;
+    },
+    read: () => count,
+  };
+}
+
+/**
+ * Declares the cases of each form of rows, whose calls state the contract
+ * contract. Each form passes a true property, and fails a false one with a
+ * record of the form.
+ */
+export function formCases(rows: readonly FormRow[], contract: string): void {
+  for (const row of rows) {
+    describe(row.name, () => {
+      test("passes a property that is true for every input", async ({ seat }) => {
+        const recorder = new Recorder();
+        await row.passing(recorder);
+
+        isEmpty(seat, recorder.failures, "no failure");
+      });
+
+      test(`fails with a record of prop-${row.assertion} whose case failed ${row.assertion}`, async ({
+        seat,
+      }) => {
+        const recorder = new Recorder();
+        await row.failing(recorder);
+        const [failure] = recorder.failures;
+
+        isEqualTo(
+          seat,
+          [failure?.assertion, failure?.contract, failure?.caseFailure?.assertion],
+          [`prop-${row.assertion}`, contract, row.assertion],
+          "the form's record",
+        );
+      });
+
+      const { relaxed } = row;
+      if (relaxed !== undefined) {
+        test("passes the relaxations to the assertion", async ({ seat }) => {
+          const recorder = new Recorder();
+          await relaxed(recorder);
+
+          isEmpty(seat, recorder.failures, "the relaxation applies");
+        });
+      }
+    });
+  }
+}

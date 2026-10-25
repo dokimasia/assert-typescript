@@ -12,17 +12,17 @@
 /** The two readings an assertion needs from time. */
 export interface Clock {
   /**
-   * Answer the current instant, in milliseconds.
+   * Returns the current instant, in milliseconds.
    *
    * @returns A reading comparable against another from the same clock.
    */
-  now(): number;
+  now: () => number;
   /**
-   * Block until the duration has passed on this clock.
+   * Waits until the duration has passed on this clock.
    *
    * @param duration - Milliseconds to wait.
    */
-  sleep(duration: number): Promise<void>;
+  sleep: (duration: number) => Promise<void>;
 }
 
 /**
@@ -97,12 +97,16 @@ export class Controlled implements Clock {
    * @param duration - Milliseconds to move forward by.
    */
   advance(duration: number): void {
-    if (duration <= 0) return;
+    if (duration <= 0) {
+      return;
+    }
     this.#instant += duration;
 
     const due = this.#waiting.filter((w) => w.until <= this.#instant);
     this.#waiting = this.#waiting.filter((w) => w.until > this.#instant);
-    for (const waiter of due) waiter.wake();
+    for (const waiter of due) {
+      waiter.wake();
+    }
   }
 
   /**
@@ -116,7 +120,9 @@ export class Controlled implements Clock {
    * @returns A promise settling once the clock has passed it.
    */
   sleep(duration: number): Promise<void> {
-    if (duration <= 0) return Promise.resolve();
+    if (duration <= 0) {
+      return Promise.resolve();
+    }
     return new Promise((resolve) => {
       this.#waiting.push({ until: this.#instant + duration, wake: resolve });
     });

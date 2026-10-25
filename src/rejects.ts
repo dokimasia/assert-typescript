@@ -23,7 +23,7 @@ import { own } from "./record/calls.js";
  * and so does a fault that ends its call.
  */
 class Check extends Body implements Reporter {
-  #records: Failure[] = [];
+  readonly #records: Failure[] = [];
   #failed = false;
   #fault: Error | undefined;
 
@@ -42,7 +42,9 @@ class Check extends Body implements Reporter {
   report(failure: Failure, aborting: boolean): void {
     this.#failed = true;
     this.#records.push(failure);
-    if (aborting) throw new Ended();
+    if (aborting) {
+      throw new Ended();
+    }
   }
 
   /**

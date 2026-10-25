@@ -21,6 +21,7 @@ import {
   surfaceNames,
 } from "../src/conformance/index.js";
 import * as index from "../src/index.js";
+import { compareText } from "../src/order.js";
 import { test as it } from "../src/vitest.js";
 
 const { bench, check, files, golden, history, prop, soft, stateful } = index;
@@ -51,7 +52,9 @@ const CHECK_ONLY: Record<string, string> = {
 function memberOf(owner: unknown, path: string): unknown {
   let current = owner;
   for (const part of path.split(".")) {
-    if (current === null || current === undefined) return undefined;
+    if (current === null || current === undefined) {
+      return undefined;
+    }
     const holder = current as Record<string, unknown>;
     current =
       holder[part] ??
@@ -149,14 +152,14 @@ const DECLARED: Record<string, { file: string; text: string }> = {
   "seat.report": { file: "seat.d.ts", text: "report(" },
   "seat.report-fault": {
     file: "matcher/seat.d.ts",
-    text: "reportFault?(fault: Error, ending: boolean): void",
+    text: "reportFault?: (fault: Error, ending: boolean) => void",
   },
   "seat.cancellation": {
     file: "matcher/seat.d.ts",
     text: "readonly signal?: AbortSignal",
   },
   "case.cancellation": { file: "prop/case.d.ts", text: "readonly signal: AbortSignal" },
-  scrubber: { file: "golden.d.ts", text: "export type Scrubber" },
+  scrubber: { file: "golden/scrub.d.ts", text: "export type Scrubber" },
   tree: { file: "files/tree.d.ts", text: "export type Tree" },
   event: { file: "history/event.d.ts", text: "export type Event = " },
   outcome: { file: "history/concurrently.d.ts", text: "export interface Outcome {" },
@@ -263,23 +266,33 @@ function offers(sid: string, name: string): boolean {
     return sid.includes(".") ? declares(clock, leaf) : typeof clock === "function";
   }
   const declared = DECLARED[sid];
-  if (declared !== undefined)
+  if (declared !== undefined) {
     return declarations(declared.file).includes(declared.text);
+  }
   if (sid === "assertion") {
     return CHAINS.every(({ file, text }) => declarations(file).includes(text));
   }
   if (sid === "that") {
     return REGISTERS.every(({ file, text }) => declarations(file).includes(text));
   }
-  if (sid in SEATS) return typeof SEATS[sid] === "function";
+  if (sid in SEATS) {
+    return typeof SEATS[sid] === "function";
+  }
   // A constructor, such as `new History()`, is the class of its row.
-  if (name.startsWith("new "))
+  if (name.startsWith("new ")) {
     return typeof CLASSES[sid.split(".")[0] as string] === "function";
-  if (sid === "contract") return typeof bench.Contract === "function";
-  if (sid.startsWith("contract.")) return declares(bench.Contract, leaf);
+  }
+  if (sid === "contract") {
+    return typeof bench.Contract === "function";
+  }
+  if (sid.startsWith("contract.")) {
+    return declares(bench.Contract, leaf);
+  }
   // A helper is a name of the entry point, such as signalOf or
   // golden.shouldUpdate.
-  if (present(index, name)) return true;
+  if (present(index, name)) {
+    return true;
+  }
   // A member of a class. The members of every seat are checked on each
   // seat, and any other member on the class that its id names.
   const owners = sid.startsWith("seat.")
@@ -292,7 +305,7 @@ describe("index", () => {
   it("exports the names of the entry point of the package", ({ seat }) => {
     check.isEqualTo(
       seat,
-      Object.keys(index).sort(),
+      Object.keys(index).sort(compareText),
       [
         "AssertionFailed",
         "Collector",
@@ -327,7 +340,7 @@ describe("index", () => {
 
   for (const id of Object.keys(ASSERTIONS)
     .filter((one) => !diverges(one))
-    .sort()) {
+    .sort(compareText)) {
     it(`exports the assertion ${id} under its name`, ({ seat }) => {
       const { owner, member } = locate(id);
 
@@ -359,7 +372,7 @@ describe("index", () => {
 
   const declined = Object.keys(ASSERTIONS)
     .filter((one) => diverges(one))
-    .sort();
+    .sort(compareText);
 
   it("checks at least one assertion that the overlay declines", ({ seat }) => {
     check.isNotEmpty(seat, declined, "the overlay declines an assertion");
@@ -375,7 +388,7 @@ describe("index", () => {
 
   for (const id of Object.keys(ASSERTIONS)
     .filter((one) => !ASSERTIONS[one]?.package)
-    .sort()) {
+    .sort(compareText)) {
     const name = NAMES[id] as string;
     if (diverges(id)) {
       it(`exports the declined assertion ${id} on neither surface`, ({ seat }) => {
@@ -395,13 +408,13 @@ describe("index", () => {
       });
 
       it(`exports the assertion ${id} on soft with the arity of check`, ({ seat }) => {
-        const length = (surface: object) =>
-          (memberOf(surface, name) as (...args: never[]) => unknown).length;
+        const arity = (exported: object) =>
+          (memberOf(exported, name) as (...args: never[]) => unknown).length;
 
         check.isEqualTo(
           seat,
-          length(soft),
-          length(check),
+          arity(soft),
+          arity(check),
           `${name} takes one set of arguments`,
         );
       });
@@ -413,8 +426,8 @@ describe("index", () => {
       seat,
       Object.keys(check)
         .filter((name) => !(name in CHECK_ONLY))
-        .sort(),
-      Object.keys(soft).sort(),
+        .sort(compareText),
+      Object.keys(soft).sort(compareText),
       "the surfaces have the same members",
     );
   });

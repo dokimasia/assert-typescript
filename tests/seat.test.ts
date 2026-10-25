@@ -230,7 +230,7 @@ describe("seat", () => {
     });
 
     it("returns the signal that withSignal set", () => {
-      const signal = new AbortController().signal;
+      const { signal } = new AbortController();
 
       expect(new Recorder().withSignal(signal).signal).toBe(signal);
     });
@@ -365,7 +365,7 @@ describe("seat", () => {
     });
 
     it("returns the signal that withSignal set", () => {
-      const signal = new AbortController().signal;
+      const { signal } = new AbortController();
 
       expect(new Collector().withSignal(signal).signal).toBe(signal);
     });

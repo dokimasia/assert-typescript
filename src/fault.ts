@@ -9,8 +9,8 @@
  * call with a fault as the assertions of this library end theirs.
  */
 
+import { end } from "./matcher/fault.js";
 import type { Seat } from "./matcher/seat.js";
-import { end } from "./matcher/verdict.js";
 
 /**
  * Ends the call of a helper with error, a fault. A seat with reportFault

@@ -30,11 +30,21 @@
  * one run would fail the next for no reason.
  */
 
+import { end } from "./matcher/fault.js";
 import { clockOf, Mode, type Seat } from "./matcher/seat.js";
-import { end, fail, pass } from "./matcher/verdict.js";
+import { fail, pass } from "./matcher/verdict.js";
 
 /** How many samples a p99 needs before it means anything. */
 const P99_MINIMUM = 100;
+
+/** The percentile that a latency ceiling bounds. */
+const LATENCY_PERCENTILE = 99;
+
+/** The number of percentiles in the whole of a sample. */
+const PERCENT = 100;
+
+/** The decimals of a millisecond that a crossed ceiling states. */
+const MEASURED_DECIMALS = 3;
 
 /** What one run of the body cost. */
 interface Measurement {
@@ -42,6 +52,22 @@ interface Measurement {
   readonly iterations: number;
   /** Every sample, in milliseconds, sorted. */
   readonly latencies: readonly number[];
+}
+
+/**
+ * Returns the given percentile of a sorted list of one sample or more.
+ *
+ * Below {@link P99_MINIMUM} samples a percentile is the slowest one: with
+ * ten samples the 99th is the tenth, and a p99 of ten samples is a single
+ * reading.
+ */
+function percentile(sorted: readonly number[], nth: number): number {
+  if (sorted.length < P99_MINIMUM) {
+    return sorted.at(-1) as number;
+  }
+
+  const at = Math.ceil((nth / PERCENT) * sorted.length) - 1;
+  return sorted[Math.min(at, sorted.length - 1)] as number;
 }
 
 /**
@@ -54,7 +80,7 @@ export class Contract {
   readonly #seat: Seat;
   readonly #msg: string;
   #warmup = 0;
-  #ran = false;
+  #ran: boolean;
   #maxLatency: number | undefined;
   #maxMean: number | undefined;
   #measurement: Measurement | undefined;
@@ -69,6 +95,7 @@ export class Contract {
   constructor(seat: Seat, msg: string) {
     this.#seat = seat;
     this.#msg = msg;
+    this.#ran = false;
   }
 
   /**
@@ -87,8 +114,9 @@ export class Contract {
         `bench: warmup(${iterations}) states no whole number of 0 or more`,
       );
     }
-    if (this.#ran)
+    if (this.#ran) {
       throw new RangeError("bench: warmup after the contract has run its body");
+    }
     this.#warmup = iterations;
     return this;
   }
@@ -209,7 +237,7 @@ export class Contract {
 
     const mean =
       run.latencies.reduce((total, ms) => total + ms, 0) / run.latencies.length;
-    const p99 = percentile(run.latencies, 99);
+    const p99 = percentile(run.latencies, LATENCY_PERCENTILE);
 
     if (this.#maxLatency !== undefined) {
       this.#ceiling("bench-max-latency", this.#maxLatency, p99);
@@ -224,24 +252,10 @@ export class Contract {
     if (measured > want) {
       fail(this.#seat, Mode.Fatal, assertion, this.#msg, {
         want,
-        got: Number(measured.toFixed(3)),
+        got: Number(measured.toFixed(MEASURED_DECIMALS)),
       });
       return;
     }
     pass(this.#seat, Mode.Fatal, assertion, this.#msg);
   }
-}
-
-/**
- * Returns the given percentile of a sorted list of one sample or more.
- *
- * Below {@link P99_MINIMUM} samples a percentile is the slowest one: with
- * ten samples the 99th is the tenth, and a p99 of ten samples is a single
- * reading.
- */
-function percentile(sorted: readonly number[], nth: number): number {
-  if (sorted.length < P99_MINIMUM) return sorted[sorted.length - 1] as number;
-
-  const at = Math.ceil((nth / 100) * sorted.length) - 1;
-  return sorted[Math.min(at, sorted.length - 1)] as number;
 }

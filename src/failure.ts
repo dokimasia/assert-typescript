@@ -12,74 +12,12 @@
 import { dirname, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { show } from "./matcher/inspect.js";
-
-/** The call site a failure came from. */
-export interface Where {
-  /** The file the assertion was called from. */
-  readonly file: string;
-  /** The line within it. */
-  readonly line: number;
-}
+import { compareText } from "./order.js";
 
 /** The fields of a detail that the accessors of a failure record read. */
 const WANT = "want";
 const GOT = "got";
 const CASE_FAILURE = "failure";
-
-/** The failure record that a failing assertion reports, as the definition states it. */
-export class Failure {
-  /** The assertion's id, as the definition spells it. */
-  readonly assertion: string;
-  /** The caller's message, unchanged. */
-  readonly contract: string;
-  /** The fields that the definition declares for the assertion, and no others. */
-  readonly detail: Readonly<Record<string, unknown>>;
-  /** Where the assertion was called, when the call site could be read. */
-  declare readonly where?: Where;
-
-  /**
-   * Returns the record of a failure of assertion.
-   *
-   * @param assertion - The assertion's canonical id.
-   * @param contract - The caller's message, unchanged.
-   * @param detail - The fields that the assertion declares.
-   * @param where - The call site, or undefined when it could not be read.
-   */
-  constructor(
-    assertion: string,
-    contract: string,
-    detail: Readonly<Record<string, unknown>>,
-    where?: Where,
-  ) {
-    this.assertion = assertion;
-    this.contract = contract;
-    this.detail = detail;
-    if (where !== undefined) this.where = where;
-  }
-
-  /**
-   * The detail's want. Undefined when the assertion does not declare a
-   * want, and null when it declares one whose value is absent.
-   */
-  get want(): unknown {
-    return Object.hasOwn(this.detail, WANT) ? this.detail[WANT] : undefined;
-  }
-
-  /** The detail's got, with the same rule as want. */
-  get got(): unknown {
-    return Object.hasOwn(this.detail, GOT) ? this.detail[GOT] : undefined;
-  }
-
-  /**
-   * The record of a property's failing case: the minimal case of a
-   * counterexample, or the case that the replay of a flaky run
-   * contradicted. Undefined for any other failure.
-   */
-  get caseFailure(): Failure | undefined {
-    const held = this.detail[CASE_FAILURE];
-    return held instanceof Failure ? held : undefined;
-  }
-}
 
 /**
  * The order TypeScript names detail fields in, which is want before
@@ -114,43 +52,6 @@ const ORDER = [
 const SENTENCES = new Map<string, (failure: Failure) => string>();
 
 /**
- * Makes sentence the sentence of the records of assertions, in place of the
- * contract and the list of the detail's fields.
- *
- * @param sentence - Returns the sentence of a record.
- * @param assertions - The ids of the assertions.
- */
-export function registerSentence(
-  sentence: (failure: Failure) => string,
-  ...assertions: readonly string[]
-): void {
-  for (const id of assertions) SENTENCES.set(id, sentence);
-}
-
-/**
- * Turns a record into the sentence a person reads.
- *
- * @param failure - The record to phrase.
- * @returns The sentence that the assertion's module registered, or the
- *   contract, then each field of the detail with its value.
- */
-export function render(failure: Failure): string {
-  const sentence = SENTENCES.get(failure.assertion);
-  if (sentence !== undefined) return sentence(failure);
-  const names = Object.keys(failure.detail);
-  if (names.length === 0) return failure.contract;
-
-  const known = ORDER.filter((name) => name in failure.detail);
-  const rest = names
-    .filter((name) => !(ORDER as readonly string[]).includes(name))
-    .sort();
-  const parts = [...known, ...rest].map(
-    (name) => `${name} ${show(failure.detail[name])}`,
-  );
-  return `${failure.contract}: ${parts.join(", ")}`;
-}
-
-/**
  * The location of a frame of a V8 stack, in parentheses or after `at`: a
  * file, then its line and its column. A frame without a line, such as that
  * of a built-in function, has none.
@@ -168,31 +69,7 @@ function pathOf(file: string): string {
 
 /** A frame of V8's structured stack, as `Error.prepareStackTrace` receives it. */
 interface Site {
-  getFileName(): string | null | undefined;
-}
-
-/**
- * Returns the directory of the module that calls it. A module calls it as
- * it loads, in an ES module and in a CommonJS module. It reads the file of
- * the caller's frame from V8's structured stack, which no source map
- * rewrites. A test runner such as jest maps the text of a stack to the
- * sources that a source map names, and the package does not ship them.
- *
- * @returns The directory, or `.` for a caller whose frame has no file.
- */
-export function directoryOf(): string {
-  const prepare = Error.prepareStackTrace;
-  const limit = Error.stackTraceLimit;
-  Error.prepareStackTrace = (_error, sites) => sites;
-  Error.stackTraceLimit = 2;
-  try {
-    const sites = new Error("read the caller's file")
-      .stack as unknown as readonly Site[];
-    return dirname(pathOf(sites[1]?.getFileName() ?? ""));
-  } finally {
-    Error.prepareStackTrace = prepare;
-    Error.stackTraceLimit = limit;
-  }
+  getFileName: () => string | null | undefined;
 }
 
 /**
@@ -226,6 +103,155 @@ const PACKAGES = `${sep}node_modules${sep}`;
  */
 const FRAMES = 100;
 
+/** Returns the file and the line of a frame whose file is the caller's, and undefined for any other line of a stack. */
+function callerAt(line: string): Where | undefined {
+  const frame = FRAME.exec(line.trim());
+  if (frame === null) {
+    return undefined;
+  }
+  const { file, line: at } = frame.groups as { file: string; line: string };
+  if (file.startsWith("node:")) {
+    return undefined;
+  }
+  const path = pathOf(file);
+  if (LIBRARY.some((dir) => path.startsWith(dir)) || path.includes(PACKAGES)) {
+    return undefined;
+  }
+  return { file: path, line: Number(at) };
+}
+
+/** The call site a failure came from. */
+export interface Where {
+  /** The file the assertion was called from. */
+  readonly file: string;
+  /** The line within it. */
+  readonly line: number;
+}
+
+/** The failure record that a failing assertion reports, as the definition states it. */
+export class Failure {
+  /** The assertion's id, as the definition spells it. */
+  readonly assertion: string;
+  /** The caller's message, unchanged. */
+  readonly contract: string;
+  /** The fields that the definition declares for the assertion, and no others. */
+  readonly detail: Readonly<Record<string, unknown>>;
+  /** Where the assertion was called, when the call site could be read. */
+  declare readonly where?: Where;
+
+  /**
+   * Returns the record of a failure of assertion.
+   *
+   * @param assertion - The assertion's canonical id.
+   * @param contract - The caller's message, unchanged.
+   * @param detail - The fields that the assertion declares.
+   * @param where - The call site, or undefined when it could not be read.
+   */
+  constructor(
+    assertion: string,
+    contract: string,
+    detail: Readonly<Record<string, unknown>>,
+    where?: Where,
+  ) {
+    this.assertion = assertion;
+    this.contract = contract;
+    this.detail = detail;
+    if (where !== undefined) {
+      this.where = where;
+    }
+  }
+
+  /**
+   * The detail's want. Undefined when the assertion does not declare a
+   * want, and null when it declares one whose value is absent.
+   */
+  get want(): unknown {
+    return Object.hasOwn(this.detail, WANT) ? this.detail[WANT] : undefined;
+  }
+
+  /** The detail's got, with the same rule as want. */
+  get got(): unknown {
+    return Object.hasOwn(this.detail, GOT) ? this.detail[GOT] : undefined;
+  }
+
+  /**
+   * The record of a property's failing case: the minimal case of a
+   * counterexample, or the case that the replay of a flaky run
+   * contradicted. Undefined for any other failure.
+   */
+  get caseFailure(): Failure | undefined {
+    const held = this.detail[CASE_FAILURE];
+    return held instanceof Failure ? held : undefined;
+  }
+}
+
+/**
+ * Makes sentence the sentence of the records of assertions, in place of the
+ * contract and the list of the detail's fields.
+ *
+ * @param sentence - Returns the sentence of a record.
+ * @param assertions - The ids of the assertions.
+ */
+export function registerSentence(
+  sentence: (failure: Failure) => string,
+  ...assertions: readonly string[]
+): void {
+  for (const id of assertions) {
+    SENTENCES.set(id, sentence);
+  }
+}
+
+/**
+ * Turns a record into the sentence a person reads.
+ *
+ * @param failure - The record to phrase.
+ * @returns The sentence that the assertion's module registered, or the
+ *   contract, then each field of the detail with its value.
+ */
+export function render(failure: Failure): string {
+  const sentence = SENTENCES.get(failure.assertion);
+  if (sentence !== undefined) {
+    return sentence(failure);
+  }
+  const names = Object.keys(failure.detail);
+  if (names.length === 0) {
+    return failure.contract;
+  }
+
+  const known = ORDER.filter((name) => name in failure.detail);
+  const rest = names
+    .filter((name) => !(ORDER as readonly string[]).includes(name))
+    .sort(compareText);
+  const parts = [...known, ...rest].map(
+    (name) => `${name} ${show(failure.detail[name])}`,
+  );
+  return `${failure.contract}: ${parts.join(", ")}`;
+}
+
+/**
+ * Returns the directory of the module that calls it. A module calls it as
+ * it loads, in an ES module and in a CommonJS module. It reads the file of
+ * the caller's frame from V8's structured stack, which no source map
+ * rewrites. A test runner such as jest maps the text of a stack to the
+ * sources that a source map names, and the package does not ship them.
+ *
+ * @returns The directory, or `.` for a caller whose frame has no file.
+ */
+export function directoryOf(): string {
+  const prepare = Error.prepareStackTrace;
+  const limit = Error.stackTraceLimit;
+  Error.prepareStackTrace = (_error, sites) => sites;
+  Error.stackTraceLimit = 2;
+  try {
+    const sites = new Error("read the caller's file")
+      .stack as unknown as readonly Site[];
+    return dirname(pathOf(sites[1]?.getFileName() ?? ""));
+  } finally {
+    Error.prepareStackTrace = prepare;
+    Error.stackTraceLimit = limit;
+  }
+}
+
 /**
  * Returns the stack of a new error of message. The stack has at least
  * {@link FRAMES} frames, whatever limit `Error.stackTraceLimit` sets, and
@@ -257,14 +283,10 @@ export function stackOf(message: string): string {
  */
 export function siteIn(stack: string): Where | undefined {
   for (const line of stack.split("\n").slice(1)) {
-    const frame = FRAME.exec(line.trim());
-    if (frame === null) continue;
-    const { file, line: at } = frame.groups as { file: string; line: string };
-    if (file.startsWith("node:")) continue;
-    const path = pathOf(file);
-    if (LIBRARY.some((dir) => path.startsWith(dir)) || path.includes(PACKAGES))
-      continue;
-    return { file: path, line: Number(at) };
+    const site = callerAt(line);
+    if (site !== undefined) {
+      return site;
+    }
   }
   return undefined;
 }

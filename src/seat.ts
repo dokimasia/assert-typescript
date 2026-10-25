@@ -15,13 +15,40 @@
 
 import { type Clock, System } from "./clock.js";
 import { type Failure, render } from "./failure.js";
+import { faultText } from "./matcher/fault.js";
 import { clear, dropped } from "./matcher/pending.js";
 import type { Cleanups, Seat } from "./matcher/seat.js";
-import { faultText } from "./matcher/verdict.js";
 import { keep, lines, own } from "./record/calls.js";
 
+/**
+ * Throws when this seat has assertions that nobody awaited.
+ *
+ * Several assertions return a promise, and a caller who drops one gets a
+ * green test that asserted nothing. No type checker catches it, because
+ * the caller used the promise as a value.
+ *
+ * @param seat The seat whose started work is being closed off.
+ * @throws AssertionFailed naming every assertion that was dropped.
+ */
+function reportDropped(seat: Seat): void {
+  const forgotten = dropped(seat);
+  clear(seat);
+  if (forgotten.length === 0) {
+    return;
+  }
+
+  const listed = forgotten.map((m) => `  - ${m}`).join("\n");
+  throw new AssertionFailed(
+    `${forgotten.length} assertion(s) were never awaited, so they ` +
+      `asserted nothing:\n${listed}\nAdd \`await\` to the call.`,
+  );
+}
+
+/** The functions that each collector runs when its test ends, in the order of their registration. */
+const CLEANUPS = new WeakMap<Collector, (() => void)[]>();
+
+export type { Cleanups, Seat } from "./matcher/seat.js";
 export { signalOf } from "./matcher/seat.js";
-export type { Cleanups, Seat };
 
 /** Raised by every seat that stops a test. */
 export class AssertionFailed extends Error {
@@ -37,28 +64,6 @@ export class AssertionFailed extends Error {
 }
 
 /**
- * Throws when this seat has assertions that nobody awaited.
- *
- * Several assertions return a promise, and a caller who drops one gets a
- * green test that asserted nothing. No type checker catches it, because
- * the caller used the promise as a value.
- *
- * @param seat The seat whose started work is being closed off.
- * @throws AssertionFailed naming every assertion that was dropped.
- */
-function reportDropped(seat: Seat): void {
-  const forgotten = dropped(seat);
-  clear(seat);
-  if (forgotten.length === 0) return;
-
-  const listed = forgotten.map((m) => `  - ${m}`).join("\n");
-  throw new AssertionFailed(
-    `${forgotten.length} assertion(s) were never awaited, so they ` +
-      `asserted nothing:\n${listed}\nAdd \`await\` to the call.`,
-  );
-}
-
-/**
  * A seat that throws on any failure.
  *
  * The seat to construct outside a test runner. Its `record` throws too: a
@@ -68,7 +73,9 @@ function reportDropped(seat: Seat): void {
  */
 export class Standard implements Seat {
   /** Does nothing, because no runner hides frames here. */
-  helper(): void {}
+  helper(): void {
+    // A seat outside a test runner has no frames to hide.
+  }
 
   /**
    * Throws, which stops the test here.
@@ -111,15 +118,15 @@ export class Standard implements Seat {
  */
 export class Recorder implements Seat {
   /** Every record that arrived, in call order. */
-  #records: Failure[] = [];
+  readonly #records: Failure[] = [];
   /** Every fault that arrived through reportFault, in call order. */
-  #faults: Error[] = [];
+  readonly #faults: Error[] = [];
   /** What assertions read time from, or undefined for the platform. */
   #clock: Clock | undefined;
   /** The signal that this recorder states, or undefined for none. */
   #signal: AbortSignal | undefined;
   #fatal: string | undefined;
-  #recorded: string[] = [];
+  readonly #recorded: string[] = [];
   #helpers = 0;
 
   /** Returns a recorder that has received nothing. */
@@ -167,7 +174,9 @@ export class Recorder implements Seat {
    */
   reportFault(fault: Error, ending: boolean): void {
     this.#faults.push(fault);
-    if (ending) this.fail(fault.message);
+    if (ending) {
+      this.fail(fault.message);
+    }
   }
 
   /** Every fault that arrived through reportFault, in call order. */
@@ -266,9 +275,6 @@ export class Recorder implements Seat {
   }
 }
 
-/** The functions that each collector runs when its test ends, in the order of their registration. */
-const CLEANUPS = new WeakMap<Collector, (() => void)[]>();
-
 /**
  * A seat that throws on a check and collects what soft records.
  *
@@ -283,7 +289,9 @@ export class Collector implements Seat, Cleanups {
   #signal: AbortSignal | undefined;
 
   /** Does nothing, because the adapter hides frames, not the seat. */
-  helper(): void {}
+  helper(): void {
+    // The adapter of the test runner hides the frames of a helper.
+  }
 
   /**
    * Throws, which stops the test here.
@@ -353,7 +361,9 @@ export class Collector implements Seat, Cleanups {
    */
   flush(): void {
     reportDropped(this);
-    if (this.#collected.length === 0) return;
+    if (this.#collected.length === 0) {
+      return;
+    }
 
     const collected = this.#collected;
     this.#collected = [];

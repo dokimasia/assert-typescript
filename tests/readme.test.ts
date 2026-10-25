@@ -50,6 +50,17 @@ const FILES = new Set([
   "tree-unchanged",
 ]);
 
+/** Returns the family of a vector kind, as the README counts the vectors. */
+function familyOf(kind: string): string {
+  if (HISTORY.has(kind)) {
+    return "history";
+  }
+  if (kind === "machines") {
+    return "machine";
+  }
+  return FILES.has(kind) ? "file" : "property";
+}
+
 /** Returns the text of the README's section under the heading title. */
 function section(title: string): string {
   const start = README.indexOf(`\n${title}\n`);
@@ -245,8 +256,12 @@ describe("README", () => {
     it("shows the sentence of a register whose read misses a write", ({ seat }) => {
       const register: history.Spec<unknown> = {
         initial: () => null,
-        next: (state, op) =>
-          op.name === "write" ? [op.args[0]] : op.returned(state) ? [state] : [],
+        next: (state, op) => {
+          if (op.name === "write") {
+            return [op.args[0]];
+          }
+          return op.returned(state) ? [state] : [];
+        },
       };
       const calls = new history.History();
       calls.invoke(0, "write", [1], "x").ok(null);
@@ -280,8 +295,8 @@ describe("README", () => {
             actions: [
               {
                 name: "increment",
-                run: async (c, client) => {
-                  const call = c.history().invoke(client, "increment", []);
+                run: async (one, client) => {
+                  const call = one.history().invoke(client, "increment", []);
                   const read = count;
                   await scheduler.yield();
                   count = read + 1;
@@ -319,13 +334,7 @@ describe("README", () => {
     it("states the number of vectors of each family", ({ seat }) => {
       const counts = new Map<string, number>();
       for (const v of vectors()) {
-        const family = HISTORY.has(v.kind)
-          ? "history"
-          : v.kind === "machines"
-            ? "machine"
-            : FILES.has(v.kind)
-              ? "file"
-              : "property";
+        const family = familyOf(v.kind);
         counts.set(family, (counts.get(family) ?? 0) + 1);
       }
 

@@ -221,7 +221,7 @@ describe("failure", () => {
       const recorder = new Recorder();
       queueMicrotask(check.isTrue.bind(null, recorder, false, "a microtask calls it"));
       await new Promise((resolve) => setImmediate(resolve));
-      const failure = recorder.failures[0];
+      const [failure] = recorder.failures;
 
       check.isNotNil(seat, failure, "the assertion failed");
       check.isFalse(
