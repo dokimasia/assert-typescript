@@ -32,7 +32,7 @@ import { fromBits, fromBits32 } from "./float.js";
 import { bitLength } from "./source.js";
 
 /** The lengths that a sequence without a maximum may take beyond its minimum, read from two bytes. */
-const UNBOUNDED_LENGTHS = 0xffff;
+const UNBOUNDED_LENGTHS = 0xff_ff;
 
 /** Returns the bytes that cover an integer range of span + 1 values. */
 function width(span: bigint): number {

@@ -22,6 +22,7 @@
  */
 
 import { randomBytes } from "node:crypto";
+import process from "node:process";
 import { Fault } from "../matcher/fault.js";
 import { mix } from "./engine/source.js";
 

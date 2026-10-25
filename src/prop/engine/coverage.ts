@@ -14,7 +14,7 @@
  */
 
 /** The standard normal quantile at 1 − 5e-10: a certainty of 10^9, split between the two tails. */
-const Z = 6.109410191663286;
+const Z = 6.109_410_191_663_286;
 
 /** A requirement is met when the lower bound is at least this fraction of the required share. */
 const TOLERANCE = 0.9;

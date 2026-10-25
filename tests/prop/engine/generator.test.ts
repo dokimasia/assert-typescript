@@ -547,7 +547,7 @@ describe("generator", () => {
     it("spells the indices in the default alphabet", ({ seat }) => {
       check.isEqualTo(
         seat,
-        decode(new Text(undefined, new SequenceBounds(0x10f800)), [10, 0])[0],
+        decode(new Text(undefined, new SequenceBounds(0x10_f8_00)), [10, 0])[0],
         "a0",
         "index 10 is a",
       );
@@ -561,7 +561,7 @@ describe("generator", () => {
 
     it("repeats the first character minSize times from no choice", ({ seat }) => {
       const xyz = new Text(["x", "y", "z"], new SequenceBounds(3, 2));
-      const digits = new Text(undefined, new SequenceBounds(0x10f800, 2));
+      const digits = new Text(undefined, new SequenceBounds(0x10_f8_00, 2));
 
       check.isEqualTo(
         seat,
@@ -878,7 +878,7 @@ describe("generator", () => {
       ["list", DIGITS],
       ["unique list", UNIQUE],
       ["dict", TABLE],
-      ["string", new Text(undefined, new SequenceBounds(0x10f800, 0, 4))],
+      ["string", new Text(undefined, new SequenceBounds(0x10_f8_00, 0, 4))],
       ["alphabet", new Text(["x", "y", "z"], new SequenceBounds(3))],
       ["bytes", new Bytes(new SequenceBounds(256))],
       [

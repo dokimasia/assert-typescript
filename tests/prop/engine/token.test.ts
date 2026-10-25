@@ -30,8 +30,7 @@ const CHOICES: Choice[] = [
   { kind: "float", value: 1.5 },
   { kind: "sequence", value: [1, 200] },
 ];
-const BYTES =
-  "0000" + "0101" + "007f" + "008001" + "00ac02" + "02000000000000f83f" + "030201c801";
+const BYTES = "00000101007f00800100ac0202000000000000f83f030201c801";
 
 /** The lowest finite float. Its bits are nearly all ones, so its token contains the base64url character of 63. */
 const LOWEST: Choice = { kind: "float", value: -Number.MAX_VALUE };

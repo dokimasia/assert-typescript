@@ -255,7 +255,7 @@ export function shrink(runs: number): Option {
  * @throws RangeError for a time that is no number of 0 or more.
  */
 export function shrinkTime(ms: number): Option {
-  if (!(ms >= 0) || !Number.isFinite(ms)) {
+  if (!(ms >= 0 && Number.isFinite(ms))) {
     throw new RangeError(`prop: shrinkTime(${ms}) states no time of 0 or more`);
   }
   return { kind: "shrink-time", value: ms };

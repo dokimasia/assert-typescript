@@ -487,7 +487,7 @@ describe("draw", () => {
       it(`returns values that bounds ${bounds.id} admit`, ({ seat }) => {
         const source = new Source(17n);
         const outside = times(DRAWS, () => floatValue(source, bounds)).filter(
-          (value) => !bounds.admits(value) || !representable(value, bounds.width),
+          (value) => !(bounds.admits(value) && representable(value, bounds.width)),
         );
 
         check.isEmpty(seat, outside, "no value outside the bounds");

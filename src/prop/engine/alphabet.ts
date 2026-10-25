@@ -29,9 +29,9 @@ const PRINTABLE =
  */
 const REST: readonly Interval[] = [
   [0x00, 0x1f],
-  [0x7f, 0xd7ff],
-  [0xe000, 0xffff],
-  [0x10000, 0x10ffff],
+  [0x7f, 0xd7_ff],
+  [0xe0_00, 0xff_ff],
+  [0x1_00_00, 0x10_ff_ff],
 ];
 
 /** The number of characters in the default alphabet: every Unicode scalar value. */

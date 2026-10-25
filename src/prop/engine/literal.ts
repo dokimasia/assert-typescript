@@ -156,8 +156,10 @@ function mapOf(literal: Literal): Pairs | undefined {
   if ("entries" in literal) {
     const entries = literal["entries"];
     if (
-      !Array.isArray(entries) ||
-      !entries.every((e) => Array.isArray(e) && e.length === 2)
+      !(
+        Array.isArray(entries) &&
+        entries.every((e) => Array.isArray(e) && e.length === 2)
+      )
     ) {
       throw new LiteralError(
         `prop: entries is ${shown(entries)}, not key and value pairs`,

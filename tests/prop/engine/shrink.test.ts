@@ -97,7 +97,6 @@ function integers(...values: bigint[]): Choice[] {
 function body(fn: (c: Case) => void): Body {
   return (c) => {
     fn(c);
-    return undefined;
   };
 }
 

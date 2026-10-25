@@ -82,7 +82,7 @@ export class IntegerBounds {
     if (lo > hi) throw new RangeError(`prop: integer bounds [${lo}, ${hi}] are empty`);
     const signed = lo >= INT64_MIN && hi <= INT64_MAX;
     const unsigned = lo >= 0n && hi <= UINT64_MAX;
-    if (!signed && !unsigned) {
+    if (!(signed || unsigned)) {
       throw new RangeError(
         `prop: integer bounds [${lo}, ${hi}] are inside neither the signed nor the unsigned 64-bit range`,
       );

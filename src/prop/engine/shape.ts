@@ -108,7 +108,7 @@ const UUID_BYTES = 16;
 
 /** The largest finite float of each width. */
 const FLOAT_MAX: Readonly<Record<Width, number>> = {
-  32: 3.4028234663852886e38,
+  32: 3.402_823_466_385_288_6e38,
   64: Number.MAX_VALUE,
 };
 
@@ -1029,7 +1029,7 @@ class Reader {
       ...[...graph.values()].flatMap((named) => [...named]),
     ];
     const unknown = targets.find(
-      (target) => !this.#sources.has(target) && !this.#externals.has(target),
+      (target) => !(this.#sources.has(target) || this.#externals.has(target)),
     );
     if (unknown !== undefined) {
       throw new ShapeError(
@@ -1118,7 +1118,7 @@ class Reader {
       );
     }
     const extra = stated
-      .filter((key) => !required.includes(key) && !optional.includes(key))
+      .filter((key) => !(required.includes(key) || optional.includes(key)))
       .sort();
     if (extra.length > 0) {
       throw new ShapeError(

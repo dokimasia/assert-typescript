@@ -616,7 +616,7 @@ export class Shrinker {
       for (const pass of passes) {
         if (yield* pass()) improved = true;
       }
-      if (!improved && !(yield* this.#deleteAndLower())) return;
+      if (!(improved || (yield* this.#deleteAndLower()))) return;
     }
   }
 

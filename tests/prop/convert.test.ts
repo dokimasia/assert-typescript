@@ -450,7 +450,7 @@ describe("convert", () => {
         },
         {
           name: "an IPv6 address with a trailing run",
-          give: groups(0x2001, 0xdb8, 0, 0, 0, 0, 0, 0),
+          give: groups(0x20_01, 0xd_b8, 0, 0, 0, 0, 0, 0),
           want: "2001:db8::",
         },
       ];
@@ -472,7 +472,7 @@ describe("convert", () => {
       check.isEqualTo(
         seat,
         of({ shape: "ip-address" }).back("::ffff:1.2.3.4"),
-        groups(0, 0, 0, 0, 0, 0xffff, 0x102, 0x304),
+        groups(0, 0, 0, 0, 0, 0xff_ff, 0x1_02, 0x3_04),
         "the mapped address",
       );
     });

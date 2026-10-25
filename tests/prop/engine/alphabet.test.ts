@@ -19,7 +19,7 @@ import { thrown } from "../../helpers.js";
 const DEL = 95 + 32;
 
 /** The index of U+E000, the first code point after the surrogates. */
-const AFTER_SURROGATES = DEL + (0xd7ff - 0x7f + 1);
+const AFTER_SURROGATES = DEL + (0xd7_ff - 0x7f + 1);
 
 describe("alphabet", () => {
   describe("SIZE", () => {
@@ -27,7 +27,7 @@ describe("alphabet", () => {
       check.isEqualTo(
         seat,
         SIZE,
-        0x110000 - 0x800,
+        0x11_00_00 - 0x8_00,
         "the code points without the surrogates",
       );
     });
@@ -119,14 +119,14 @@ describe("alphabet", () => {
     it("leaves the surrogates out", ({ seat }) => {
       check.isEqualTo(
         seat,
-        indices(0xd7ff, 0xe000),
+        indices(0xd7_ff, 0xe0_00),
         [[AFTER_SURROGATES - 1, AFTER_SURROGATES]],
         "the code points around the surrogates are neighbours in the alphabet",
       );
     });
 
     it("returns no interval for a range of surrogates alone", ({ seat }) => {
-      check.isEmpty(seat, indices(0xd800, 0xdfff), "no index");
+      check.isEmpty(seat, indices(0xd8_00, 0xdf_ff), "no index");
     });
   });
 
