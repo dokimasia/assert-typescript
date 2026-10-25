@@ -220,8 +220,7 @@ export function hasContent(
     refused,
     (e) => {
       const content = kindOf(e) === "file" ? contentOf(e as Entry) : undefined;
-      if (content !== undefined && Buffer.from(content).equals(wanted))
-        return undefined;
+      if (content !== undefined && Buffer.from(content).equals(wanted)) return;
       return {
         want: contentValue(wanted),
         got: content === undefined ? null : contentValue(content),

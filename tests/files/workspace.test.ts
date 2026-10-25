@@ -6,6 +6,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import process from "node:process";
 import { describe, onTestFinished } from "vitest";
 import { directory, Entry, text } from "../../src/files/entry.js";
 import { workspace } from "../../src/files/workspace.js";
