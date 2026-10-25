@@ -137,11 +137,14 @@ rules.
 ## Verdicts
 
 - The specs of `src/matcher/`, of the surfaces `src/check.ts` and
-  `src/soft.ts`, of the seats in `src/seat.ts`, of the corpus in
+  `src/soft.ts` with their modules in `src/check/` and `src/soft/`, of
+  the seats in `src/seat.ts`, of the corpus in
   `src/conformance/corpus.ts`, and of the vectors in
-  `src/conformance/vector.ts`, `src/conformance/files.ts`,
-  `src/conformance/prop/vectors.ts`, `src/conformance/history/vectors.ts`
-  and `src/conformance/stateful/vectors.ts` use vitest's `expect` alone.
+  `src/conformance/vector.ts`, `src/conformance/files.ts` with its
+  modules in `src/conformance/files/`, `src/conformance/prop/vectors.ts`,
+  `src/conformance/history/vectors.ts` with
+  `src/conformance/history/script.ts`, and
+  `src/conformance/stateful/vectors.ts` use vitest's `expect` alone.
   So do the specs of the matchers in `src/expect/`, of the adapters in
   `src/vitest/api.ts` and `src/jest/api.ts`, and of their entry points
   `src/vitest.ts` and `src/jest.ts`. These modules compare the values,
@@ -151,7 +154,7 @@ rules.
   registers the standard's matchers for another case. A case that
   registers them restores the runner's matchers when it ends.
 - The verdicts of the corpus compare a value with `canonical` of
-  `src/conformance/literal.ts`. The verdicts of the vectors compare JSON
+  `src/conformance/equality.ts`. The verdicts of the vectors compare JSON
   with `sameJson` of the same module: the JSON of a call record or of the
   events of a history, or the outputs that the property engine computes.
   Neither uses the library's comparison.
