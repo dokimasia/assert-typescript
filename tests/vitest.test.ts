@@ -8,13 +8,14 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { compareText } from "../src/order.js";
 import * as seats from "../src/seat.js";
 import * as api from "../src/vitest/api.js";
 import * as entry from "../src/vitest.js";
 
 describe("vitest", () => {
   it("exports the adapter and the seats", () => {
-    expect(Object.keys(entry).sort()).toEqual([
+    expect(Object.keys(entry).sort(compareText)).toEqual([
       "Collector",
       "RECORDS",
       "Recorder",

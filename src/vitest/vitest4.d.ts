@@ -14,9 +14,9 @@
 
 import type { StandardMatchers } from "../expect/types.js";
 
-export * from "../vitest.js";
-
 declare module "vitest" {
   // biome-ignore lint/suspicious/noExplicitAny: the default of vitest 4's own declaration, which this one must repeat
   interface Matchers<T = any> extends StandardMatchers<void, T> {}
 }
+
+export * from "../vitest.js";

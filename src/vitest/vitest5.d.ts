@@ -13,8 +13,8 @@
 
 import type { StandardMatchers } from "../expect/types.js";
 
-export * from "../vitest.js";
-
 declare module "vitest" {
   interface Matchers<R, T> extends StandardMatchers<R, T> {}
 }
+
+export * from "../vitest.js";

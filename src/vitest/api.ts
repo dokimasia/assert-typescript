@@ -65,20 +65,25 @@ const EQUALITY = ["toEqual", "toStrictEqual"] as const;
 /** The asynchronous matchers of each test that has not ended. */
 const PENDING = new Pending();
 
-/** Fails test for the first call that it did not await, when the test ends. */
-function end(test: Test): void {
-  const calls = PENDING.end(test);
+/** Fails the test for the first call that it did not await, when the test ends. */
+function end(finished: Test): void {
+  const calls = PENDING.end(finished);
   const abandoned = calls.find((call) => call.abandoned);
-  if (abandoned !== undefined) throw abandoned.neverAwaited();
+  if (abandoned !== undefined) {
+    throw abandoned.neverAwaited();
+  }
   const failed = calls.find((call) => call.failed);
-  if (failed !== undefined && test.result?.state !== "fail")
+  if (failed !== undefined && finished.result?.state !== "fail") {
     throw failed.failedUnawaited();
+  }
 }
 
 /** Starts the guard of a call of an asynchronous matcher in the test of state. */
 function start(state: State, name: string): Call | undefined {
   const test = (state as { readonly task?: Test }).task;
-  if (test === undefined) return undefined;
+  if (test === undefined) {
+    return undefined;
+  }
   if (!PENDING.has(test)) {
     try {
       test.context.onTestFinished(() => end(test));
@@ -95,12 +100,12 @@ const MATCHERS = matchers({ seat: () => new Recorder(), start });
 
 /** The parts of chai's utilities that shadow mode calls. */
 interface Utilities {
-  flag(object: object, key: string): unknown;
-  overwriteMethod(
+  readonly flag: (object: object, key: string) => unknown;
+  readonly overwriteMethod: (
     target: object,
     name: string,
     method: (original: (this: object, ...args: unknown[]) => unknown) => unknown,
-  ): void;
+  ) => void;
 }
 
 /** Wraps vitest's equality matchers, so that each logs a call whose verdict the standard's equality would change. */
@@ -139,6 +144,43 @@ function shadow(log: string): void {
 }
 
 /**
+ * Returns the path of a test: the segments of its file's path relative to
+ * the working directory, the titles of its describe blocks and its own
+ * title.
+ */
+function pathOf(file: string, task: Task): string[] {
+  const titles: string[] = [];
+  for (let { suite } = task; suite?.suite !== undefined; suite = suite.suite) {
+    titles.unshift(suite.name);
+  }
+  return [...relative(process.cwd(), file).split(sep), ...titles, task.name];
+}
+
+/** The seat of a fixture's test, which skips the test through skip of the test's context. */
+class TestSeat extends Collector {
+  readonly #skip: (note?: string) => never;
+
+  /**
+   * Returns the seat of a test whose context skips it with skip.
+   *
+   * @param skip - The skip of the test's context.
+   */
+  constructor(skip: (note?: string) => never) {
+    super();
+    this.#skip = skip;
+  }
+
+  /**
+   * Skips the test, and does not return.
+   *
+   * @param reason - Why the test skips.
+   */
+  skip(reason: string): never {
+    this.#skip(reason);
+  }
+}
+
+/**
  * Adds the standard's assertions to vitest's `expect`.
  *
  * Call it from a file that `setupFiles` names. vitest runs a setup file
@@ -173,11 +215,17 @@ export function register(overlap: Overlap = { mode: "allow" }): void {
         `register: chai's Assertion already has a property named ${taken}, which a plugin defines`,
       );
     }
-    if (overlap.mode === "shadow") open(overlap.log);
+    if (overlap.mode === "shadow") {
+      open(overlap.log);
+    }
   }
   expect.extend(MATCHERS);
-  if (applied !== undefined) return;
-  if (overlap.mode === "shadow") shadow(overlap.log);
+  if (applied !== undefined) {
+    return;
+  }
+  if (overlap.mode === "shadow") {
+    shadow(overlap.log);
+  }
   if (overlap.mode === "strict") {
     expect.extend(
       Object.fromEntries(Object.keys(STRICT).map((name) => [name, refusal(name)])),
@@ -189,19 +237,6 @@ export function register(overlap: Overlap = { mode: "allow" }): void {
   });
 }
 
-/**
- * Returns the path of a test: the segments of its file's path relative to
- * the working directory, the titles of its describe blocks and its own
- * title.
- */
-function pathOf(file: string, task: Task): string[] {
-  const titles: string[] = [];
-  for (let suite = task.suite; suite?.suite !== undefined; suite = suite.suite) {
-    titles.unshift(suite.name);
-  }
-  return [...relative(process.cwd(), file).split(sep), ...titles, task.name];
-}
-
 /** The key of a test's task meta under which the call records of the test are. */
 export const RECORDS = "dokimi.assert";
 
@@ -209,30 +244,6 @@ export const RECORDS = "dokimi.assert";
 export interface SeatFixture {
   /** The seat to pass to an assertion. */
   seat: Collector;
-}
-
-/** The seat of a fixture's test, which skips the test through skip of the test's context. */
-class TestSeat extends Collector {
-  readonly #skip: (note?: string) => never;
-
-  /**
-   * Returns the seat of a test whose context skips it with skip.
-   *
-   * @param skip - The skip of the test's context.
-   */
-  constructor(skip: (note?: string) => never) {
-    super();
-    this.#skip = skip;
-  }
-
-  /**
-   * Skips the test, and does not return.
-   *
-   * @param reason - Why the test skips.
-   */
-  skip(reason: string): never {
-    this.#skip(reason);
-  }
 }
 
 /**

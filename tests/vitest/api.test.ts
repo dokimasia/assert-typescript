@@ -63,7 +63,9 @@ function snapshot(): () => void {
   return () => {
     for (const [target, descriptors] of kept) {
       for (const key of Reflect.ownKeys(target)) {
-        if (!(key in descriptors)) delete (target as Record<PropertyKey, unknown>)[key];
+        if (!(key in descriptors)) {
+          delete (target as Record<PropertyKey, unknown>)[key];
+        }
       }
       Object.defineProperties(target, descriptors);
     }
@@ -486,7 +488,9 @@ describe("api", () => {
 
     describe("with a skip", () => {
       it("skips the test through the seat", ({ seat }) => {
-        if (takesSkips(seat)) seat.skip("the environment lacks a capability");
+        if (takesSkips(seat)) {
+          seat.skip("the environment lacks a capability");
+        }
       });
 
       it("ends the test that the seat skipped as skipped with the reason", ({
