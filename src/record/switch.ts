@@ -9,6 +9,8 @@
  * value ends every call with a fault that names the variable.
  */
 
+import process from "node:process";
+
 /** The environment variable that switches recording on. */
 export const VARIABLE = "DOKIMI_ASSERT_RECORD";
 

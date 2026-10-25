@@ -9,6 +9,7 @@
  * before it asserts.
  */
 
+import process from "node:process";
 import { describe } from "vitest";
 import { check } from "../../src/index.js";
 import { type Reading, reading, VARIABLE } from "../../src/record/switch.js";

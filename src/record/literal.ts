@@ -177,7 +177,7 @@ class Walk {
 
   /** Returns the literal of a string, and undefined for one that is no UTF-8 text. */
   #text(value: string): Written | undefined {
-    if (!value.isWellFormed() || !this.#spend(Buffer.byteLength(value)))
+    if (!(value.isWellFormed() && this.#spend(Buffer.byteLength(value))))
       return undefined;
     return scalar("string", value);
   }
