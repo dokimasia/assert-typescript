@@ -14,7 +14,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe } from "vitest";
 import { check, prop } from "../../src/index.js";
-import { type Node, PatternError, parse } from "../../src/pattern/parse.js";
+import { PatternError } from "../../src/pattern/cursor.js";
+import { type Node, parse } from "../../src/pattern/parse.js";
 import { test as it } from "../../src/vitest.js";
 
 /** One pattern, and the verdict of the reference parser on it. */
@@ -204,19 +205,6 @@ describe("parse", () => {
           check.errorIs(c, err, PatternError, "the refusal is a PatternError");
         }
       });
-    });
-  });
-
-  describe("new PatternError", () => {
-    it("returns an error named PatternError with the message", ({ seat }) => {
-      const err = new PatternError('pattern "x" at 0: a reason');
-
-      check.isEqualTo(
-        seat,
-        [err.name, err.message],
-        ["PatternError", 'pattern "x" at 0: a reason'],
-        "the error",
-      );
     });
   });
 });

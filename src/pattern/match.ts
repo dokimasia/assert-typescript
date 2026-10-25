@@ -20,7 +20,9 @@ const SPACE = " \\t\\n\\f\\r";
 
 /** Returns the text of an escape of char, inside a class or outside one. */
 function escapeOf(char: string, inClass: boolean): string {
-  if (char !== "s") return `\\${char}`;
+  if (char !== "s") {
+    return `\\${char}`;
+  }
   return inClass ? SPACE : `[${SPACE}]`;
 }
 
@@ -38,18 +40,18 @@ export function compile(pattern: string): RegExp {
   // The subset escapes only ASCII characters, so the character after a
   // backslash is the whole escaped character. An unescaped [ opens a class
   // and an unescaped ] closes it, because neither stands for itself there.
-  const chars = [...pattern];
+  const chars = pattern[Symbol.iterator]();
   let source = "";
   let inClass = false;
-  for (let i = 0; i < chars.length; i += 1) {
-    const char = chars[i] as string;
+  for (const char of chars) {
     if (char === "\\") {
-      i += 1;
-      source += escapeOf(chars[i] as string, inClass);
-      continue;
+      source += escapeOf(chars.next().value as string, inClass);
+    } else {
+      source += !inClass && char === "." ? DOT : char;
+      if (char === "[" || char === "]") {
+        inClass = char === "[";
+      }
     }
-    source += !inClass && char === "." ? DOT : char;
-    if (char === "[" || char === "]") inClass = char === "[";
   }
   return new RegExp(source, "u");
 }

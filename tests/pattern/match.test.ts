@@ -5,8 +5,8 @@
 
 import { describe } from "vitest";
 import { check } from "../../src/index.js";
+import { PatternError } from "../../src/pattern/cursor.js";
 import { compile } from "../../src/pattern/match.js";
-import { PatternError } from "../../src/pattern/parse.js";
 import { test as it } from "../../src/vitest.js";
 
 describe("match", () => {
