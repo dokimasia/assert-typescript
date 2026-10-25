@@ -1,5 +1,5 @@
 {
-  "ergon": "0.14.0",
+  "ergon": "0.14.3",
   "files": [
     {
       "path": ".commitlint.yaml",
@@ -133,7 +133,7 @@
     {
       "path": "biome.json",
       "producer": "js",
-      "sha256": "ab2e590a9d506c30bddff6fa08f2dd3c85b3e09e65c5d813932a043df0841fac"
+      "sha256": "118c439d6307cb82be9b1d2f099a27b31ff824ee1d84836861c81f9ee491d52e"
     }
   ],
   "settings": {
@@ -248,8 +248,7 @@
       "test",
       "audit"
     ],
-    "typescript.generate.args": [],
-    "typescript.generate.command": [],
+    "typescript.generate.commands": [],
     "typescript.test.args": [],
     "typescript.tools.typescript": "typescript@7.0.2"
   },
