@@ -5,7 +5,7 @@
 // the declarations must refuse. tsc compiles it, and nothing runs it.
 import { expect } from "vitest";
 
-export async function probe(): Promise<void> {
+export function probeValues(): void {
   expect(1).isEqualTo(1, "m");
   // @ts-expect-error: the want of isEqualTo has the type of the subject
   expect(1).isEqualTo("1", "m");
@@ -38,6 +38,9 @@ export async function probe(): Promise<void> {
   }).doesThrow("m");
   expect(() => 1).doesNotThrow("m");
   expect([1, 2]).isPermutation([2, 1], "m");
+}
+
+export async function probeCallables(): Promise<void> {
   await expect(() => undefined).doesReject("m");
   await expect(() => Promise.reject(new Error("e"))).rejectsWith("m");
   await expect((signal: AbortSignal) => Promise.resolve(signal)).honoursCancellation(
