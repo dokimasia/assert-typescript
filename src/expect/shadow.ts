@@ -15,6 +15,7 @@
 
 import { appendFileSync } from "node:fs";
 import { relative } from "node:path";
+import process from "node:process";
 import { callSite } from "../failure.js";
 import { equal } from "../matcher/compare.js";
 import { settings } from "../matcher/option.js";

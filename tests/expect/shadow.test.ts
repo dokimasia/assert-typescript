@@ -8,6 +8,7 @@
 
 import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import process from "node:process";
 import { describe, expect, it } from "vitest";
 import { type Comparison, compare, open } from "../../src/expect/shadow.js";
 import { temporary } from "../helpers.js";
