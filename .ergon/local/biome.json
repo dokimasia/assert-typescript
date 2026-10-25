@@ -86,6 +86,7 @@
     },
     {
       "includes": [
+        "tests/testdata/jest/**",
         "tools/consumer/**"
       ],
       "linter": {
