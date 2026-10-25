@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * The assertions about a value: equality, truth, size, text, numbers.
+ * The assertions about a value: equality, truth, size, containment,
+ * numbers.
  *
  * Each takes a seat and a mode, so one implementation serves both
  * surfaces. A value of the wrong shape is reported like any other
@@ -10,7 +11,6 @@
  * from ending a run with a stack trace instead of a message.
  */
 
-import { compile } from "../pattern/match.js";
 import { equal as compare } from "./compare.js";
 import { type Option, settings } from "./option.js";
 import type { Mode, Seat } from "./seat.js";
@@ -18,7 +18,9 @@ import { fail, pass } from "./verdict.js";
 
 /** Reports whether value is a plain object, whose own keys are its entries. */
 function isPlain(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== "object") return false;
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 }
@@ -31,14 +33,81 @@ function isPlain(value: unknown): value is Record<string, unknown> {
  * have no length.
  */
 function lengthOf(value: unknown): number | undefined {
-  if (typeof value === "string")
+  if (typeof value === "string") {
     return value.isWellFormed() ? [...value].length : undefined;
-  if (Array.isArray(value)) return value.length;
+  }
+  if (Array.isArray(value)) {
+    return value.length;
+  }
   if (ArrayBuffer.isView(value) && !(value instanceof DataView)) {
     return (value as unknown as ArrayLike<unknown>).length;
   }
-  if (value instanceof Map || value instanceof Set) return value.size;
-  if (isPlain(value)) return Object.keys(value).length;
+  if (value instanceof Map || value instanceof Set) {
+    return value.size;
+  }
+  if (isPlain(value)) {
+    return Object.keys(value).length;
+  }
+  return undefined;
+}
+
+/**
+ * Whether haystack contains needle, and whether the question applies to
+ * the haystack at all.
+ *
+ * What containing means follows the haystack: text contains a substring,
+ * a `Map` a key and a plain object an own key, and an array, a typed
+ * array or a `Set` an element. Keys and elements compare as
+ * {@link equal} compares, so no NaN key is found without `equateNans`.
+ */
+function contained(
+  haystack: unknown,
+  needle: unknown,
+  options: readonly Option[],
+): { found: boolean; supported: boolean } {
+  const relax = settings(options);
+  const unsupported = { found: false, supported: false };
+  const among = (items: Iterable<unknown>) => {
+    for (const item of items) {
+      if (compare(item, needle, relax)) {
+        return { found: true, supported: true };
+      }
+    }
+    return { found: false, supported: true };
+  };
+
+  if (typeof haystack === "string") {
+    if (typeof needle !== "string") {
+      return unsupported;
+    }
+    return { found: haystack.includes(needle), supported: true };
+  }
+  if (haystack instanceof Map) {
+    return among(haystack.keys());
+  }
+  if (haystack instanceof Set || Array.isArray(haystack)) {
+    return among(haystack);
+  }
+  if (ArrayBuffer.isView(haystack) && !(haystack instanceof DataView)) {
+    return among(haystack as unknown as Iterable<unknown>);
+  }
+  if (isPlain(haystack)) {
+    if (typeof needle !== "string") {
+      return unsupported;
+    }
+    return { found: Object.hasOwn(haystack, needle), supported: true };
+  }
+  return unsupported;
+}
+
+/** Returns a number or a bigint as a number, and undefined for any other value. */
+function numberOf(value: unknown): number | undefined {
+  if (typeof value === "number") {
+    return value;
+  }
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
   return undefined;
 }
 
@@ -155,45 +224,6 @@ export function isNotEmpty(seat: Seat, mode: Mode, got: unknown, msg: string): v
   pass(seat, mode, "not-empty", msg);
 }
 
-/**
- * Whether haystack contains needle, and whether the question applies to
- * the haystack at all.
- *
- * What containing means follows the haystack: text contains a substring,
- * a `Map` a key and a plain object an own key, and an array, a typed
- * array or a `Set` an element. Keys and elements compare as
- * {@link equal} compares, so no NaN key is found without `equateNans`.
- */
-function contained(
-  haystack: unknown,
-  needle: unknown,
-  options: readonly Option[],
-): { found: boolean; supported: boolean } {
-  const relax = settings(options);
-  const unsupported = { found: false, supported: false };
-  const among = (items: Iterable<unknown>) => {
-    for (const item of items) {
-      if (compare(item, needle, relax)) return { found: true, supported: true };
-    }
-    return { found: false, supported: true };
-  };
-
-  if (typeof haystack === "string") {
-    if (typeof needle !== "string") return unsupported;
-    return { found: haystack.includes(needle), supported: true };
-  }
-  if (haystack instanceof Map) return among(haystack.keys());
-  if (haystack instanceof Set || Array.isArray(haystack)) return among(haystack);
-  if (ArrayBuffer.isView(haystack) && !(haystack instanceof DataView)) {
-    return among(haystack as unknown as Iterable<unknown>);
-  }
-  if (isPlain(haystack)) {
-    if (typeof needle !== "string") return unsupported;
-    return { found: Object.hasOwn(haystack, needle), supported: true };
-  }
-  return unsupported;
-}
-
 /** Fail when haystack does not contain needle. */
 export function contains(
   seat: Seat,
@@ -227,101 +257,6 @@ export function notContains(
     return;
   }
   pass(seat, mode, "not-contains", msg);
-}
-
-/** Fail when got does not start with prefix. */
-export function hasPrefix(
-  seat: Seat,
-  mode: Mode,
-  got: unknown,
-  prefix: string,
-  msg: string,
-): void {
-  seat.helper();
-  if (typeof got !== "string" || !got.startsWith(prefix)) {
-    fail(seat, mode, "has-prefix", msg, { got, prefix });
-    return;
-  }
-  pass(seat, mode, "has-prefix", msg);
-}
-
-/** Fail when got does not end with suffix. */
-export function hasSuffix(
-  seat: Seat,
-  mode: Mode,
-  got: unknown,
-  suffix: string,
-  msg: string,
-): void {
-  seat.helper();
-  if (typeof got !== "string" || !got.endsWith(suffix)) {
-    fail(seat, mode, "has-suffix", msg, { got, suffix });
-    return;
-  }
-  pass(seat, mode, "has-suffix", msg);
-}
-
-/**
- * Fail when got does not match the pattern, a pattern of the portable
- * subset. A pattern outside the subset fails, with reason the text with
- * which the subset's parser refuses it. reason is null for a pattern
- * inside the subset.
- */
-export function matches(
-  seat: Seat,
-  mode: Mode,
-  got: unknown,
-  pattern: string,
-  msg: string,
-): void {
-  seat.helper();
-  let expression: RegExp | undefined;
-  let reason: string | null = null;
-  try {
-    expression = compile(pattern);
-  } catch (err) {
-    reason = (err as Error).message;
-  }
-  if (typeof got !== "string" || expression === undefined || !expression.test(got)) {
-    fail(seat, mode, "matches", msg, { got, pattern, reason });
-    return;
-  }
-  pass(seat, mode, "matches", msg);
-}
-
-/** Fail when got does not contain every needle, in order. */
-export function containsInOrder(
-  seat: Seat,
-  mode: Mode,
-  got: unknown,
-  needles: readonly string[],
-  msg: string,
-): void {
-  seat.helper();
-  if (typeof got !== "string") {
-    fail(seat, mode, "contains-in-order", msg, { haystack: got, needle: "", index: 0 });
-    return;
-  }
-
-  let from = 0;
-  // The index is the loop's own, not a lookup: a needle listed twice
-  // would find its first position rather than the one that failed.
-  for (const [index, needle] of needles.entries()) {
-    const at = got.indexOf(needle, from);
-    if (at < 0) {
-      fail(seat, mode, "contains-in-order", msg, { haystack: got, needle, index });
-      return;
-    }
-    from = at + needle.length;
-  }
-  pass(seat, mode, "contains-in-order", msg);
-}
-
-/** Returns a number or a bigint as a number, and undefined for any other value. */
-function numberOf(value: unknown): number | undefined {
-  if (typeof value === "number") return value;
-  if (typeof value === "bigint") return Number(value);
-  return undefined;
 }
 
 /**

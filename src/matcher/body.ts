@@ -14,8 +14,8 @@
  */
 
 import { own, run, type Slot } from "../record/calls.js";
+import { noteFault } from "./fault.js";
 import { type Seat, signalOf } from "./seat.js";
-import { noteFault } from "./verdict.js";
 
 /** Thrown by the seat of a body to end the body at a failure that stops. */
 export class Ended {}
@@ -40,8 +40,10 @@ export abstract class Body implements Seat {
     run(own(this), slot);
   }
 
-  /** Do nothing; a body's seat has no frames worth hiding. */
-  helper(): void {}
+  /** Marks the calling function as a helper, which a body's seat does not track. */
+  helper(): void {
+    // A body's seat keeps no frames to hide.
+  }
 
   /** Reports a failure that stops the body, and ends it. */
   abstract fail(message: string): never;
@@ -87,7 +89,9 @@ export async function runOn<S extends Body>(
   try {
     await body(seat);
   } catch (thrown) {
-    if (!(thrown instanceof Ended)) throw thrown;
+    if (!(thrown instanceof Ended)) {
+      throw thrown;
+    }
   } finally {
     seat.end();
   }

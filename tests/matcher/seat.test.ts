@@ -108,7 +108,7 @@ describe("seat", () => {
 
   describe("signalOf", () => {
     it("returns the signal of a seat with one", () => {
-      const signal = new AbortController().signal;
+      const { signal } = new AbortController();
 
       expect(signalOf(new Recorder().withSignal(signal))).toBe(signal);
     });

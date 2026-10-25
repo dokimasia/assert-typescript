@@ -14,6 +14,7 @@
 import process from "node:process";
 import { type Clock, wait } from "../clock.js";
 import { callSite } from "../failure.js";
+import { compareText } from "../order.js";
 import { own } from "../record/calls.js";
 import { Body, Ended, runOn } from "./body.js";
 import { clockOf, type Mode, type Seat } from "./seat.js";
@@ -21,6 +22,9 @@ import { fail, pass, Running } from "./verdict.js";
 
 /** The shortest wait between two attempts. Every wait moves a controlled clock forward. */
 const MIN_WAIT = 1;
+
+/** The parts of the timeout of eventuallyTrue, one of which caps its backoff. */
+const BACKOFF_PARTS = 4;
 
 /**
  * The seat of one attempt of a body, which keeps the attempt's first
@@ -55,9 +59,20 @@ class Attempt extends Body {
  */
 async function waitWithin(clock: Clock, deadline: number, d: number): Promise<boolean> {
   const now = clock.now();
-  if (!(now < deadline)) return false;
+  if (!(now < deadline)) {
+    return false;
+  }
   await wait(clock, Math.min(d, deadline - now));
   return !(clock.now() > deadline);
+}
+
+/** Count how many resources of each kind are active. */
+function tally(kinds: readonly string[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const kind of kinds) {
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  return counts;
 }
 
 /**
@@ -119,7 +134,7 @@ export async function eventuallyTrue(
   const call = Running.of(seat, callSite());
   const clock = clockOf(seat);
   const deadline = clock.now() + timeout;
-  const cap = Math.max(timeout / 4, MIN_WAIT);
+  const cap = Math.max(timeout / BACKOFF_PARTS, MIN_WAIT);
   let backoff = MIN_WAIT;
 
   for (let attempts = 1; ; attempts += 1) {
@@ -158,21 +173,14 @@ export function noTaskLeaks(seat: Seat, mode: Mode, msg: string): () => void {
     const leaked: string[] = [];
     for (const [kind, count] of after) {
       const started = count - (before.get(kind) ?? 0);
-      if (started > 0) leaked.push(`${started} ${kind}`);
+      if (started > 0) {
+        leaked.push(`${started} ${kind}`);
+      }
     }
     if (leaked.length > 0) {
-      fail(seat, mode, "no-task-leaks", msg, { leaked: leaked.sort() });
+      fail(seat, mode, "no-task-leaks", msg, { leaked: leaked.sort(compareText) });
       return;
     }
     pass(seat, mode, "no-task-leaks", msg);
   };
-}
-
-/** Count how many resources of each kind are active. */
-function tally(kinds: readonly string[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const kind of kinds) {
-    counts.set(kind, (counts.get(kind) ?? 0) + 1);
-  }
-  return counts;
 }

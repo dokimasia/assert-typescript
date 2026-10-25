@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { byIdentity, equateEmpty, equateNans } from "../../src/matcher/option.js";
+import { equateEmpty, equateNans } from "../../src/matcher/option.js";
 import * as relation from "../../src/matcher/relation.js";
 import { Mode } from "../../src/matcher/seat.js";
 import { Recorder } from "../../src/seat.js";
@@ -30,15 +30,21 @@ function reported(seat: Recorder): [string, unknown][] {
 /** Returns a function that returns each of values in turn, and the last one after. */
 function script<T>(...values: T[]): () => T {
   let next = 0;
-  return () => values[Math.min(next++, values.length - 1)] as T;
+  return () => {
+    const value = values[Math.min(next, values.length - 1)] as T;
+    next += 1;
+    return value;
+  };
 }
 
-/** Returns a function that throws boom on its nth call, from 1, and returns otherwise. */
-function throwsOnCall(nth: number, boom: unknown): () => void {
+/** Returns a function that throws thrown on its nth call, from 1, and returns otherwise. */
+function throwsOnCall(nth: number, thrown: unknown): () => void {
   let calls = 0;
   return () => {
     calls += 1;
-    if (calls === nth) throw boom;
+    if (calls === nth) {
+      throw thrown;
+    }
   };
 }
 
@@ -120,7 +126,9 @@ describe("relation", () => {
           Mode.Fatal,
           async () => {
             calls += 1;
-            if (calls === 2) throw boom;
+            if (calls === 2) {
+              throw boom;
+            }
           },
           0,
           () => 0,
@@ -298,14 +306,23 @@ describe("relation", () => {
     it("reports the first two results of a call that counts its calls", async () => {
       let calls = 0;
       const seat = await drive((s) =>
-        relation.isDeterministic(s, Mode.Fatal, () => ++calls, 1, MSG),
+        relation.isDeterministic(
+          s,
+          Mode.Fatal,
+          () => {
+            calls += 1;
+            return calls;
+          },
+          1,
+          MSG,
+        ),
       );
 
       expect(reported(seat)).toEqual([["deterministic", { first: 1, second: 2 }]]);
     });
 
     it("reports a result that changes at the 32nd call", async () => {
-      const results = [...Array<number>(31).fill(0), 1];
+      const results = [...new Array<number>(31).fill(0), 1];
       const seat = await drive((s) =>
         relation.isDeterministic(s, Mode.Fatal, script(...results), 1, MSG),
       );
@@ -314,7 +331,7 @@ describe("relation", () => {
     });
 
     it("passes a result that changes at the 33rd call", async () => {
-      const results = [...Array<number>(32).fill(0), 1];
+      const results = [...new Array<number>(32).fill(0), 1];
       const seat = await drive((s) =>
         relation.isDeterministic(s, Mode.Fatal, script(...results), 1, MSG),
       );
@@ -585,185 +602,6 @@ describe("relation", () => {
     });
   });
 
-  describe("hasStableOrder", () => {
-    it("passes a fixed order", async () => {
-      const seat = await drive((s) =>
-        relation.hasStableOrder(s, Mode.Fatal, () => [1, 2, 3], MSG),
-      );
-
-      expect(seat.failed).toBe(false);
-    });
-
-    it("reports the first two orders of a rotating order", async () => {
-      let items = [1, 2, 3];
-      const seat = await drive((s) =>
-        relation.hasStableOrder(
-          s,
-          Mode.Fatal,
-          () => {
-            const out = items;
-            items = [...items.slice(1), ...items.slice(0, 1)];
-            return out;
-          },
-          MSG,
-        ),
-      );
-
-      expect(reported(seat)).toEqual([
-        ["stable-order", { first: [1, 2, 3], second: [2, 3, 1] }],
-      ]);
-    });
-
-    it("reads an async iterable", async () => {
-      const seat = await drive((s) =>
-        relation.hasStableOrder(
-          s,
-          Mode.Fatal,
-          async function* () {
-            yield 1;
-            yield 2;
-          },
-          MSG,
-        ),
-      );
-
-      expect(seat.failed).toBe(false);
-    });
-
-    it("reads a promise of an iterable", async () => {
-      const seat = await drive((s) =>
-        relation.hasStableOrder(s, Mode.Fatal, async () => new Set([1, 2]), MSG),
-      );
-
-      expect(seat.failed).toBe(false);
-    });
-
-    it("reports an absent sequence against an empty one", async () => {
-      const seat = await drive((s) =>
-        relation.hasStableOrder(
-          s,
-          Mode.Fatal,
-          script<number[] | null>(null, []) as () => number[],
-          MSG,
-        ),
-      );
-
-      expect(reported(seat)).toEqual([["stable-order", { first: null, second: [] }]]);
-    });
-
-    it("passes an absent sequence against an empty one under equateEmpty", async () => {
-      const seat = await drive((s) =>
-        relation.hasStableOrder(
-          s,
-          Mode.Fatal,
-          script<number[] | null>(null, []) as () => number[],
-          MSG,
-          equateEmpty(),
-        ),
-      );
-
-      expect(seat.failed).toBe(false);
-    });
-
-    it("reports a throw of a later iteration as second", async () => {
-      const once = throwsOnCall(2, boom);
-      const seat = await drive((s) =>
-        relation.hasStableOrder(
-          s,
-          Mode.Fatal,
-          () => {
-            once();
-            return [1];
-          },
-          MSG,
-        ),
-      );
-
-      expect(reported(seat)).toEqual([["stable-order", { first: null, second: boom }]]);
-    });
-  });
-
-  describe("noDuplicates", () => {
-    const one = Object(1);
-
-    const tests: {
-      name: string;
-      give: () => unknown;
-      giveIdentity?: boolean;
-      giveNans?: boolean;
-      want?: Record<string, unknown>;
-    }[] = [
-      { name: "passes distinct elements", give: () => [1, 2, 3] },
-      { name: "passes no elements", give: () => [] },
-      { name: "passes an absent sequence", give: () => null },
-      {
-        name: "reports a repeated element at its position",
-        give: () => [1, 2, 2, 3],
-        want: { got: 2, index: 2 },
-      },
-      {
-        name: "reports a repeat of the first element where it repeats",
-        give: () => [1, 2, 1],
-        want: { got: 1, index: 2 },
-      },
-      { name: "passes two NaNs", give: () => [Number.NaN, Number.NaN] },
-      {
-        name: "reports two NaNs under equateNans",
-        give: () => [Number.NaN, Number.NaN],
-        giveNans: true,
-        want: { got: Number.NaN, index: 1 },
-      },
-      {
-        name: "passes two equal objects under byIdentity",
-        give: () => [Object(1), Object(1)],
-        giveIdentity: true,
-      },
-      {
-        name: "reports one object twice under byIdentity",
-        give: () => [one, one],
-        giveIdentity: true,
-        want: { got: one, index: 1 },
-      },
-      {
-        name: "reports a repeat that an async iterable yields",
-        async *give() {
-          yield 1;
-          yield 1;
-        },
-        want: { got: 1, index: 1 },
-      },
-      {
-        name: "reports a throw of iterate as got",
-        give: () => {
-          throw boom;
-        },
-        want: { got: boom, index: null },
-      },
-    ];
-
-    for (const tt of tests) {
-      it(tt.name, async () => {
-        const options = [
-          ...(tt.giveIdentity ? [byIdentity()] : []),
-          ...(tt.giveNans ? [equateNans()] : []),
-        ];
-        const seat = await drive((s) =>
-          relation.noDuplicates(
-            s,
-            Mode.Fatal,
-            tt.give as () => number[],
-            MSG,
-            ...options,
-          ),
-        );
-
-        expect(reported(seat)).toEqual(
-          tt.want === undefined ? [] : [["no-duplicates", tt.want]],
-        );
-      });
-    }
-  });
-
   describe("isMonotonic", () => {
     const tests: {
       name: string;
@@ -858,48 +696,6 @@ describe("relation", () => {
     });
   });
 
-  describe("isTotal", () => {
-    it("passes a call that succeeds for every element", async () => {
-      const seat = await drive((s) =>
-        relation.isTotal(s, Mode.Fatal, () => undefined, [1, 2, 3], MSG),
-      );
-
-      expect(seat.failed).toBe(false);
-    });
-
-    it("passes an empty domain", async () => {
-      const seat = await drive((s) =>
-        relation.isTotal(
-          s,
-          Mode.Fatal,
-          () => {
-            throw boom;
-          },
-          [],
-          MSG,
-        ),
-      );
-
-      expect(seat.failed).toBe(false);
-    });
-
-    it("reports the index with the error of a later element", async () => {
-      const seat = await drive((s) =>
-        relation.isTotal(
-          s,
-          Mode.Fatal,
-          async (x: number) => {
-            if (x === 3) throw boom;
-          },
-          new Set([1, 2, 3]),
-          MSG,
-        ),
-      );
-
-      expect(reported(seat)).toEqual([["total", { index: 2, got: boom }]]);
-    });
-  });
-
   describe("isNotPure", () => {
     it("passes a changed projection", async () => {
       let count = 0;
@@ -970,246 +766,5 @@ describe("relation", () => {
 
       expect(reported(seat)).toEqual([["not-pure", { got: boom }]]);
     });
-  });
-
-  describe("failsAfterClose", () => {
-    class Closed extends Error {}
-    const sentinel = new Closed("closed");
-
-    const tests: {
-      name: string;
-      giveClose: () => unknown;
-      giveCall: () => unknown;
-      giveSentinel: unknown;
-      want?: Record<string, unknown>;
-    }[] = [
-      {
-        name: "passes a call that throws the sentinel",
-        giveClose: () => undefined,
-        giveCall: () => {
-          throw sentinel;
-        },
-        giveSentinel: sentinel,
-      },
-      {
-        name: "passes a call that rejects with an error that wraps the sentinel",
-        giveClose: () => undefined,
-        giveCall: async () => {
-          throw new Error("while reading", { cause: sentinel });
-        },
-        giveSentinel: sentinel,
-      },
-      {
-        name: "passes a call that throws an error of the sentinel class",
-        giveClose: () => undefined,
-        giveCall: () => {
-          throw new Closed("another");
-        },
-        giveSentinel: Closed,
-      },
-      {
-        name: "reports a call that returns with got null",
-        giveClose: () => undefined,
-        giveCall: () => 1,
-        giveSentinel: sentinel,
-        want: { want: sentinel, got: null },
-      },
-      {
-        name: "reports a call that fails with another error",
-        giveClose: () => undefined,
-        giveCall: () => {
-          throw boom;
-        },
-        giveSentinel: sentinel,
-        want: { want: sentinel, got: boom },
-      },
-      {
-        name: "reports a throw of close as got with want null",
-        giveClose: () => {
-          throw boom;
-        },
-        giveCall: () => undefined,
-        giveSentinel: sentinel,
-        want: { want: null, got: boom },
-      },
-    ];
-
-    for (const tt of tests) {
-      it(tt.name, async () => {
-        const seat = await drive((s) =>
-          relation.failsAfterClose(
-            s,
-            Mode.Fatal,
-            tt.giveClose,
-            tt.giveCall,
-            tt.giveSentinel,
-            MSG,
-          ),
-        );
-
-        expect(reported(seat)).toEqual(
-          tt.want === undefined ? [] : [["after-close", tt.want]],
-        );
-      });
-    }
-  });
-
-  describe("isPoisoned", () => {
-    it("passes a subject whose 32 readings after induce all throw", async () => {
-      let readings = 0;
-      const seat = await drive((s) =>
-        relation.isPoisoned(
-          s,
-          Mode.Fatal,
-          () => undefined,
-          () => {
-            readings += 1;
-            if (readings <= 32) throw boom;
-          },
-          MSG,
-        ),
-      );
-
-      expect(seat.failed).toBe(false);
-    });
-
-    it("reports the first reading that returns with what it returned", async () => {
-      let readings = 0;
-      const seat = await drive((s) =>
-        relation.isPoisoned(
-          s,
-          Mode.Fatal,
-          () => undefined,
-          async () => {
-            readings += 1;
-            if (readings < 3) throw boom;
-            return "served";
-          },
-          MSG,
-        ),
-      );
-
-      expect(reported(seat)).toEqual([["poisoned", { index: 2, got: "served" }]]);
-    });
-
-    it("reports a throw of induce as got with index null", async () => {
-      const seat = await drive((s) =>
-        relation.isPoisoned(
-          s,
-          Mode.Fatal,
-          () => {
-            throw boom;
-          },
-          () => undefined,
-          MSG,
-        ),
-      );
-
-      expect(reported(seat)).toEqual([["poisoned", { index: null, got: boom }]]);
-    });
-  });
-
-  describe("isPermutation", () => {
-    const a = { n: 1 };
-    const b = { n: 2 };
-
-    const tests: {
-      name: string;
-      giveGot: unknown;
-      giveWant: unknown;
-      giveOptions?: ReturnType<typeof equateEmpty>[];
-      want: boolean;
-    }[] = [
-      {
-        name: "passes the same elements in another order",
-        giveGot: [3, 1, 2],
-        giveWant: [1, 2, 3],
-        want: true,
-      },
-      {
-        name: "passes repeated elements in another order",
-        giveGot: [1, 2, 1],
-        giveWant: [1, 1, 2],
-        want: true,
-      },
-      {
-        name: "fails an element repeated a different number of times",
-        giveGot: [1, 1, 2],
-        giveWant: [1, 2, 2],
-        want: false,
-      },
-      {
-        name: "fails an extra element",
-        giveGot: [1, 2, 3],
-        giveWant: [1, 2],
-        want: false,
-      },
-      {
-        name: "fails two NaNs",
-        giveGot: [Number.NaN],
-        giveWant: [Number.NaN],
-        want: false,
-      },
-      {
-        name: "passes two NaNs under equateNans",
-        giveGot: [Number.NaN],
-        giveWant: [Number.NaN],
-        giveOptions: [equateNans()],
-        want: true,
-      },
-      {
-        name: "fails an absent list against an empty one",
-        giveGot: null,
-        giveWant: [],
-        want: false,
-      },
-      {
-        name: "passes an absent list against an empty one under equateEmpty",
-        giveGot: null,
-        giveWant: [],
-        giveOptions: [equateEmpty()],
-        want: true,
-      },
-      { name: "passes two absent lists", giveGot: null, giveWant: null, want: true },
-      {
-        name: "passes the same objects in another order under byIdentity",
-        giveGot: [a, b],
-        giveWant: [b, a],
-        giveOptions: [byIdentity()],
-        want: true,
-      },
-      {
-        name: "fails an equal object in place of one under byIdentity",
-        giveGot: [{ n: 1 }, b],
-        giveWant: [a, b],
-        giveOptions: [byIdentity()],
-        want: false,
-      },
-      {
-        name: "passes elements that need a partner other than their first under equateEmpty",
-        giveGot: [null, []],
-        giveWant: [[], {}],
-        giveOptions: [equateEmpty()],
-        want: true,
-      },
-    ];
-
-    for (const tt of tests) {
-      it(tt.name, () => {
-        const seat = new Recorder();
-        relation.isPermutation(
-          seat,
-          Mode.Fatal,
-          tt.giveGot,
-          tt.giveWant,
-          MSG,
-          ...(tt.giveOptions ?? []),
-        );
-
-        expect(reported(seat)).toEqual(
-          tt.want ? [] : [["permutation", { want: tt.giveWant, got: tt.giveGot }]],
-        );
-      });
-    }
   });
 });

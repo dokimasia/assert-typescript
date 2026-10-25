@@ -33,17 +33,33 @@ const BOXES: readonly unknown[] = [Number, String, Boolean, BigInt, Symbol];
 
 /** Answer which comparison rule a value falls under. */
 function shapeOf(value: unknown): Shape {
-  if (value === null || typeof value !== "object") return "primitive";
+  if (value === null || typeof value !== "object") {
+    return "primitive";
+  }
   if (BOXES.some((box) => value instanceof (box as abstract new () => object))) {
     return "boxed";
   }
-  if (Array.isArray(value)) return "array";
-  if (ArrayBuffer.isView(value) && !(value instanceof DataView)) return "typed";
-  if (value instanceof Map) return "map";
-  if (value instanceof Set) return "set";
-  if (value instanceof Date) return "date";
-  if (value instanceof RegExp) return "regexp";
-  if (value instanceof Error) return "error";
+  if (Array.isArray(value)) {
+    return "array";
+  }
+  if (ArrayBuffer.isView(value) && !(value instanceof DataView)) {
+    return "typed";
+  }
+  if (value instanceof Map) {
+    return "map";
+  }
+  if (value instanceof Set) {
+    return "set";
+  }
+  if (value instanceof Date) {
+    return "date";
+  }
+  if (value instanceof RegExp) {
+    return "regexp";
+  }
+  if (value instanceof Error) {
+    return "error";
+  }
   return "object";
 }
 
@@ -60,8 +76,12 @@ function isCollection(value: unknown): boolean {
 
 /** Answer how many entries a collection holds. */
 function sizeOf(value: unknown): number {
-  if (Array.isArray(value)) return value.length;
-  if (value instanceof Map || value instanceof Set) return value.size;
+  if (Array.isArray(value)) {
+    return value.length;
+  }
+  if (value instanceof Map || value instanceof Set) {
+    return value.size;
+  }
   return Object.keys(value as object).length;
 }
 
@@ -73,38 +93,28 @@ function sizeOf(value: unknown): number {
  * where a field was never populated at all.
  */
 function absentAgainstEmpty(a: unknown, b: unknown, relax: Relaxations): boolean {
-  if (!relax.equateEmpty) return false;
+  if (!relax.equateEmpty) {
+    return false;
+  }
   const absent = (v: unknown) => v === null || v === undefined;
-  if (absent(a) && isCollection(b)) return sizeOf(b) === 0;
-  if (absent(b) && isCollection(a)) return sizeOf(a) === 0;
+  if (absent(a) && isCollection(b)) {
+    return sizeOf(b) === 0;
+  }
+  if (absent(b) && isCollection(a)) {
+    return sizeOf(a) === 0;
+  }
   return false;
 }
 
 /** Compares two primitives: no coercion, NaN unequal to itself unless relaxed, -0 equal to +0. */
 function equalPrimitives(a: unknown, b: unknown, relax: Relaxations): boolean {
   if (typeof a === "number" && typeof b === "number") {
-    if (Number.isNaN(a) && Number.isNaN(b)) return relax.equateNans;
+    if (Number.isNaN(a) && Number.isNaN(b)) {
+      return relax.equateNans;
+    }
     return a === b;
   }
   return Object.is(a, b) || a === b;
-}
-
-/**
- * Whether two values are structurally equal.
- *
- * Reaches inside arrays, typed arrays, plain objects, `Map`, `Set`,
- * `Date`, `RegExp`, `Error` and boxed primitives. Different shapes never
- * compare. A map's keys compare by these rules, so no NaN key matches
- * without `equateNans`, and -0 and +0 are one key. A cycle stops the walk
- * rather than overflowing the stack.
- *
- * @param got The value produced by the code under test.
- * @param want The value it is supposed to produce.
- * @param relax The relaxations in force for this comparison.
- * @returns True when the two are equal under those rules.
- */
-export function equal(got: unknown, want: unknown, relax: Relaxations): boolean {
-  return walk(got, want, relax, 0, new Set());
 }
 
 /** Compare one level, then recurse. `seen` stops a cycle. */
@@ -115,16 +125,30 @@ function walk(
   depth: number,
   seen: Set<unknown>,
 ): boolean {
-  if (absentAgainstEmpty(a, b, relax)) return true;
-  if (relax.byIdentity && isReference(a) && isReference(b)) return a === b;
-  if (depth > MAX_DEPTH) return true;
+  if (absentAgainstEmpty(a, b, relax)) {
+    return true;
+  }
+  if (relax.byIdentity && isReference(a) && isReference(b)) {
+    return a === b;
+  }
+  if (depth > MAX_DEPTH) {
+    return true;
+  }
 
   const shape = shapeOf(a);
-  if (shape !== shapeOf(b)) return false;
-  if (shape === "primitive") return equalPrimitives(a, b, relax);
+  if (shape !== shapeOf(b)) {
+    return false;
+  }
+  if (shape === "primitive") {
+    return equalPrimitives(a, b, relax);
+  }
 
-  if (a === b) return true;
-  if (seen.has(a)) return true;
+  if (a === b) {
+    return true;
+  }
+  if (seen.has(a)) {
+    return true;
+  }
   seen.add(a);
   try {
     return walkDeep(a, b, relax, depth, seen, shape);
@@ -142,9 +166,13 @@ function equalArrays(
   b: ArrayLike<unknown>,
   again: Recurse,
 ): boolean {
-  if (a.length !== b.length) return false;
+  if (a.length !== b.length) {
+    return false;
+  }
   for (let i = 0; i < a.length; i += 1) {
-    if (!again(a[i], b[i])) return false;
+    if (!again(a[i], b[i])) {
+      return false;
+    }
   }
   return true;
 }
@@ -157,12 +185,16 @@ function equalArrays(
  * compared structurally, which is why this cannot just ask `has`.
  */
 function equalSets(a: Set<unknown>, b: Set<unknown>, again: Recurse): boolean {
-  if (a.size !== b.size) return false;
+  if (a.size !== b.size) {
+    return false;
+  }
 
   const spare = [...b];
   return [...a].every((item) => {
     const at = spare.findIndex((candidate) => again(item, candidate));
-    if (at < 0) return false;
+    if (at < 0) {
+      return false;
+    }
     spare.splice(at, 1);
     return true;
   });
@@ -181,12 +213,16 @@ function equalMaps(
   b: Map<unknown, unknown>,
   again: Recurse,
 ): boolean {
-  if (a.size !== b.size) return false;
+  if (a.size !== b.size) {
+    return false;
+  }
 
   const spare = [...b];
   for (const [key, value] of a) {
     const at = spare.findIndex(([k, v]) => again(key, k) && again(value, v));
-    if (at < 0) return false;
+    if (at < 0) {
+      return false;
+    }
     spare.splice(at, 1);
   }
   return true;
@@ -199,7 +235,9 @@ function equalObjects(
   again: Recurse,
 ): boolean {
   const keys = Object.keys(a);
-  if (keys.length !== Object.keys(b).length) return false;
+  if (keys.length !== Object.keys(b).length) {
+    return false;
+  }
   return keys.every((k) => Object.hasOwn(b, k) && again(a[k], b[k]));
 }
 
@@ -247,4 +285,22 @@ function walkDeep(
         again,
       );
   }
+}
+
+/**
+ * Whether two values are structurally equal.
+ *
+ * Reaches inside arrays, typed arrays, plain objects, `Map`, `Set`,
+ * `Date`, `RegExp`, `Error` and boxed primitives. Different shapes never
+ * compare. A map's keys compare by these rules, so no NaN key matches
+ * without `equateNans`, and -0 and +0 are one key. A cycle stops the walk
+ * rather than overflowing the stack.
+ *
+ * @param got The value produced by the code under test.
+ * @param want The value it is supposed to produce.
+ * @param relax The relaxations in force for this comparison.
+ * @returns True when the two are equal under those rules.
+ */
+export function equal(got: unknown, want: unknown, relax: Relaxations): boolean {
+  return walk(got, want, relax, 0, new Set());
 }

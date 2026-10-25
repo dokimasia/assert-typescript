@@ -10,10 +10,12 @@ import { describe, expect, it } from "vitest";
 import { show } from "../../src/matcher/inspect.js";
 
 /** A function with a name of its own. */
-function named(): void {}
+function named(): void {
+  // The spec reads the name of the function alone.
+}
 
 /** A function without a name: an arrow function in an array has none. */
-const anonymous = [() => undefined][0];
+const [anonymous] = [() => undefined];
 
 describe("inspect", () => {
   describe("show", () => {

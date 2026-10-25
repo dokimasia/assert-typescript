@@ -32,31 +32,8 @@ interface Pending {
 /** What each seat has started, by seat. */
 const STARTED = new WeakMap<Seat, Set<Pending>>();
 
-/**
- * Register work against a seat, and note whether the caller takes it.
- *
- * @param seat The seat the assertion reports to.
- * @param msg The contract under test, used to name it if it is dropped.
- * @param work The assertion's own promise.
- * @returns A promise that settles with work and records being awaited.
- */
-export function track<T>(seat: Seat, msg: string, work: Promise<T>): Promise<T> {
-  const entry: Pending = { msg, awaited: false };
-  let set = STARTED.get(seat);
-  if (set === undefined) {
-    set = new Set();
-    STARTED.set(seat, set);
-  }
-  set.add(entry);
-
-  // On an aborting seat a failure throws inside the promise. Silencing
-  // the original keeps Node from reporting an unhandled rejection for
-  // a case this library reports better itself. The caller's copy still
-  // rejects.
-  work.catch(() => undefined);
-
-  return Tracked.of(entry, work);
-}
+/** The record of each tracked promise that track returned. A promise derived from one has none. */
+const ENTRIES = new WeakMap<Promise<unknown>, Pending>();
 
 /**
  * A promise that notes when the caller takes its result.
@@ -68,21 +45,18 @@ export function track<T>(seat: Seat, msg: string, work: Promise<T>): Promise<T> 
  * `.finally` all arrive here.
  */
 class Tracked<T> extends Promise<T> {
-  /** What this promise is, for the register. Absent on derived ones. */
-  #entry: Pending | undefined;
-
   /**
-   * Answer a tracked promise settling with work.
+   * Returns a tracked promise that settles with work.
    *
    * @param entry The register's record of this assertion.
    * @param work The assertion's own promise.
    * @returns A promise that marks the entry taken when it is awaited.
    */
-  static of<T>(entry: Pending, work: Promise<T>): Tracked<T> {
-    const tracked = new Tracked<T>((resolve, reject) => {
+  static of<V>(entry: Pending, work: Promise<V>): Tracked<V> {
+    const tracked = new Tracked<V>((resolve, reject) => {
       work.then(resolve, reject);
     });
-    tracked.#entry = entry;
+    ENTRIES.set(tracked, entry);
 
     // A dropped assertion on an aborting seat rejects, and nobody is
     // holding it. Marking it handled keeps Node from reporting an
@@ -107,9 +81,38 @@ class Tracked<T> extends Promise<T> {
     onFulfilled?: ((value: T) => A | PromiseLike<A>) | null,
     onRejected?: ((reason: unknown) => B | PromiseLike<B>) | null,
   ): Promise<A | B> {
-    if (this.#entry !== undefined) this.#entry.awaited = true;
+    const entry = ENTRIES.get(this);
+    if (entry !== undefined) {
+      entry.awaited = true;
+    }
     return super.then(onFulfilled, onRejected);
   }
+}
+
+/**
+ * Register work against a seat, and note whether the caller takes it.
+ *
+ * @param seat The seat the assertion reports to.
+ * @param msg The contract under test, used to name it if it is dropped.
+ * @param work The assertion's own promise.
+ * @returns A promise that settles with work and records being awaited.
+ */
+export function track<T>(seat: Seat, msg: string, work: Promise<T>): Promise<T> {
+  const entry: Pending = { msg, awaited: false };
+  let set = STARTED.get(seat);
+  if (set === undefined) {
+    set = new Set();
+    STARTED.set(seat, set);
+  }
+  set.add(entry);
+
+  // On an aborting seat a failure throws inside the promise. Silencing
+  // the original keeps Node from reporting an unhandled rejection for
+  // a case this library reports better itself. The caller's copy still
+  // rejects.
+  work.catch(() => undefined);
+
+  return Tracked.of(entry, work);
 }
 
 /**

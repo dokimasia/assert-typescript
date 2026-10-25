@@ -18,9 +18,6 @@ import { type Option, settings } from "./option.js";
 import { clockOf, type Mode, type Seat, signalOf } from "./seat.js";
 import { Running } from "./verdict.js";
 
-/** A subject that takes a cancellation handle and answers a promise. */
-export type Cancellable = (signal: AbortSignal) => Promise<unknown>;
-
 /**
  * Whether a thrown value is a cancellation rather than a real failure.
  *
@@ -31,7 +28,9 @@ export type Cancellable = (signal: AbortSignal) => Promise<unknown>;
  * it failed for its own reasons and happened to do so in time.
  */
 function isAbort(thrown: unknown, signal: AbortSignal): boolean {
-  if (signal.aborted && thrown === signal.reason) return true;
+  if (signal.aborted && thrown === signal.reason) {
+    return true;
+  }
   if (thrown instanceof Error) {
     return thrown.name === "AbortError" || thrown.name === "TimeoutError";
   }
@@ -70,6 +69,12 @@ async function honours(
   }
   run.fail(mode, assertion, msg, { got: null });
 }
+
+/** What ends the wait of completesWithin first: the subject, or its deadline. */
+type Ending = { readonly settled: true } | { readonly settled: false };
+
+/** A subject that takes a cancellation handle and answers a promise. */
+export type Cancellable = (signal: AbortSignal) => Promise<unknown>;
 
 /**
  * Fail when a subject given an aborted signal does not reject.
@@ -124,9 +129,6 @@ export function honoursDeadline(
     msg,
   );
 }
-
-/** What ends the wait of completesWithin first: the subject, or its deadline. */
-type Ending = { readonly settled: true } | { readonly settled: false };
 
 /**
  * Fail when fn has not settled within milliseconds.

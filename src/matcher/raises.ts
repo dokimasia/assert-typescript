@@ -42,7 +42,9 @@ export function throws(
     pass(seat, mode, "throws", msg);
     return thrown;
   }
-  if (isPromise(answered)) answered.catch(() => undefined);
+  if (isPromise(answered)) {
+    answered.catch(() => undefined);
+  }
   fail(seat, mode, "throws", msg);
   return undefined;
 }

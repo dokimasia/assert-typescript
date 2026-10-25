@@ -24,8 +24,12 @@ function chain(error: unknown): unknown[] {
   const found: unknown[] = [];
   let current = error;
   for (let depth = 0; depth < MAX_CAUSES; depth += 1) {
-    if (current === null || current === undefined) break;
-    if (found.includes(current)) break;
+    if (current === null || current === undefined) {
+      break;
+    }
+    if (found.includes(current)) {
+      break;
+    }
     found.push(current);
     current = current instanceof Error ? current.cause : undefined;
   }
@@ -39,8 +43,12 @@ function chain(error: unknown): unknown[] {
  */
 export function matchesTarget(error: unknown, target: unknown): boolean {
   return chain(error).some((link) => {
-    if (link === target) return true;
-    if (typeof target === "function" && link instanceof (target as never)) return true;
+    if (link === target) {
+      return true;
+    }
+    if (typeof target === "function" && link instanceof (target as never)) {
+      return true;
+    }
     if (target instanceof Error && link instanceof Error) {
       return link.name === target.name && link.message === target.message;
     }

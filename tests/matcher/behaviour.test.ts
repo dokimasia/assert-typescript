@@ -20,7 +20,9 @@ import { ignores, records } from "../helpers.js";
 
 /** A subject that waits for its signal, and rejects with the signal's reason when it aborts. */
 async function respects(signal: AbortSignal): Promise<void> {
-  if (signal.aborted) throw signal.reason;
+  if (signal.aborted) {
+    throw signal.reason;
+  }
   await new Promise((_, reject) => {
     signal.addEventListener("abort", () => reject(signal.reason), { once: true });
   });
@@ -51,7 +53,7 @@ describe("behaviour", () => {
         new Recorder(),
         Mode.Fatal,
         async (signal) => {
-          reason = signal.reason;
+          ({ reason } = signal);
         },
         "it stops when told",
       );
@@ -122,7 +124,7 @@ describe("behaviour", () => {
         new Recorder(),
         Mode.Fatal,
         async (signal) => {
-          reason = signal.reason;
+          ({ reason } = signal);
           throw signal.reason;
         },
         "it respects its deadline",
@@ -279,7 +281,7 @@ describe("behaviour", () => {
         Mode.Fatal,
         1000,
         (signal) => {
-          aborted = signal.aborted;
+          ({ aborted } = signal);
         },
         "it is quick",
       );
@@ -360,7 +362,9 @@ describe("behaviour", () => {
       {
         name: "passes a subject that throws an error of its own",
         give: (signal) => {
-          if (signal === undefined) throw new Error("a signal is required");
+          if (signal === undefined) {
+            throw new Error("a signal is required");
+          }
         },
       },
       {

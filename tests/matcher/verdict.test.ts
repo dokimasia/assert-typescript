@@ -7,31 +7,13 @@
  * because every assertion reports its verdict through it.
  */
 
-import { describe, expect, it, onTestFinished, vi } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 import { Failure } from "../../src/failure.js";
 import { Mode } from "../../src/matcher/seat.js";
-import {
-  end,
-  fail,
-  fault,
-  faultText,
-  noteFault,
-  pass,
-  Running,
-} from "../../src/matcher/verdict.js";
+import { fail, fault, pass, Running } from "../../src/matcher/verdict.js";
 import { VARIABLE } from "../../src/record/switch.js";
 import { Recorder } from "../../src/seat.js";
-import { Plain, records, setRecording } from "../helpers.js";
-
-/** Returns what call throws, and undefined for a call that returns. */
-function thrownBy(call: () => void): unknown {
-  try {
-    call();
-  } catch (err) {
-    return err;
-  }
-  return undefined;
-}
+import { Plain, records, setRecording, thrownBy } from "../helpers.js";
 
 describe("verdict", () => {
   it("ends every call with the fault of a switch that is neither 0 nor 1", () => {
@@ -45,7 +27,7 @@ describe("verdict", () => {
     Running.of(seat).skipRun(Mode.Soft, "prop-for-all", "a run", undefined, {}, "why");
 
     expect(seat.faults.map((f) => f.message)).toEqual(
-      Array(6).fill(`${VARIABLE}: "yes" is neither 0 nor 1`),
+      new Array(6).fill(`${VARIABLE}: "yes" is neither 0 nor 1`),
     );
   });
 
@@ -55,77 +37,6 @@ describe("verdict", () => {
     pass(seat, Mode.Soft, "true", "the count is right");
 
     expect(seat.records).toEqual([]);
-  });
-
-  describe("faultText", () => {
-    it("returns the message of an error", () => {
-      expect(faultText(new RangeError("a range"))).toBe("a range");
-    });
-
-    it("returns the text of a value that is no error", () => {
-      expect(faultText(42)).toBe("42");
-    });
-  });
-
-  describe("end", () => {
-    it("passes the fault to reportFault of a seat that takes faults, as ending", () => {
-      const broken = new Error("a fault");
-      const seat = new Recorder();
-      end(seat, broken);
-
-      expect(seat.faults).toEqual([broken]);
-      expect(seat.message).toBe("a fault");
-    });
-
-    it("throws the fault for a seat without reportFault", () => {
-      const broken = new Error("a fault");
-      const seat = new Plain();
-
-      expect(thrownBy(() => end(seat, broken))).toBe(broken);
-      expect(seat.received).toEqual([]);
-    });
-
-    it("throws an error of the text of a fault that is no error", () => {
-      const thrown = thrownBy(() => end(new Plain(), 42));
-
-      expect(thrown).toBeInstanceOf(Error);
-      expect((thrown as Error).message).toBe("42");
-    });
-
-    it("marks the frame of the call as a helper", () => {
-      const seat = new Plain();
-      thrownBy(() => end(seat, new Error("a fault")));
-
-      expect(seat.helpers).toBe(1);
-    });
-
-    it("writes no call record", () => {
-      const seat = new Recorder();
-      end(seat, new Error("a fault"));
-
-      expect(seat.records).toEqual([]);
-    });
-  });
-
-  describe("noteFault", () => {
-    it("passes the fault to reportFault of a seat that takes faults, as noted", () => {
-      const noted = new Error("a file of the store is skipped");
-      const seat = new Recorder();
-      noteFault(seat, noted);
-
-      expect(seat.faults).toEqual([noted]);
-      expect(seat.failed).toBe(false);
-    });
-
-    it("writes the message of the fault through console.warn for a seat without reportFault", () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      onTestFinished(() => warn.mockRestore());
-      const seat = new Plain();
-      noteFault(seat, new Error("a file of the store is skipped"));
-
-      expect(warn.mock.calls).toEqual([["a file of the store is skipped"]]);
-      expect(seat.received).toEqual([]);
-    });
   });
 
   describe("pass", () => {

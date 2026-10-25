@@ -13,6 +13,17 @@
 import { type Clock, System } from "../clock.js";
 import type { Failure } from "../failure.js";
 
+/** A seat that carries a clock. */
+interface Clocked {
+  clock: () => Clock;
+}
+
+/** The path of the test that each seat runs: its file's path and its titles. */
+const TESTS = new WeakMap<Seat, readonly string[]>();
+
+/** The signal of a seat without one: its controller is unreachable, so it never aborts. */
+const NEVER = new AbortController().signal;
+
 /** Where an assertion reports, and what it may do about it. */
 export interface Seat {
   /**
@@ -21,13 +32,13 @@ export interface Seat {
    * Named for the same reason Go's `testing.TB.Helper` is: a runner
    * that can hide library frames from a stack trace does it here.
    */
-  helper(): void;
+  helper: () => void;
 
   /** Report a failure that stops the test. */
-  fail(message: string): void;
+  fail: (message: string) => void;
 
   /** Report a failure the test may carry on past. */
-  record(message: string): void;
+  record: (message: string) => void;
 
   /**
    * Receives a fault. ending is true for an error that ends the call
@@ -35,7 +46,7 @@ export interface Seat {
    * past. The library throws an ending fault for a seat without this
    * member, and writes the message of a noted fault through console.warn.
    */
-  reportFault?(fault: Error, ending: boolean): void;
+  reportFault?: (fault: Error, ending: boolean) => void;
 
   /** Aborts when the test that runs on this seat ends, where the seat states one. */
   readonly signal?: AbortSignal | undefined;
@@ -47,7 +58,7 @@ export interface Cleanups {
    * Registers fn to run when the test ends, also when the test fails. The
    * functions run in the reverse order of their registration.
    */
-  cleanup(fn: () => void): void;
+  cleanup: (fn: () => void) => void;
 }
 
 /**
@@ -94,7 +105,7 @@ export interface Reporter {
    * @param failure - The record of the failing call.
    * @param aborting - True for the aborting surface, false for the recording one.
    */
-  report(failure: Failure, aborting: boolean): void;
+  report: (failure: Failure, aborting: boolean) => void;
 }
 
 /**
@@ -114,7 +125,7 @@ export interface Skipper {
    *
    * @param reason - Why the test skips.
    */
-  skip(reason: string): never;
+  skip: (reason: string) => never;
 }
 
 /**
@@ -139,11 +150,6 @@ export function takesFaults(
   return typeof seat.reportFault === "function";
 }
 
-/** A seat that carries a clock. */
-interface Clocked {
-  clock(): Clock;
-}
-
 /**
  * Answer the clock seat carries, or the platform clock.
  *
@@ -155,13 +161,12 @@ export function clockOf(seat: Seat): Clock {
   const held = (seat as Partial<Clocked>).clock;
   if (typeof held === "function") {
     const supplied = held.call(seat);
-    if (supplied) return supplied;
+    if (supplied) {
+      return supplied;
+    }
   }
   return new System();
 }
-
-/** The path of the test that each seat runs: its file's path and its titles. */
-const TESTS = new WeakMap<Seat, readonly string[]>();
 
 /**
  * Names the test that seat runs: the segments of its file's path relative
@@ -185,9 +190,6 @@ export function nameTest(seat: Seat, path: readonly string[]): void {
 export function testOf(seat: Seat): readonly string[] | undefined {
   return TESTS.get(seat);
 }
-
-/** The signal of a seat without one: its controller is unreachable, so it never aborts. */
-const NEVER = new AbortController().signal;
 
 /**
  * Returns the seat's signal, or a signal that never aborts for a seat

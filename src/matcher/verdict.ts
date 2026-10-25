@@ -18,69 +18,8 @@ import type { Call, Site, Verdict } from "../record/call.js";
 import { add, callsOf, Slot } from "../record/calls.js";
 import { detail as literalOf } from "../record/literal.js";
 import { reading } from "../record/switch.js";
-import {
-  Mode,
-  report,
-  type Seat,
-  takesFaults,
-  takesRecords,
-  takesSkips,
-} from "./seat.js";
-
-/**
- * Returns the text of a fault.
- *
- * @param error - What ended the call.
- * @returns The message of an error, and the text of any other value.
- */
-export function faultText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-/**
- * Returns a fault as an error.
- *
- * @param error - The fault.
- * @returns error itself when it is an Error, and otherwise an Error whose
- *   message is its text.
- */
-function asError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(faultText(error));
-}
-
-/**
- * Ends a call that reports no verdict with a fault. A seat that takes
- * faults receives it with ending true, and the fault is thrown for any
- * other seat. It writes no call record. It may not return.
- *
- * @param seat - The seat of the call.
- * @param error - The fault.
- * @throws The fault, as an Error, for a seat that does not take faults.
- */
-export function end(seat: Seat, error: unknown): void {
-  seat.helper();
-  const fault = asError(error);
-  if (!takesFaults(seat)) throw fault;
-  seat.reportFault(fault, true);
-}
-
-/**
- * Notes a fault that does not end the call, such as a file of a property's
- * store that the run skips. A seat that takes faults receives it with
- * ending false. For any other seat, the message of the fault goes to
- * console.warn, which the test runner shows beside the test.
- *
- * @param seat - The seat of the call.
- * @param error - The fault.
- */
-export function noteFault(seat: Seat, error: unknown): void {
-  const fault = asError(error);
-  if (!takesFaults(seat)) {
-    console.warn(fault.message);
-    return;
-  }
-  seat.reportFault(fault, false);
-}
+import { end, faultText } from "./fault.js";
+import { Mode, report, type Seat, takesRecords, takesSkips } from "./seat.js";
 
 /**
  * A call of an assertion, which reports its verdict once.
@@ -151,7 +90,9 @@ export class Running {
    * @param contract - The caller's message.
    */
   pass(mode: Mode, assertion: string, contract: string): void {
-    if (!this.#switched()) return;
+    if (!this.#switched()) {
+      return;
+    }
     this.#write({
       assertion,
       contract,
@@ -177,7 +118,9 @@ export class Running {
     detail: Readonly<Record<string, unknown>>,
   ): void {
     this.#seat.helper();
-    if (!this.#switched()) return;
+    if (!this.#switched()) {
+      return;
+    }
     const where = this.#where ?? callSite();
     this.#write(
       {
@@ -204,7 +147,9 @@ export class Running {
    */
   fault(mode: Mode, assertion: string, contract: string, error: unknown): void {
     this.#seat.helper();
-    if (!this.#switched()) return;
+    if (!this.#switched()) {
+      return;
+    }
     this.#write({
       assertion,
       contract,
@@ -256,8 +201,12 @@ export class Running {
     run: Readonly<Record<string, unknown>>,
     reason: string,
   ): void {
-    if (!this.#writeRun("skip", mode, assertion, contract, where, run)) return;
-    if (takesSkips(this.#seat)) this.#seat.skip(reason);
+    if (!this.#writeRun("skip", mode, assertion, contract, where, run)) {
+      return;
+    }
+    if (takesSkips(this.#seat)) {
+      this.#seat.skip(reason);
+    }
   }
 
   /**
@@ -272,7 +221,9 @@ export class Running {
     where: Site | undefined,
     run: Readonly<Record<string, unknown>>,
   ): boolean {
-    if (!this.#switched()) return false;
+    if (!this.#switched()) {
+      return false;
+    }
     this.#write(
       {
         assertion,
@@ -299,7 +250,9 @@ export class Running {
    */
   failRun(mode: Mode, failure: Failure, run: Readonly<Record<string, unknown>>): void {
     this.#seat.helper();
-    if (!this.#switched()) return;
+    if (!this.#switched()) {
+      return;
+    }
     this.#write(
       {
         assertion: failure.assertion,
@@ -350,7 +303,9 @@ export class Running {
     run?: Readonly<Record<string, unknown>>,
   ): void {
     const calls = this.#body ? undefined : callsOf(this.#seat);
-    if (this.#body ? this.#slot === undefined : calls === undefined) return;
+    if (this.#body ? this.#slot === undefined : calls === undefined) {
+      return;
+    }
 
     const where = call.where ?? this.#where ?? callSite();
     const stated =
