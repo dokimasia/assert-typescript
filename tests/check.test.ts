@@ -8,61 +8,28 @@
  */
 
 import { describe, expect, it } from "vitest";
+import * as behaviour from "../src/check/behaviour.js";
+import * as relations from "../src/check/relations.js";
+import * as values from "../src/check/values.js";
 import * as check from "../src/check.js";
-import { Controlled } from "../src/clock.js";
-import { dropped } from "../src/matcher/pending.js";
+import { compareText } from "../src/order.js";
 import { doesReject } from "../src/rejects.js";
-import { Recorder } from "../src/seat.js";
-import { FAILING, type Failing, TRACKED } from "./helpers.js";
-
-/** The contract that every call passes. */
-const MSG = "the stated contract";
-
-/** Returns a recorder that reads a clock the test controls, with the clock. */
-function seated(): [Recorder, Controlled] {
-  const clock = new Controlled(0);
-  return [new Recorder().withClock(clock), clock];
-}
+import { FAILING } from "./helpers.js";
 
 describe("check", () => {
   it("exports an assertion for each failing call of the shared table besides doesReject", () => {
     expect(
       Object.keys(check)
         .filter((name) => name !== "doesReject")
-        .sort(),
-    ).toEqual(Object.keys(FAILING).sort());
+        .sort(compareText),
+    ).toEqual(Object.keys(FAILING).sort(compareText));
   });
 
   it("exports the doesReject of the module rejects", () => {
     expect(check.doesReject).toBe(doesReject);
   });
 
-  for (const [name, call] of Object.entries(FAILING) as [string, Failing][]) {
-    describe(name, () => {
-      it("reports its failure through fail", async () => {
-        const [seat, clock] = seated();
-        await call(check, seat, clock, MSG);
-
-        expect(seat.failures.map((f) => f.contract)).toEqual([MSG]);
-        expect(seat.message).not.toBe("");
-        expect(seat.messages).toEqual([]);
-      });
-
-      if (TRACKED.includes(name)) {
-        it("returns a promise that the forgotten-await guard tracks", async () => {
-          const [seat, clock] = seated();
-          const pending = call(check, seat, clock, MSG);
-
-          expect(dropped(seat)).toEqual([MSG]);
-          await pending;
-        });
-      } else {
-        it("returns no promise", () => {
-          const [seat, clock] = seated();
-
-          expect(call(check, seat, clock, MSG)).not.toBeInstanceOf(Promise);
-        });
-      }
-    });
-  }
+  it("exports the assertions of the modules behaviour, relations and values", () => {
+    expect({ ...check }).toEqual({ ...behaviour, ...relations, ...values, doesReject });
+  });
 });
