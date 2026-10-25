@@ -23,6 +23,7 @@ import {
   SUBJECTS,
 } from "../../src/expect/matchers.js";
 import type { Seat } from "../../src/matcher/seat.js";
+import { compareText } from "../../src/order.js";
 import { Recorder } from "../../src/seat.js";
 import { FAILING, ignores } from "../helpers.js";
 
@@ -218,7 +219,9 @@ const CHAINED: Readonly<Record<string, (m: Table, clock: Controlled) => unknown>
     let closed = false;
     return m.failsAfterClose?.(
       () => {
-        if (!closed) throw new Error("the call ran before the close");
+        if (!closed) {
+          throw new Error("the call ran before the close");
+        }
       },
       () => {
         closed = true;
@@ -231,7 +234,9 @@ const CHAINED: Readonly<Record<string, (m: Table, clock: Controlled) => unknown>
     let induced = false;
     return m.isPoisoned?.(
       () => {
-        if (!induced) throw new Error("the reading ran before the failure");
+        if (!induced) {
+          throw new Error("the reading ran before the failure");
+        }
       },
       () => {
         induced = true;
@@ -246,8 +251,11 @@ const CHAINED: Readonly<Record<string, (m: Table, clock: Controlled) => unknown>
 async function reported(name: string): Promise<Recorder> {
   const clock = new Controlled(0);
   const seat = new Recorder().withClock(clock);
-  if (name === "doesReject") await check.doesReject(seat, MSG, passes);
-  else await FAILING[name as keyof typeof FAILING](check, seat, clock, MSG);
+  if (name === "doesReject") {
+    await check.doesReject(seat, MSG, passes);
+  } else {
+    await FAILING[name as keyof typeof FAILING](check, seat, clock, MSG);
+  }
   return seat;
 }
 
@@ -266,11 +274,11 @@ function starting(started: { state: State; name: string; call: Call }[]): Runner
 describe("matchers", () => {
   describe("NAMES", () => {
     it("contains the name of each assertion of the function form", () => {
-      expect(NAMES).toEqual(Object.keys(check).sort());
+      expect(NAMES).toEqual(Object.keys(check).sort(compareText));
     });
 
     it("contains the name of each failing call of the spec", () => {
-      expect(Object.keys(CHAINED).sort()).toEqual(NAMES);
+      expect(Object.keys(CHAINED).sort(compareText)).toEqual(NAMES);
     });
   });
 
@@ -282,8 +290,9 @@ describe("matchers", () => {
 
   describe("NEGATIVES", () => {
     it("contains each pair in both directions", () => {
-      for (const [name, negative] of NEGATIVES)
+      for (const [name, negative] of NEGATIVES) {
         expect(NEGATIVES.get(negative)).toBe(name);
+      }
     });
 
     it("contains the names of assertions alone", () => {
@@ -299,7 +308,7 @@ describe("matchers", () => {
         const got = await (CHAINED[name]?.(clocked(clock), clock) as
           | Outcome
           | Promise<Outcome>);
-        const failure = got.meta.failure;
+        const { failure } = got.meta;
 
         expect(got.pass).toBe(false);
         expect([failure?.assertion, failure?.contract]).toEqual([

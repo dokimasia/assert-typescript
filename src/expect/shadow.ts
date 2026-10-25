@@ -26,6 +26,26 @@ const DEPTH = 100;
 /** The relaxations of a call of the standard's equality that states none. */
 const STRICT = settings([]);
 
+/** Returns the keys and the values of a map, the elements of a set, and the values of any other object. */
+function childrenOf(value: object): unknown[] {
+  if (value instanceof Map) {
+    return [...value.keys(), ...value.values()];
+  }
+  return value instanceof Set ? [...value] : Object.values(value);
+}
+
+/** Reports whether value contains an asymmetric matcher, within the depth of the standard's equality. */
+function asymmetric(value: unknown, depth: number, seen: Set<unknown>): boolean {
+  if (depth > DEPTH || value === null || typeof value !== "object" || seen.has(value)) {
+    return false;
+  }
+  if (typeof (value as { asymmetricMatch?: unknown }).asymmetricMatch === "function") {
+    return true;
+  }
+  seen.add(value);
+  return childrenOf(value).some((child) => asymmetric(child, depth + 1, seen));
+}
+
 /** A call of a runner's equality matcher, with the runner's verdict. */
 export interface Comparison {
   /** The runner, which names the field of the runner's verdict in the log. */
@@ -42,24 +62,6 @@ export interface Comparison {
   readonly expected: unknown;
   /** Whether the runner's call passed, with `.not` applied. */
   readonly passed: boolean;
-}
-
-/** Reports whether value contains an asymmetric matcher, within the depth of the standard's equality. */
-function asymmetric(value: unknown, depth: number, seen: Set<unknown>): boolean {
-  if (depth > DEPTH || value === null || typeof value !== "object" || seen.has(value)) {
-    return false;
-  }
-  if (typeof (value as { asymmetricMatch?: unknown }).asymmetricMatch === "function") {
-    return true;
-  }
-  seen.add(value);
-  const children =
-    value instanceof Map
-      ? [...value.keys(), ...value.values()]
-      : value instanceof Set
-        ? [...value]
-        : Object.values(value);
-  return children.some((child) => asymmetric(child, depth + 1, seen));
 }
 
 /**
@@ -90,7 +92,9 @@ export function compare(log: string, call: Comparison): boolean {
     return false;
   }
   const standard = equal(call.received, call.expected, STRICT) !== call.negated;
-  if (standard === call.passed) return false;
+  if (standard === call.passed) {
+    return false;
+  }
   const where = callSite();
   const line = {
     test: call.test,

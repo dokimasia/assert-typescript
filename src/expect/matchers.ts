@@ -20,8 +20,98 @@
 
 import * as check from "../check.js";
 import type { Failure } from "../failure.js";
+import { compareText } from "../order.js";
 import type { Recorder } from "../seat.js";
 import type { Call } from "./guard.js";
+
+/** The function form of each assertion, by its TypeScript name. */
+const FORMS = check as unknown as Readonly<
+  Record<string, (seat: Recorder, ...args: unknown[]) => unknown>
+>;
+
+/**
+ * The assertions whose function form returns a value that the subject
+ * supplied, which can be a promise, and not a promise of the verdict.
+ */
+const VALUED = new Set(["doesThrow", "errorAs"]);
+
+/** The outcome of a call that passed. */
+const PASSED: Outcome = { pass: true, message: () => "the assertion passed", meta: {} };
+
+/** Runs scope between the start of the function form of noTaskLeaks and the call of its result. */
+async function scoped(seat: Recorder, scope: unknown, msg: unknown): Promise<void> {
+  const done = check.noTaskLeaks(seat, msg as string);
+  await (scope as () => unknown)();
+  done();
+}
+
+/** Runs the function form of name on seat, with received in the place of the subject. */
+function invoke(
+  name: string,
+  seat: Recorder,
+  received: unknown,
+  args: readonly unknown[],
+): unknown {
+  if (name === "noTaskLeaks") {
+    return scoped(seat, received, args[0]);
+  }
+  const at = SUBJECTS[name] ?? 0;
+  const form = FORMS[name] as (seat: Recorder, ...args: unknown[]) => unknown;
+  return form(seat, ...args.slice(0, at), received, ...args.slice(at));
+}
+
+/** Returns the outcome of the calls that seat received. Every failure of an assertion of the root namespace has a record. */
+function outcomeOf(seat: Recorder): Outcome {
+  if (!seat.failed) {
+    return PASSED;
+  }
+  const failure = seat.failures[0] as Failure;
+  const { message } = seat;
+  const values =
+    Object.hasOwn(failure.detail, "want") && Object.hasOwn(failure.detail, "got")
+      ? { actual: failure.got, expected: failure.want }
+      : {};
+  return { pass: false, message: () => message, ...values, meta: { failure } };
+}
+
+/** Returns the outcome of a call of name under `.not`, which fails with the negative to call. */
+function refusal(name: string): Outcome {
+  const negative = NEGATIVES.get(name);
+  const message =
+    negative === undefined
+      ? `${name} does not take .not, and the standard has no negative of it.`
+      : `${name} does not take .not. Call ${negative} instead.`;
+  return { pass: true, message: () => message, meta: {} };
+}
+
+/** Returns the outcome of a call that settled, and settles its guard. */
+function settled(call: Call | undefined, seat: Recorder): Outcome {
+  const outcome = outcomeOf(seat);
+  call?.settle(!outcome.pass);
+  return call?.abandoned === true ? PASSED : outcome;
+}
+
+/** Returns the matcher of the assertion name. */
+function matcherOf(name: string, runner: Runner): Matcher {
+  return function (this: State, received: unknown, ...args: unknown[]) {
+    if (this.isNot) {
+      return refusal(name);
+    }
+    const seat = runner.seat();
+    const result = invoke(name, seat, received, args);
+    if (VALUED.has(name) || !(result instanceof Promise)) {
+      return outcomeOf(seat);
+    }
+    const call = runner.start(this, name);
+    return result.then(
+      () => settled(call, seat),
+      (err: unknown) => {
+        call?.settle(true);
+        throw err;
+      },
+    );
+  };
+}
 
 /** The part of a runner's matcher state that a matcher reads. */
 export interface State {
@@ -61,13 +151,8 @@ export interface Runner {
   readonly start: (state: State, name: string) => Call | undefined;
 }
 
-/** The function form of each assertion, by its TypeScript name. */
-const FORMS = check as unknown as Readonly<
-  Record<string, (seat: Recorder, ...args: unknown[]) => unknown>
->;
-
 /** The TypeScript names of the assertions, which name the matchers. */
-export const NAMES: readonly string[] = Object.keys(check).sort();
+export const NAMES: readonly string[] = Object.keys(check).sort(compareText);
 
 /**
  * The place of the subject among the arguments that the function form
@@ -104,82 +189,6 @@ export const NEGATIVES: ReadonlyMap<string, string> = new Map(
     [b as string, a as string],
   ]),
 );
-
-/**
- * The assertions whose function form returns a value that the subject
- * supplied, which can be a promise, and not a promise of the verdict.
- */
-const VALUED = new Set(["doesThrow", "errorAs"]);
-
-/** The outcome of a call that passed. */
-const PASSED: Outcome = { pass: true, message: () => "the assertion passed", meta: {} };
-
-/** Runs scope between the start of the function form of noTaskLeaks and the call of its result. */
-async function scoped(seat: Recorder, scope: unknown, msg: unknown): Promise<void> {
-  const done = check.noTaskLeaks(seat, msg as string);
-  await (scope as () => unknown)();
-  done();
-}
-
-/** Runs the function form of name on seat, with received in the place of the subject. */
-function invoke(
-  name: string,
-  seat: Recorder,
-  received: unknown,
-  args: readonly unknown[],
-): unknown {
-  if (name === "noTaskLeaks") return scoped(seat, received, args[0]);
-  const at = SUBJECTS[name] ?? 0;
-  const form = FORMS[name] as (seat: Recorder, ...args: unknown[]) => unknown;
-  return form(seat, ...args.slice(0, at), received, ...args.slice(at));
-}
-
-/** Returns the outcome of the calls that seat received. Every failure of an assertion of the root namespace has a record. */
-function outcomeOf(seat: Recorder): Outcome {
-  if (!seat.failed) return PASSED;
-  const failure = seat.failures[0] as Failure;
-  const message = seat.message;
-  const values =
-    Object.hasOwn(failure.detail, "want") && Object.hasOwn(failure.detail, "got")
-      ? { actual: failure.got, expected: failure.want }
-      : {};
-  return { pass: false, message: () => message, ...values, meta: { failure } };
-}
-
-/** Returns the outcome of a call of name under `.not`, which fails with the negative to call. */
-function refusal(name: string): Outcome {
-  const negative = NEGATIVES.get(name);
-  const message =
-    negative === undefined
-      ? `${name} does not take .not, and the standard has no negative of it.`
-      : `${name} does not take .not. Call ${negative} instead.`;
-  return { pass: true, message: () => message, meta: {} };
-}
-
-/** Returns the outcome of a call that settled, and settles its guard. */
-function settled(call: Call | undefined, seat: Recorder): Outcome {
-  const outcome = outcomeOf(seat);
-  call?.settle(!outcome.pass);
-  return call?.abandoned === true ? PASSED : outcome;
-}
-
-/** Returns the matcher of the assertion name. */
-function matcherOf(name: string, runner: Runner): Matcher {
-  return function (this: State, received: unknown, ...args: unknown[]) {
-    if (this.isNot) return refusal(name);
-    const seat = runner.seat();
-    const result = invoke(name, seat, received, args);
-    if (VALUED.has(name) || !(result instanceof Promise)) return outcomeOf(seat);
-    const call = runner.start(this, name);
-    return result.then(
-      () => settled(call, seat),
-      (err: unknown) => {
-        call?.settle(true);
-        throw err;
-      },
-    );
-  };
-}
 
 /**
  * Returns the matchers of every assertion, by name, for the runner that

@@ -167,7 +167,9 @@ describe("shadow", () => {
     it("compares a value deeper than the depth of the standard's equality", () => {
       const log = join(temporary(), "shadow.jsonl");
       let deep: unknown = anything();
-      for (let level = 0; level < 102; level += 1) deep = [deep];
+      for (let level = 0; level < 102; level += 1) {
+        deep = [deep];
+      }
 
       expect(compare(log, { ...AGREES, received: deep, expected: deep })).toBe(false);
     });

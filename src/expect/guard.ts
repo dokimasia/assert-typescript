@@ -113,8 +113,11 @@ export class Pending {
   start(test: unknown, name: string): Call {
     const call = new Call(name);
     const calls = this.#tests.get(test);
-    if (calls === undefined) this.#tests.set(test, [call]);
-    else calls.push(call);
+    if (calls === undefined) {
+      this.#tests.set(test, [call]);
+    } else {
+      calls.push(call);
+    }
     return call;
   }
 
@@ -138,7 +141,11 @@ export class Pending {
   end(test: unknown): readonly Call[] {
     const calls = this.#tests.get(test) ?? [];
     this.#tests.delete(test);
-    for (const call of calls) if (!call.settled) call.abandon();
+    for (const call of calls) {
+      if (!call.settled) {
+        call.abandon();
+      }
+    }
     return calls;
   }
 }
