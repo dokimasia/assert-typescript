@@ -23,9 +23,6 @@ import { type Call, encodeCall, type Phase } from "./call.js";
 /** What a set of calls does with a record. */
 type State = "off" | "keeping" | "writing" | "running";
 
-/** Where the calls of a test write a record: its number, and its line of JSON. */
-export type Sink = (seq: number, line: string) => void;
-
 /** One call among the calls of its test. */
 interface Entry {
   /** The record, once the call has ended. */
@@ -43,6 +40,12 @@ interface Entry {
   /** The calls that keep the entry now. */
   home: Calls | undefined;
 }
+
+/** The calls of each seat of this library. */
+const SEATS = new WeakMap<object, Calls>();
+
+/** Where the calls of a test write a record: its number, and its line of JSON. */
+export type Sink = (seq: number, line: string) => void;
 
 /** The calls of a seat. A new set of calls records nothing. */
 export class Calls {
@@ -67,10 +70,14 @@ export class Calls {
       this.entries.push(e);
       return;
     }
-    if (this.state === "off") return;
+    if (this.state === "off") {
+      return;
+    }
     this.next += 1;
     e.seq = this.next;
-    if (e.call !== undefined) this.emit(e);
+    if (e.call !== undefined) {
+      this.emit(e);
+    }
   }
 
   /** Writes the record of e, a numbered entry whose call has ended. */
@@ -90,13 +97,12 @@ export class Calls {
       this.sink?.(e.seq, line);
       return;
     }
-    while (this.kept.length < e.seq) this.kept.push("");
+    while (this.kept.length < e.seq) {
+      this.kept.push("");
+    }
     this.kept[e.seq - 1] = line;
   }
 }
-
-/** The calls of each seat of this library. */
-const SEATS = new WeakMap<object, Calls>();
 
 /**
  * Returns the calls of seat, and registers new ones for a seat that has
@@ -246,7 +252,9 @@ export class Slot {
    */
   static begin(seat: object): Slot | undefined {
     const calls = callsOf(seat);
-    if (calls === undefined) return undefined;
+    if (calls === undefined) {
+      return undefined;
+    }
     const entry: Entry = {
       call: undefined,
       parent: undefined,
@@ -270,7 +278,7 @@ export class Slot {
    * @param phase - The phase of the run, for a property's case.
    */
   take(body: Calls, phase?: Phase): void {
-    const entries = body.entries;
+    const { entries } = body;
     body.entries = [];
     this.#runs += 1;
     const home = this.#entry.home as Calls;
@@ -293,6 +301,8 @@ export class Slot {
   write(call: Call): void {
     this.#entry.call = call;
     const home = this.#entry.home as Calls;
-    if (this.#entry.seq !== 0) home.emit(this.#entry);
+    if (this.#entry.seq !== 0) {
+      home.emit(this.#entry);
+    }
   }
 }

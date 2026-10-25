@@ -12,14 +12,6 @@
 
 import { show } from "../matcher/inspect.js";
 
-/** A typed literal: a JSON object whose `type` names its form. */
-export interface Literal {
-  /** The literal's type, as the encoding names it. */
-  readonly type: string;
-  /** The other keys of the literal's form. */
-  readonly [key: string]: unknown;
-}
-
 /**
  * The most levels of objects and arrays that a literal nests. A store
  * entry's root object, its counterexample and the draw take three of a
@@ -36,6 +28,12 @@ const MAX_PARTS = 65_536;
 
 /** The largest integer that a JSON reader in JavaScript keeps exact. */
 const SAFE = BigInt(Number.MAX_SAFE_INTEGER);
+
+/** The levels of a container's literal without its elements: its object and its array. */
+const CONTAINER_LEVELS = 2;
+
+/** The levels above a key, a value or a field of a map or a record: the container and the pair. */
+const PAIR_LEVELS = CONTAINER_LEVELS + 1;
 
 /** The scalar types of a list's `of`. */
 type Scalar = "bool" | "int" | "float" | "string";
@@ -63,10 +61,18 @@ function scalar(type: Scalar, plain: unknown): Written {
  * infinities by their names.
  */
 function numberOf(value: number): Written {
-  if (Number.isSafeInteger(value) && !Object.is(value, -0)) return scalar("int", value);
-  if (Number.isNaN(value)) return scalar("float", "NaN");
-  if (value === Number.POSITIVE_INFINITY) return scalar("float", "Inf");
-  if (value === Number.NEGATIVE_INFINITY) return scalar("float", "-Inf");
+  if (Number.isSafeInteger(value) && !Object.is(value, -0)) {
+    return scalar("int", value);
+  }
+  if (Number.isNaN(value)) {
+    return scalar("float", "NaN");
+  }
+  if (value === Number.POSITIVE_INFINITY) {
+    return scalar("float", "Inf");
+  }
+  if (value === Number.NEGATIVE_INFINITY) {
+    return scalar("float", "-Inf");
+  }
   return scalar("float", value);
 }
 
@@ -110,17 +116,12 @@ function opaqueKind(value: object): boolean {
   );
 }
 
-/** Returns the hexadecimal text of bytes, in lowercase. */
-function hex(bytes: Uint8Array): string {
-  let out = "";
-  for (const byte of bytes) out += byte.toString(16).padStart(2, "0");
-  return out;
-}
-
 /** The scalar type that every one of items has, or undefined. */
 function commonScalar(items: readonly Written[]): Scalar | undefined {
   const first = items[0]?.scalar;
-  if (first === undefined) return undefined;
+  if (first === undefined) {
+    return undefined;
+  }
   return items.every((item) => item.scalar === first) ? first : undefined;
 }
 
@@ -156,9 +157,12 @@ class Walk {
    * nests.
    */
   literalOf(value: unknown): Written | undefined {
-    if (!this.#spend(1) || this.#level > VALUE_DEPTH) return undefined;
-    if (value === null || value === undefined)
+    if (!this.#spend(1) || this.#level > VALUE_DEPTH) {
+      return undefined;
+    }
+    if (value === null || value === undefined) {
       return { form: { type: "null" }, depth: 1 };
+    }
     switch (typeof value) {
       case "boolean":
         return scalar("bool", value);
@@ -177,26 +181,39 @@ class Walk {
 
   /** Returns the literal of a string, and undefined for one that is no UTF-8 text. */
   #text(value: string): Written | undefined {
-    if (!(value.isWellFormed() && this.#spend(Buffer.byteLength(value))))
+    if (!(value.isWellFormed() && this.#spend(Buffer.byteLength(value)))) {
       return undefined;
+    }
     return scalar("string", value);
   }
 
   /** Returns the literal of an object, by its kind. */
   #objectOf(value: object): Written | undefined {
-    if (boxed(value))
-      return this.literalOf((value as { valueOf(): unknown }).valueOf());
-    if (opaqueKind(value)) return undefined;
+    if (boxed(value)) {
+      return this.literalOf((value as { valueOf: () => unknown }).valueOf());
+    }
+    if (opaqueKind(value)) {
+      return undefined;
+    }
     if (value instanceof Uint8Array) {
-      if (!this.#spend(value.length)) return undefined;
-      return { form: { type: "bytes", value: hex(value) }, depth: 1 };
+      if (!this.#spend(value.length)) {
+        return undefined;
+      }
+      const text = Buffer.from(value).toString("hex");
+      return { form: { type: "bytes", value: text }, depth: 1 };
     }
     if (ArrayBuffer.isView(value)) {
       return this.#listOf(Array.from(value as unknown as ArrayLike<unknown>));
     }
-    if (Array.isArray(value)) return this.#listOf(value);
-    if (value instanceof Set) return this.#listOf([...value]);
-    if (value instanceof Map) return this.#mapOf([...value]);
+    if (Array.isArray(value)) {
+      return this.#listOf(value);
+    }
+    if (value instanceof Set) {
+      return this.#listOf([...value]);
+    }
+    if (value instanceof Map) {
+      return this.#mapOf([...value]);
+    }
     if (value instanceof Date) {
       return Number.isNaN(value.getTime())
         ? undefined
@@ -210,37 +227,49 @@ class Walk {
    * the literal of each element otherwise.
    */
   #listOf(elements: readonly unknown[]): Written | undefined {
-    if (!this.#fits(elements.length)) return undefined;
+    if (!this.#fits(elements.length)) {
+      return undefined;
+    }
     const items: Written[] = [];
-    // An index walk, so a hole of a sparse array is an absent element.
-    for (let i = 0; i < elements.length; i += 1) {
-      const item = this.#nested(elements[i], 2);
-      if (item === undefined) return undefined;
+    // The iterator of an array visits a hole as undefined, so a hole of a
+    // sparse array is an absent element.
+    for (const element of elements) {
+      const item = this.#nested(element, CONTAINER_LEVELS);
+      if (item === undefined) {
+        return undefined;
+      }
       items.push(item);
     }
     const of = commonScalar(items);
     if (of !== undefined) {
-      return { form: { type: "list", of, value: items.map((i) => i.plain) }, depth: 2 };
+      const value = items.map((i) => i.plain);
+      return { form: { type: "list", of, value }, depth: CONTAINER_LEVELS };
     }
     const deepest = Math.max(0, ...items.map((i) => i.depth));
     return {
       form: { type: "list", items: items.map((i) => i.form) },
-      depth: 2 + deepest,
+      depth: CONTAINER_LEVELS + deepest,
     };
   }
 
   /** Returns the literal of a map: its entries, in the order the map lists them. */
   #mapOf(entries: readonly (readonly [unknown, unknown])[]): Written | undefined {
-    if (!this.#fits(2 * entries.length)) return undefined;
+    if (!this.#fits(2 * entries.length)) {
+      return undefined;
+    }
     const pairs: [Literal, Literal][] = [];
-    let depth = 2;
+    let depth = CONTAINER_LEVELS;
     for (const [key, value] of entries) {
-      const k = this.#nested(key, 3);
-      if (k === undefined) return undefined;
-      const v = this.#nested(value, 3);
-      if (v === undefined) return undefined;
+      const k = this.#nested(key, PAIR_LEVELS);
+      if (k === undefined) {
+        return undefined;
+      }
+      const v = this.#nested(value, PAIR_LEVELS);
+      if (v === undefined) {
+        return undefined;
+      }
       pairs.push([k.form, v.form]);
-      depth = Math.max(depth, 3 + k.depth, 3 + v.depth);
+      depth = Math.max(depth, PAIR_LEVELS + k.depth, PAIR_LEVELS + v.depth);
     }
     return { form: { type: "map", entries: pairs }, depth };
   }
@@ -248,18 +277,32 @@ class Walk {
   /** Returns the literal of an object: a record of its own enumerable fields, in order. */
   #recordOf(value: Record<string, unknown>): Written | undefined {
     const names = Object.keys(value);
-    if (!this.#fits(names.length)) return undefined;
+    if (!this.#fits(names.length)) {
+      return undefined;
+    }
     const fields: [string, Literal][] = [];
-    let depth = 2;
+    let depth = CONTAINER_LEVELS;
     for (const name of names) {
-      if (!this.#spend(Buffer.byteLength(name))) return undefined;
-      const field = this.#nested(value[name], 3);
-      if (field === undefined) return undefined;
+      if (!this.#spend(Buffer.byteLength(name))) {
+        return undefined;
+      }
+      const field = this.#nested(value[name], PAIR_LEVELS);
+      if (field === undefined) {
+        return undefined;
+      }
       fields.push([name, field.form]);
-      depth = Math.max(depth, 3 + field.depth);
+      depth = Math.max(depth, PAIR_LEVELS + field.depth);
     }
     return { form: { type: "record", fields }, depth };
   }
+}
+
+/** A typed literal: a JSON object whose `type` names its form. */
+export interface Literal {
+  /** The literal's type, as the encoding names it. */
+  readonly type: string;
+  /** The other keys of the literal's form. */
+  readonly [key: string]: unknown;
 }
 
 /**
@@ -291,7 +334,9 @@ class Walk {
  */
 export function encode(value: unknown): Literal | undefined {
   const written = new Walk().literalOf(value);
-  if (written === undefined || written.depth > VALUE_DEPTH) return undefined;
+  if (written === undefined || written.depth > VALUE_DEPTH) {
+    return undefined;
+  }
   return written.form;
 }
 
@@ -314,39 +359,4 @@ export function opaque(text: string): Literal {
  */
 export function detail(value: unknown): Literal {
   return encode(value) ?? opaque(show(value));
-}
-
-/**
- * Returns the JSON text of a JSON value, on one line, with the keys of
- * each object in the order the object lists them.
- *
- * It writes -0 as `-0`, where `JSON.stringify` writes `0`, so a float's
- * sign survives the text.
- *
- * @param value - A JSON value: null, a boolean, a finite number, a
- *   string, an array or a plain object of JSON values.
- * @returns The text.
- * @throws TypeError for a number that is not finite and for a value that
- *   is no JSON value, which no caller in this library builds.
- */
-export function json(value: unknown): string {
-  if (value === null) return "null";
-  switch (typeof value) {
-    case "boolean":
-    case "string":
-      return JSON.stringify(value);
-    case "number":
-      if (!Number.isFinite(value))
-        throw new TypeError(`record: ${value} is no JSON number`);
-      return Object.is(value, -0) ? "-0" : JSON.stringify(value);
-    case "object": {
-      if (Array.isArray(value)) return `[${value.map(json).join(",")}]`;
-      const fields = Object.entries(value as Record<string, unknown>)
-        .filter(([, v]) => v !== undefined)
-        .map(([k, v]) => `${JSON.stringify(k)}:${json(v)}`);
-      return `{${fields.join(",")}}`;
-    }
-    default:
-      throw new TypeError(`record: a ${typeof value} is no JSON value`);
-  }
 }

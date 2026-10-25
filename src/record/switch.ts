@@ -11,12 +11,6 @@
 
 import process from "node:process";
 
-/** The environment variable that switches recording on. */
-export const VARIABLE = "DOKIMI_ASSERT_RECORD";
-
-/** The reading of the switch: whether it is on, or the fault of a value it does not define. */
-export type Reading = { readonly on: boolean } | { readonly fault: Error };
-
 /**
  * The key of the reading on `globalThis`. vitest can evaluate this module
  * once per test file in one process, and the reading is the process's.
@@ -26,12 +20,22 @@ const KEY = Symbol.for("dokimi.assert.record.switch");
 /** Reads the variable. */
 function read(): Reading {
   const value = process.env[VARIABLE];
-  if (value === undefined || value === "" || value === "0") return { on: false };
-  if (value === "1") return { on: true };
+  if (value === undefined || value === "" || value === "0") {
+    return { on: false };
+  }
+  if (value === "1") {
+    return { on: true };
+  }
   return {
     fault: new Error(`${VARIABLE}: ${JSON.stringify(value)} is neither 0 nor 1`),
   };
 }
+
+/** The environment variable that switches recording on. */
+export const VARIABLE = "DOKIMI_ASSERT_RECORD";
+
+/** The reading of the switch: whether it is on, or the fault of a value it does not define. */
+export type Reading = { readonly on: boolean } | { readonly fault: Error };
 
 /**
  * Returns the reading of the switch, which the process reads once: a

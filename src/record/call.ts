@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { directoryOf } from "../failure.js";
-import { json } from "./literal.js";
+import { json } from "./json.js";
 
 /**
  * The definition version that this library implements, which every call

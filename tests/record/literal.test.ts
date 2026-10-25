@@ -5,7 +5,7 @@
 
 import { describe } from "vitest";
 import { check } from "../../src/index.js";
-import { detail, encode, json, opaque } from "../../src/record/literal.js";
+import { detail, encode, opaque } from "../../src/record/literal.js";
 import { test as it } from "../../src/vitest.js";
 
 /** A class whose instances have two own fields. */
@@ -193,17 +193,17 @@ describe("literal", () => {
       },
       {
         name: "returns the literal of the value of a boxed number",
-        give: Object(1),
+        give: new Object(1),
         want: { type: "int", value: 1 },
       },
       {
         name: "returns the literal of the value of a boxed string",
-        give: Object("a"),
+        give: new Object("a"),
         want: { type: "string", value: "a" },
       },
       {
         name: "returns the literal of the value of a boxed bigint",
-        give: Object(3n),
+        give: new Object(3n),
         want: { type: "int", value: 3 },
       },
       {
@@ -242,7 +242,7 @@ describe("literal", () => {
       },
       {
         name: "returns undefined for a boxed symbol",
-        give: Object(Symbol("s")),
+        give: new Object(Symbol("s")),
         want: undefined,
       },
       {
@@ -303,7 +303,7 @@ describe("literal", () => {
       },
       {
         name: "returns undefined for an array of 65,536 elements",
-        give: Array(65_536).fill(1),
+        give: new Array(65_536).fill(1),
         want: undefined,
       },
       {
@@ -373,45 +373,12 @@ describe("literal", () => {
     it("returns the opaque literal of the text of a function", ({ seat }) => {
       check.isEqualTo(
         seat,
-        detail(function named() {}),
+        detail(function named() {
+          // The literal states the name of the function alone.
+        }),
         opaque("[function named]"),
         "the function's text",
       );
-    });
-  });
-
-  describe("json", () => {
-    it("returns one line with the keys of each object in their order", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        json({ b: 1, a: [true, null, "x"], d: { e: 2 } }),
-        '{"b":1,"a":[true,null,"x"],"d":{"e":2}}',
-        "the line",
-      );
-    });
-
-    it("leaves out a field whose value is undefined", ({ seat }) => {
-      check.isEqualTo(seat, json({ a: 1, c: undefined }), '{"a":1}', "no field c");
-    });
-
-    it("writes -0 as -0", ({ seat }) => {
-      check.isEqualTo(seat, json({ e: -0 }), '{"e":-0}', "the sign survives");
-    });
-
-    it("throws a TypeError for a number that is not finite", ({ seat }) => {
-      const err = check.doesThrow(
-        seat,
-        () => json(Number.NaN),
-        "NaN is no JSON number",
-      );
-
-      check.isTrue(seat, err instanceof TypeError, "the error is a TypeError");
-    });
-
-    it("throws a TypeError for a value that is no JSON value", ({ seat }) => {
-      const err = check.doesThrow(seat, () => json(1n), "a bigint is no JSON value");
-
-      check.isTrue(seat, err instanceof TypeError, "the error is a TypeError");
     });
   });
 });
