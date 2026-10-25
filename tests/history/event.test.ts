@@ -17,7 +17,9 @@ function int(value: number): Record<string, unknown> {
 }
 
 /** A function whose text an opaque literal states. */
-function probe(): void {}
+function probe(): void {
+  // The opaque literal states the name of the function alone.
+}
 
 describe("event", () => {
   describe("eventJson", () => {

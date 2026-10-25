@@ -8,6 +8,7 @@
  */
 
 import { describe, onTestFinished, vi } from "vitest";
+import type { Ending, SpecError } from "../../src/history/ending.js";
 import { History, recorded } from "../../src/history/history.js";
 import {
   budget,
@@ -17,8 +18,8 @@ import {
   timeLimit,
 } from "../../src/history/option.js";
 import { callsOf } from "../../src/history/partition.js";
-import { type Ending, Search, SpecError } from "../../src/history/search.js";
-import { CallOperation, type Spec, specFrom } from "../../src/history/spec.js";
+import { Search } from "../../src/history/search.js";
+import { type Spec, specFrom } from "../../src/history/spec.js";
 import { check, equateNans } from "../../src/index.js";
 import { test as it } from "../../src/vitest.js";
 import { REGISTER } from "../helpers.js";
@@ -58,7 +59,9 @@ const LOCK: Spec<unknown> = {
   initial: () => null,
   next: (state, op) => {
     const [client] = op.args;
-    if (op.name === "acquire") return state === null ? [client] : [];
+    if (op.name === "acquire") {
+      return state === null ? [client] : [];
+    }
     return state === client ? [null] : [];
   },
 };
@@ -90,37 +93,6 @@ function specError(history: History, spec: Spec<unknown>): SpecError | undefined
 }
 
 describe("search", () => {
-  describe("new SpecError", () => {
-    it("returns the error of a function that threw on a stepped call", ({ seat }) => {
-      const cause = new Error("boom");
-      const err = new SpecError(
-        "next",
-        { call: 4, operation: new CallOperation("read", [], true, 1) },
-        cause,
-      );
-
-      check.isEqualTo(
-        seat,
-        [err.name, err.message, err.fn, err.call, err.operation, err.cause],
-        ["SpecError", 'the spec\'s next throws on "read"', "next", 4, "read", cause],
-        "the fields",
-      );
-    });
-
-    it("returns the error of a function that threw before the first step", ({
-      seat,
-    }) => {
-      const err = new SpecError("initial", undefined, "boom");
-
-      check.isEqualTo(
-        seat,
-        [err.message, err.call, err.operation],
-        ["the spec's initial throws", undefined, undefined],
-        "no call",
-      );
-    });
-  });
-
   describe("Search.run", () => {
     it("returns a pass with the states after the order it found", ({ seat }) => {
       check.isEqualTo(
@@ -446,12 +418,12 @@ describe("search", () => {
     it("compares the states with the spec's equal", ({ seat }) => {
       const parity: Spec<number> = {
         initial: () => 0,
-        next: (state, op) =>
-          op.name === "write"
-            ? [op.args[0] as number, 2]
-            : op.returned(state % 2)
-              ? [state]
-              : [],
+        next: (state, op) => {
+          if (op.name === "write") {
+            return [op.args[0] as number, 2];
+          }
+          return op.returned(state % 2) ? [state] : [];
+        },
         equal: (a, b) => a % 2 === b % 2,
         key: (state) => String(state % 2),
       };

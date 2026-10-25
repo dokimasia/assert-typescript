@@ -5,11 +5,20 @@
  * The options of a check of linearizability: its limits, and its workers.
  */
 
+/** Throws a RangeError for a value that is no integer of least or more. */
+function atLeast(call: string, value: number, least: number): void {
+  if (!Number.isSafeInteger(value) || value < least) {
+    throw new RangeError(
+      `history: ${call}(${value}) is no integer of ${least} or more`,
+    );
+  }
+}
+
 /** The steps that the search of one partition may spend when no option states them. */
 export const BUDGET = 10_000_000;
 
 /** The bits that the memo of one partition may count when no option states them: 2^33, which is 1 GiB. */
-export const MEMO_LIMIT = 2 ** 33;
+export const MEMO_LIMIT = 8_589_934_592;
 
 /** What the options of one check state. */
 export interface Config {
@@ -25,15 +34,6 @@ export interface Config {
 export interface Option {
   /** Returns the settings with the option's setting applied. */
   readonly set: (config: Config) => Config;
-}
-
-/** Throws a RangeError for a value that is no integer of least or more. */
-function atLeast(call: string, value: number, least: number): void {
-  if (!Number.isSafeInteger(value) || value < least) {
-    throw new RangeError(
-      `history: ${call}(${value}) is no integer of ${least} or more`,
-    );
-  }
 }
 
 /**
@@ -109,6 +109,8 @@ export function workers(n: number): Option {
  */
 export function configure(options: readonly Option[]): Config {
   let config: Config = { budget: BUDGET, memoLimit: MEMO_LIMIT, timeLimit: 0 };
-  for (const option of options) config = option.set(config);
+  for (const option of options) {
+    config = option.set(config);
+  }
   return config;
 }

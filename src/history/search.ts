@@ -27,6 +27,7 @@
  * its states and the candidates that the spec rejected there.
  */
 
+import { type Ending, type Limit, SpecError, type Verdict } from "./ending.js";
 import type { Config } from "./option.js";
 import type { Checked } from "./partition.js";
 import {
@@ -38,61 +39,11 @@ import {
   stateKey,
 } from "./spec.js";
 
-/** How a check or the search of a partition ended. */
-export type Verdict = "passed" | "violated" | "undecided";
-
-/** The limit that stopped an undecided search. */
-export type Limit = "steps" | "memo" | "time";
-
 /** The number of steps between two readings of the clock. */
 const CLOCK_STEPS = 1024;
 
-/** How the search of one partition ended, and its frontier. */
-export interface Ending<S> {
-  /** The partition's verdict. */
-  readonly outcome: Verdict;
-  /** The steps that the search spent. */
-  readonly steps: number;
-  /** The positions of the frontier's calls, in order, for a search that did not pass. */
-  readonly linearized: readonly number[];
-  /** The frontier's states, or for a search that passed the states after the order it found. */
-  readonly states: readonly S[];
-  /** The positions of the calls that the spec rejected at the frontier. */
-  readonly candidates: readonly number[];
-  /** The limit that stopped an undecided search. */
-  readonly limit: Limit | undefined;
-}
-
-/** A function of a spec that threw during a search, with the call that the search stepped. */
-export class SpecError extends Error {
-  /** The function: initial, next, equal or key. */
-  readonly fn: string;
-  /** The call that the search stepped, or undefined before the first step. */
-  readonly call: number | undefined;
-  /** The operation of that call, or undefined before the first step. */
-  readonly operation: string | undefined;
-
-  /**
-   * Returns the error of a function of a spec that threw.
-   *
-   * @param fn - The function.
-   * @param stepped - The call that the search stepped, as the record states it, or undefined.
-   * @param cause - What the function threw.
-   */
-  constructor(
-    fn: string,
-    stepped: { readonly call: number; readonly operation: Operation } | undefined,
-    cause: unknown,
-  ) {
-    const on =
-      stepped === undefined ? "" : ` on ${JSON.stringify(stepped.operation.name)}`;
-    super(`the spec's ${fn} throws${on}`, { cause });
-    this.name = "SpecError";
-    this.fn = fn;
-    this.call = stepped?.call;
-    this.operation = stepped?.operation.name;
-  }
-}
+/** The radix of the set of linearized calls in the name of a configuration. */
+const HEX_RADIX = 16;
 
 /** A limit that stopped the search. */
 class Stopped {
@@ -138,7 +89,7 @@ export class Search<S> {
   #linearized: number[] = [];
   #frontier: S[] = [];
   #candidates: number[] = [];
-  #atFrontier = true;
+  #atFrontier: boolean;
   /** The spec's function that the search calls, and the position of the call that it steps. */
   #calling = "initial";
   #stepped: number | undefined;
@@ -171,8 +122,9 @@ export class Search<S> {
     const entries: [event: number, position: number, invokes: boolean][] = [];
     calls.forEach(({ span }, position) => {
       entries.push([span.call, position, true]);
-      if (span.operation.known)
+      if (span.operation.known) {
         entries.push([span.completion as number, position, false]);
+      }
     });
     entries.sort(([a], [b]) => a - b);
     const n = entries.length;
@@ -189,10 +141,14 @@ export class Search<S> {
     this.#invocation = new Array<number>(calls.length).fill(0);
     this.#completion = new Array<number | undefined>(calls.length).fill(undefined);
     entries.forEach(([, position, invokes], entry) => {
-      if (invokes) this.#invocation[position] = entry;
-      else this.#completion[position] = entry;
+      if (invokes) {
+        this.#invocation[position] = entry;
+      } else {
+        this.#completion[position] = entry;
+      }
     });
     this.#open = calls.filter(({ span }) => span.operation.known).length;
+    this.#atFrontier = true;
   }
 
   /**
@@ -210,7 +166,9 @@ export class Search<S> {
       }
       return this.#ending("violated", undefined);
     } catch (err) {
-      if (err instanceof Stopped) return this.#ending("undecided", err.limit);
+      if (err instanceof Stopped) {
+        return this.#ending("undecided", err.limit);
+      }
       const stepped =
         this.#stepped === undefined ? undefined : this.#calls[this.#stepped]?.span;
       throw new SpecError(this.#calling, stepped, err);
@@ -234,7 +192,9 @@ export class Search<S> {
     let entry = this.#next[this.#head] as number;
     while (this.#open > 0) {
       if (!this.#invokes[entry]) {
-        if (this.#stack.length === 0) return false;
+        if (this.#stack.length === 0) {
+          return false;
+        }
         entry = this.#backtrack();
       } else if (this.#linearize(this.#position[entry] as number)) {
         entry = this.#next[this.#head] as number;
@@ -250,11 +210,15 @@ export class Search<S> {
     this.#stepped = position;
     const following = this.#step((this.#calls[position] as Checked).span.operation);
     if (following.length === 0) {
-      if (this.#atFrontier) this.#candidates.push(position);
+      if (this.#atFrontier) {
+        this.#candidates.push(position);
+      }
       return false;
     }
     const done = this.#done | (1n << BigInt(position));
-    if (!this.#remember(done, following)) return false;
+    if (!this.#remember(done, following)) {
+      return false;
+    }
     this.#stack.push([position, this.#states]);
     this.#done = done;
     this.#states = following;
@@ -274,15 +238,21 @@ export class Search<S> {
     for (const state of this.#states) {
       this.#calling = "next";
       const cost = this.#cost(state);
-      if (this.#steps + cost > this.#budget) throw new Stopped("steps");
+      if (this.#steps + cost > this.#budget) {
+        throw new Stopped("steps");
+      }
       if (this.#steps >= this.#clockAt) {
-        if (performance.now() >= this.#deadline) throw new Stopped("time");
+        if (performance.now() >= this.#deadline) {
+          throw new Stopped("time");
+        }
         this.#clockAt = this.#steps + CLOCK_STEPS;
       }
       this.#steps += cost;
       for (const after of this.#spec.next(state, op)) {
         this.#calling = "equal";
-        if (!following.some((kept) => this.#equal(after, kept))) following.push(after);
+        if (!following.some((kept) => this.#equal(after, kept))) {
+          following.push(after);
+        }
         this.#calling = "next";
       }
     }
@@ -293,7 +263,7 @@ export class Search<S> {
   #remember(done: bigint, states: S[]): boolean {
     this.#calling = "key";
     const keys = [...new Set(states.map(this.#key))].sort();
-    const name = `${done.toString(16)}|${JSON.stringify(keys)}`;
+    const name = `${done.toString(HEX_RADIX)}|${JSON.stringify(keys)}`;
     const bucket = this.#memo.get(name) ?? [];
     this.#calling = "equal";
     for (const seen of bucket) {

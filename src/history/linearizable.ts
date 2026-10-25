@@ -12,6 +12,7 @@ import { Fault, ofOperation } from "../matcher/fault.js";
 import { Mode, type Seat } from "../matcher/seat.js";
 import { Running } from "../matcher/verdict.js";
 import { detail as literalOf } from "../record/literal.js";
+import type { Ending, Limit, SpecError, Verdict } from "./ending.js";
 import { History, recorded } from "./history.js";
 import { configure, type Option } from "./option.js";
 import {
@@ -23,48 +24,11 @@ import {
   type Span,
   spanJson,
 } from "./partition.js";
-import {
-  type Ending,
-  type Limit,
-  Search,
-  type SpecError,
-  type Verdict,
-} from "./search.js";
+import { Search } from "./search.js";
 import type { Spec } from "./spec.js";
-
-/** The assertion of the record. */
-export const LINEARIZABLE = "linearizable";
 
 /** The operation that the faults of a check name. */
 const OP = "history.isLinearizable";
-
-/**
- * The detail of the record of a check: the ten fields of the definition. A
- * check that passed states the outcome, the partitions and the steps, and
- * leaves the fields of a reported partition empty.
- */
-export interface Detail<S> {
-  /** How the check ended. */
-  readonly outcome: Verdict;
-  /** The number of partitions. */
-  readonly partitions: number;
-  /** The steps of the partitions up to and including the reported one, and of every partition of a check that passed. */
-  readonly steps: number;
-  /** The keys of the reported partition, and none for every key. */
-  readonly partition: readonly unknown[];
-  /** The number of calls of the reported partition. */
-  readonly calls: number;
-  /** The most calls of the reported partition that are open at one event. */
-  readonly concurrency: number;
-  /** The frontier's order of calls. */
-  readonly linearized: readonly Span[];
-  /** The frontier's states. */
-  readonly states: readonly S[];
-  /** The calls that the spec rejected at the frontier. */
-  readonly candidates: readonly Span[];
-  /** The limit that stopped an undecided check, and undefined for a violated one. */
-  readonly limit: Limit | undefined;
-}
 
 /** Returns the detail of a check that reports partition p of partitions, whose search ended as ending. */
 function reported<S>(
@@ -105,6 +69,37 @@ function passed<S>(partitions: number, steps: number): Detail<S> {
   };
 }
 
+/** The assertion of the record. */
+export const LINEARIZABLE = "linearizable";
+
+/**
+ * The detail of the record of a check: the ten fields of the definition. A
+ * check that passed states the outcome, the partitions and the steps, and
+ * leaves the fields of a reported partition empty.
+ */
+export interface Detail<S> {
+  /** How the check ended. */
+  readonly outcome: Verdict;
+  /** The number of partitions. */
+  readonly partitions: number;
+  /** The steps of the partitions up to and including the reported one, and of every partition of a check that passed. */
+  readonly steps: number;
+  /** The keys of the reported partition, and none for every key. */
+  readonly partition: readonly unknown[];
+  /** The number of calls of the reported partition. */
+  readonly calls: number;
+  /** The most calls of the reported partition that are open at one event. */
+  readonly concurrency: number;
+  /** The frontier's order of calls. */
+  readonly linearized: readonly Span[];
+  /** The frontier's states. */
+  readonly states: readonly S[];
+  /** The calls that the spec rejected at the frontier. */
+  readonly candidates: readonly Span[];
+  /** The limit that stopped an undecided check, and undefined for a violated one. */
+  readonly limit: Limit | undefined;
+}
+
 /**
  * Returns the detail of the check of history against spec under options:
  * the first violated partition, else the first undecided one, else a pass.
@@ -132,10 +127,13 @@ export function check<S>(
   for (const p of partitions) {
     const ending = new Search(p.calls, spec, config, deadline).run();
     steps += ending.steps;
-    if (ending.outcome === "passed") continue;
-    const detail = reported(p, ending, partitions.length, steps);
-    if (ending.outcome === "violated") return detail;
-    undecided ??= detail;
+    if (ending.outcome !== "passed") {
+      const detail = reported(p, ending, partitions.length, steps);
+      if (ending.outcome === "violated") {
+        return detail;
+      }
+      undecided ??= detail;
+    }
   }
   return undecided ?? passed(partitions.length, steps);
 }
@@ -257,7 +255,9 @@ export function isLinearizable<S>(
     );
     return;
   }
-  if (typeof spec?.initial !== "function" || typeof spec.next !== "function") {
+  // A caller without types can pass a spec that lacks either function.
+  const stated: Partial<Spec<S>> | undefined = spec;
+  if (typeof stated?.initial !== "function" || typeof stated.next !== "function") {
     run.fault(
       Mode.Fatal,
       LINEARIZABLE,
@@ -276,7 +276,7 @@ export function isLinearizable<S>(
       Mode.Fatal,
       LINEARIZABLE,
       msg,
-      ofOperation(OP, new Fault(at, message, cause)),
+      ofOperation(OP, new Fault(at, message, { cause })),
     );
     return;
   }

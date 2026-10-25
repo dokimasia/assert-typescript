@@ -27,7 +27,9 @@ function refusal(history: History): string {
   try {
     transactions(history.events());
   } catch (err) {
-    if (err instanceof TransactionError) return err.message;
+    if (err instanceof TransactionError) {
+      return err.message;
+    }
     throw err;
   }
   return "";

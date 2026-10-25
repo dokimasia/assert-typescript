@@ -8,7 +8,7 @@
  */
 
 import { describe } from "vitest";
-import type { Edge } from "../../src/history/derivation.js";
+import type { Edge } from "../../src/history/anomaly.js";
 import { History } from "../../src/history/history.js";
 import {
   checkIsolation,
@@ -182,11 +182,11 @@ describe("isolation", () => {
         invokeTxn(history, 1, append("y", 2)),
         invokeTxn(history, 2, readOf("x", null), readOf("y", null)),
         invokeTxn(history, 3, readOf("x", null), readOf("y", null)),
-      ];
-      calls[0]?.ok([append("x", 1)]);
-      calls[1]?.ok([append("y", 2)]);
-      calls[2]?.ok([readOf("x", [1]), readOf("y", [])]);
-      calls[3]?.ok([readOf("x", []), readOf("y", [2])]);
+      ] as const;
+      calls[0].ok([append("x", 1)]);
+      calls[1].ok([append("y", 2)]);
+      calls[2].ok([readOf("x", [1]), readOf("y", [])]);
+      calls[3].ok([readOf("x", []), readOf("y", [2])]);
 
       check.isEqualTo(
         seat,
@@ -354,7 +354,9 @@ describe("isolation", () => {
 
     it("returns the explanation of an incompatible order", ({ seat }) => {
       const history = new History();
-      for (const value of [1, 2, 3]) runTxn(history, value, append("x", value));
+      for (const value of [1, 2, 3]) {
+        runTxn(history, value, append("x", value));
+      }
       runTxn(history, 0, readOf("x", [1, 2]));
       runTxn(history, 0, readOf("x", [1, 3]));
 

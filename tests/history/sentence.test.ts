@@ -5,7 +5,7 @@
 
 import { describe } from "vitest";
 import { Failure } from "../../src/failure.js";
-import type { Anomaly, Evidence, Observation } from "../../src/history/derivation.js";
+import type { Anomaly, Evidence, Observation } from "../../src/history/anomaly.js";
 import { History } from "../../src/history/history.js";
 import { check as checked, fieldsOf } from "../../src/history/linearizable.js";
 import { budget } from "../../src/history/option.js";

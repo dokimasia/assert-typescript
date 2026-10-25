@@ -6,7 +6,7 @@
  */
 
 /** The longest time that a timer of the platform waits: 2^31 − 1 milliseconds. */
-const LONGEST = 2 ** 31 - 1;
+const LONGEST = 2_147_483_647;
 
 /** What one client of {@link concurrently} did. */
 export interface Outcome {
@@ -81,6 +81,8 @@ export async function concurrently(
   await Promise.race([Promise.all(runs), waited]);
   clearTimeout(timer);
   const first = raised.find((one) => one !== undefined);
-  if (first !== undefined) throw first.error;
+  if (first !== undefined) {
+    throw first.error;
+  }
   return [...outcomes];
 }

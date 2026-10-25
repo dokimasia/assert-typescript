@@ -9,6 +9,7 @@
  */
 
 import { describe, onTestFinished, vi } from "vitest";
+import { SpecError } from "../../src/history/ending.js";
 import type { Call } from "../../src/history/history.js";
 import { History } from "../../src/history/history.js";
 import {
@@ -21,9 +22,9 @@ import {
   whole,
 } from "../../src/history/linearizable.js";
 import { budget, memoLimit, timeLimit, workers } from "../../src/history/option.js";
-import { SpecError } from "../../src/history/search.js";
 import type { Operation, Spec } from "../../src/history/spec.js";
 import { check } from "../../src/index.js";
+import { compareText } from "../../src/order.js";
 import { Recorder } from "../../src/seat.js";
 import { test as it } from "../../src/vitest.js";
 import { Plain, REGISTER, records } from "../helpers.js";
@@ -584,7 +585,7 @@ describe("linearizable", () => {
         [
           failure?.assertion,
           failure?.contract,
-          Object.keys(failure?.detail ?? {}).sort(),
+          Object.keys(failure?.detail ?? {}).sort(compareText),
           records(recorder)[0]?.["detail"],
         ],
         [
@@ -659,7 +660,9 @@ describe("linearizable", () => {
           {
             initial: () => null,
             next: (_state: unknown, op: Operation) => {
-              if (op.name === "read") throw new Error("boom");
+              if (op.name === "read") {
+                throw new Error("boom");
+              }
               return [op.args[0]];
             },
           },

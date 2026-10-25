@@ -8,13 +8,14 @@ import { Failure, render } from "../../src/failure.js";
 import * as history from "../../src/history/index.js";
 import { isolationSentence, sentence } from "../../src/history/sentence.js";
 import { check } from "../../src/index.js";
+import { compareText } from "../../src/order.js";
 import { test as it } from "../../src/vitest.js";
 
 describe("index", () => {
   it("exports the names of the module", ({ seat }) => {
     check.isEqualTo(
       seat,
-      Object.keys(history).sort(),
+      Object.keys(history).sort(compareText),
       [
         "Call",
         "History",

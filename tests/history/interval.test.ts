@@ -36,7 +36,9 @@ function refusal(entries: readonly Interval[]): [number, string] {
   try {
     fromIntervals(entries);
   } catch (err) {
-    if (err instanceof IntervalError) return [err.entry, err.message];
+    if (err instanceof IntervalError) {
+      return [err.entry, err.message];
+    }
     throw err;
   }
   return [-1, ""];

@@ -14,7 +14,9 @@
  */
 
 import { show } from "../matcher/inspect.js";
-import { encode, json, type Literal } from "../record/literal.js";
+import { compareText } from "../order.js";
+import { json } from "../record/json.js";
+import { encode, type Literal } from "../record/literal.js";
 import type { Event } from "./event.js";
 
 /**
@@ -26,7 +28,7 @@ function normalized(literal: Literal): Literal {
     const entries = (literal["entries"] as [Literal, Literal][])
       .map(([k, v]) => [normalized(k), normalized(v)] as const)
       .map((pair) => [json(pair), pair] as const)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .sort(([a], [b]) => compareText(a, b))
       .map(([, pair]) => pair);
     return { ...literal, entries };
   }
@@ -40,20 +42,6 @@ function normalized(literal: Literal): Literal {
     return { ...literal, fields };
   }
   return literal;
-}
-
-/**
- * Returns the identity of a key or a value: the JSON text of its typed
- * literal, with the entries of each map in one order. Two values have one
- * identity when their typed literals are equal, whatever order the entries
- * of a map are in.
- *
- * @param value - The value.
- * @returns The identity, or undefined for a value that no typed literal states.
- */
-export function identityOf(value: unknown): string | undefined {
-  const literal = encode(value);
-  return literal === undefined ? undefined : json(normalized(literal));
 }
 
 /** The state of a history, which the checks read. */
@@ -76,6 +64,43 @@ const STATES = new WeakMap<History, State>();
 /** The kind of a completion. */
 type Ending = "ok" | "fail" | "unknown";
 
+/** Records the completion of kind of the call whose invocation is at index call. */
+function complete(state: State, call: number, kind: Ending, value: unknown): void {
+  const invocation = state.events[call] as Event;
+  if (state.open.get(invocation.client) !== call) {
+    throw new Error(`history: call ${call} completes a second time`);
+  }
+  state.open.delete(invocation.client);
+  if (kind === "unknown") {
+    state.process.delete(invocation.client);
+  }
+  const index = state.events.length;
+  state.events.push({
+    index,
+    kind,
+    call,
+    client: invocation.client,
+    process: invocation.process,
+    output: kind === "ok" ? value : undefined,
+    error: kind === "ok" ? undefined : value,
+  });
+  state.ids.push([]);
+}
+
+/**
+ * Returns the identity of a key or a value: the JSON text of its typed
+ * literal, with the entries of each map in one order. Two values have one
+ * identity when their typed literals are equal, whatever order the entries
+ * of a map are in.
+ *
+ * @param value - The value.
+ * @returns The identity, or undefined for a value that no typed literal states.
+ */
+export function identityOf(value: unknown): string | undefined {
+  const literal = encode(value);
+  return literal === undefined ? undefined : json(normalized(literal));
+}
+
 /**
  * An open call of a {@link History}, through which its client records the
  * completion. Two completions of one call are a usage error.
@@ -85,13 +110,13 @@ export class Call {
   readonly #complete: (kind: Ending, value: unknown) => void;
 
   /**
-   * Returns the call whose completions complete records. History.invoke
+   * Returns the call whose completions completing records. History.invoke
    * constructs each call.
    *
-   * @param complete - Records a completion of the call.
+   * @param completing - Records a completion of the call.
    */
-  constructor(complete: (kind: Ending, value: unknown) => void) {
-    this.#complete = complete;
+  constructor(completing: (kind: Ending, value: unknown) => void) {
+    this.#complete = completing;
   }
 
   /**
@@ -215,27 +240,6 @@ export class History {
   events(): readonly Event[] {
     return [...(STATES.get(this) as State).events];
   }
-}
-
-/** Records the completion of kind of the call whose invocation is at index call. */
-function complete(state: State, call: number, kind: Ending, value: unknown): void {
-  const invocation = state.events[call] as Event;
-  if (state.open.get(invocation.client) !== call) {
-    throw new Error(`history: call ${call} completes a second time`);
-  }
-  state.open.delete(invocation.client);
-  if (kind === "unknown") state.process.delete(invocation.client);
-  const index = state.events.length;
-  state.events.push({
-    index,
-    kind,
-    call,
-    client: invocation.client,
-    process: invocation.process,
-    output: kind === "ok" ? value : undefined,
-    error: kind === "ok" ? undefined : value,
-  });
-  state.ids.push([]);
 }
 
 /**

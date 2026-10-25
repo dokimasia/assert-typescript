@@ -19,11 +19,12 @@ import { test as it } from "../../src/vitest.js";
 /** Returns the graph of edges, with the targets of each transaction in ascending order. */
 function graph(...edges: [number, number][]): Graph {
   const out = new Map<number, number[]>();
-  for (const [a, b] of edges)
+  for (const [a, b] of edges) {
     out.set(
       a,
       [...(out.get(a) ?? []), b].sort((x, y) => x - y),
     );
+  }
   return out;
 }
 

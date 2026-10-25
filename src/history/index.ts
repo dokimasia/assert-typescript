@@ -54,8 +54,8 @@ import { isolationSentence, sentence } from "./sentence.js";
 registerSentence(sentence, LINEARIZABLE);
 registerSentence(isolationSentence, SERIALIZABLE, SNAPSHOT_ISOLATION);
 
+export type { Edge, Evidence, Link, Observation } from "./anomaly.js";
 export { concurrently, type Outcome } from "./concurrently.js";
-export type { Edge, Evidence, Link, Observation } from "./derivation.js";
 export type { Completion, Event, Invocation, Kind } from "./event.js";
 export { Call, History } from "./history.js";
 export { fromIntervals, type Interval } from "./interval.js";

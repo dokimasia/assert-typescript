@@ -80,7 +80,9 @@ describe("concurrently", () => {
         seat,
         () =>
           concurrently(3, 1000, (client) => {
-            if (client > 0) throw new RangeError(`client ${client}`);
+            if (client > 0) {
+              throw new RangeError(`client ${client}`);
+            }
           }),
         "the clients throw",
       );

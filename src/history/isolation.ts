@@ -20,25 +20,22 @@ import { Running } from "../matcher/verdict.js";
 import { detail as literalOf } from "../record/literal.js";
 import {
   ANOMALIES,
-  Analysis,
   type Anomaly,
   type Edge,
   type Evidence,
   type Instance,
   type Link,
   type Observation,
-} from "./derivation.js";
+} from "./anomaly.js";
+import { Analysis } from "./derivation.js";
 import { History } from "./history.js";
 import { type Transaction, transactionJson, transactions } from "./transaction.js";
 
 /** The assertion of a check of serializability. */
-export const SERIALIZABLE = "serializable";
+const SERIALIZABLE = "serializable";
 
 /** The assertion of a check of snapshot isolation. */
-export const SNAPSHOT_ISOLATION = "snapshot-isolation";
-
-/** An isolation level, which the assertion of the same id checks. */
-export type Level = typeof SERIALIZABLE | typeof SNAPSHOT_ISOLATION;
+const SNAPSHOT_ISOLATION = "snapshot-isolation";
 
 /**
  * The kinds that each level forbids. Snapshot isolation permits a cycle in
@@ -48,51 +45,6 @@ const FORBIDS: Readonly<Record<Level, readonly Anomaly[]>> = {
   [SERIALIZABLE]: ANOMALIES,
   [SNAPSHOT_ISOLATION]: ANOMALIES.filter((kind) => kind !== "G2"),
 };
-
-/** The detail of the record of a failing isolation check: the five fields of the definition. */
-export interface IsolationDetail {
-  /** The first kind that the level forbids and the history exhibits. */
-  readonly anomaly: Anomaly;
-  /** Every kind that the level forbids and the history exhibits, in report order. */
-  readonly kinds: readonly Anomaly[];
-  /** The transactions that the anomaly involves. */
-  readonly transactions: readonly Transaction[];
-  /** The cycle of a cycle anomaly, and null for any other. */
-  readonly cycle: readonly Link[] | null;
-  /** The evidence of the anomaly: an edge for each link of a cycle, or one observation. */
-  readonly explanation: readonly Evidence[];
-}
-
-/**
- * Returns the detail of the check of a history's events at a level, or
- * undefined for a history that exhibits no anomaly that the level forbids.
- *
- * @param events - The events of the history.
- * @param level - The isolation level.
- * @returns The detail.
- * @throws TransactionError for a history that is no history of list-append
- *   transactions.
- */
-export function checkIsolation(
-  events: Parameters<typeof transactions>[0],
-  level: Level,
-): IsolationDetail | undefined {
-  const txns = transactions(events);
-  const analysis = new Analysis(txns);
-  const found = FORBIDS[level]
-    .map((kind) => [kind, analysis.instance(kind)] as const)
-    .filter((pair): pair is readonly [Anomaly, Instance] => pair[1] !== undefined);
-  const first = found[0]?.[1];
-  if (first === undefined) return undefined;
-  const byCall = new Map(txns.map((txn) => [txn.call, txn]));
-  return {
-    anomaly: first.anomaly,
-    kinds: found.map(([kind]) => kind),
-    transactions: first.calls.map((call) => byCall.get(call) as Transaction),
-    cycle: first.cycle ?? null,
-    explanation: first.explanation,
-  };
-}
 
 /** Returns an edge of a cycle as the explanation of a record states it. */
 function edgeJson(edge: Edge): Record<string, unknown> {
@@ -141,37 +93,6 @@ function observationJson(o: Observation): Record<string, unknown> {
   }
 }
 
-/**
- * Returns one entry of an explanation as a record states it.
- *
- * @param evidence - The entry.
- * @returns The JSON value.
- */
-export function evidenceJson(evidence: Evidence): Record<string, unknown> {
-  return "relation" in evidence ? edgeJson(evidence) : observationJson(evidence);
-}
-
-/**
- * Returns the detail of a failing isolation check as its call record states
- * it: the kinds by their spellings, each transaction in the history's JSON
- * form, null for the cycle of an anomaly that is no cycle, and each entry of
- * the explanation with its values as typed literals.
- *
- * @param detail - The detail.
- * @returns The JSON value.
- */
-export function isolationJson(detail: IsolationDetail): Record<string, unknown> {
-  return {
-    anomaly: detail.anomaly,
-    kinds: [...detail.kinds],
-    transactions: detail.transactions.map(transactionJson),
-    cycle:
-      detail.cycle?.map((link) => ({ ...link, relations: [...link.relations] })) ??
-      null,
-    explanation: detail.explanation.map(evidenceJson),
-  };
-}
-
 /** Checks history at level, and reports the verdict of the assertion of the level, whose faults name op. */
 function isolated(
   seat: Seat,
@@ -202,6 +123,89 @@ function isolated(
     new Failure(level, msg, { ...detail }, callSite()),
     isolationJson(detail),
   );
+}
+
+export { SERIALIZABLE, SNAPSHOT_ISOLATION };
+
+/** An isolation level, which the assertion of the same id checks. */
+export type Level = typeof SERIALIZABLE | typeof SNAPSHOT_ISOLATION;
+
+/** The detail of the record of a failing isolation check: the five fields of the definition. */
+export interface IsolationDetail {
+  /** The first kind that the level forbids and the history exhibits. */
+  readonly anomaly: Anomaly;
+  /** Every kind that the level forbids and the history exhibits, in report order. */
+  readonly kinds: readonly Anomaly[];
+  /** The transactions that the anomaly involves. */
+  readonly transactions: readonly Transaction[];
+  /** The cycle of a cycle anomaly, and null for any other. */
+  readonly cycle: readonly Link[] | null;
+  /** The evidence of the anomaly: an edge for each link of a cycle, or one observation. */
+  readonly explanation: readonly Evidence[];
+}
+
+/**
+ * Returns the detail of the check of a history's events at a level, or
+ * undefined for a history that exhibits no anomaly that the level forbids.
+ *
+ * @param events - The events of the history.
+ * @param level - The isolation level.
+ * @returns The detail.
+ * @throws TransactionError for a history that is no history of list-append
+ *   transactions.
+ */
+export function checkIsolation(
+  events: Parameters<typeof transactions>[0],
+  level: Level,
+): IsolationDetail | undefined {
+  const txns = transactions(events);
+  const analysis = new Analysis(txns);
+  const found = FORBIDS[level]
+    .map((kind) => [kind, analysis.instance(kind)] as const)
+    .filter((pair): pair is readonly [Anomaly, Instance] => pair[1] !== undefined);
+  const first = found[0]?.[1];
+  if (first === undefined) {
+    return undefined;
+  }
+  const byCall = new Map(txns.map((txn) => [txn.call, txn]));
+  return {
+    anomaly: first.anomaly,
+    kinds: found.map(([kind]) => kind),
+    transactions: first.calls.map((call) => byCall.get(call) as Transaction),
+    cycle: first.cycle ?? null,
+    explanation: first.explanation,
+  };
+}
+
+/**
+ * Returns one entry of an explanation as a record states it.
+ *
+ * @param evidence - The entry.
+ * @returns The JSON value.
+ */
+export function evidenceJson(evidence: Evidence): Record<string, unknown> {
+  return "relation" in evidence ? edgeJson(evidence) : observationJson(evidence);
+}
+
+/**
+ * Returns the detail of a failing isolation check as its call record states
+ * it: the kinds by their spellings, each transaction in the history's JSON
+ * form, null for the cycle of an anomaly that is no cycle, and each entry of
+ * the explanation with its values as typed literals.
+ *
+ * @param detail - The detail.
+ * @returns The JSON value.
+ */
+export function isolationJson(detail: IsolationDetail): Record<string, unknown> {
+  return {
+    anomaly: detail.anomaly,
+    kinds: [...detail.kinds],
+    transactions: detail.transactions.map(transactionJson),
+    cycle:
+      detail.cycle?.map((link) => ({ ...link, relations: [...link.relations] })) ??
+      null,
+    explanation: detail.explanation.map(evidenceJson),
+  };
 }
 
 /**

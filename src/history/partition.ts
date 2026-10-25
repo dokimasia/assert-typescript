@@ -15,6 +15,29 @@ import { detail as literalOf } from "../record/literal.js";
 import type { Event } from "./event.js";
 import { CallOperation, type Operation } from "./spec.js";
 
+/** Returns the representative of the partition of the call at position, halving the path to it. */
+function root(parent: number[], position: number): number {
+  let at = position;
+  while (parent[at] !== at) {
+    parent[at] = parent[parent[at] as number] as number;
+    at = parent[at] as number;
+  }
+  return at;
+}
+
+/** Returns the keys that calls declare, each once, in the order first declared. */
+function keysOf(calls: readonly Checked[]): unknown[] {
+  const seen = new Map<string, unknown>();
+  for (const call of calls) {
+    call.ids.forEach((id, i) => {
+      if (!seen.has(id)) {
+        seen.set(id, call.keys[i]);
+      }
+    });
+  }
+  return [...seen.values()];
+}
+
 /** A call of a history as the record of a check states it: the call from its invocation to its completion. */
 export interface Span {
   /** The index of the call's invocation event. */
@@ -59,48 +82,29 @@ export function callsOf(
 ): Checked[] {
   const completions = new Map<number, Event>();
   for (const event of events) {
-    if (event.kind !== "invoke") completions.set(event.call, event);
+    if (event.kind !== "invoke") {
+      completions.set(event.call, event);
+    }
   }
   const calls: Checked[] = [];
   for (const event of events) {
-    if (event.kind !== "invoke") continue;
     const completion = completions.get(event.index);
-    if (completion?.kind === "fail") continue;
-    const known = completion?.kind === "ok";
-    const output = known ? (completion as { output: unknown }).output : undefined;
-    calls.push({
-      span: {
-        call: event.index,
-        completion: completion?.index,
-        process: event.process,
-        operation: new CallOperation(event.operation, event.args, known, output),
-      },
-      keys: event.keys,
-      ids: ids[event.index] as readonly string[],
-    });
+    if (event.kind === "invoke" && completion?.kind !== "fail") {
+      const known = completion?.kind === "ok";
+      const output = known ? (completion as { output: unknown }).output : undefined;
+      calls.push({
+        span: {
+          call: event.index,
+          completion: completion?.index,
+          process: event.process,
+          operation: new CallOperation(event.operation, event.args, known, output),
+        },
+        keys: event.keys,
+        ids: ids[event.index] as readonly string[],
+      });
+    }
   }
   return calls;
-}
-
-/** Returns the representative of the partition of the call at position, halving the path to it. */
-function root(parent: number[], position: number): number {
-  let at = position;
-  while (parent[at] !== at) {
-    parent[at] = parent[parent[at] as number] as number;
-    at = parent[at] as number;
-  }
-  return at;
-}
-
-/** Returns the keys that calls declare, each once, in the order first declared. */
-function keysOf(calls: readonly Checked[]): unknown[] {
-  const seen = new Map<string, unknown>();
-  for (const call of calls) {
-    call.ids.forEach((id, i) => {
-      if (!seen.has(id)) seen.set(id, call.keys[i]);
-    });
-  }
-  return [...seen.values()];
 }
 
 /**
@@ -110,8 +114,12 @@ function keysOf(calls: readonly Checked[]): unknown[] {
  * @returns The partitions.
  */
 export function partitionsOf(calls: readonly Checked[]): Partition[] {
-  if (calls.length === 0) return [];
-  if (calls.some((call) => call.ids.length === 0)) return [{ keys: [], calls }];
+  if (calls.length === 0) {
+    return [];
+  }
+  if (calls.some((call) => call.ids.length === 0)) {
+    return [{ keys: [], calls }];
+  }
   const parent = calls.map((_, position) => position);
   const first = new Map<string, number>();
   calls.forEach((call, position) => {
@@ -125,8 +133,11 @@ export function partitionsOf(calls: readonly Checked[]): Partition[] {
   calls.forEach((call, position) => {
     const group = root(parent, position);
     const members = groups.get(group);
-    if (members === undefined) groups.set(group, [call]);
-    else members.push(call);
+    if (members === undefined) {
+      groups.set(group, [call]);
+    } else {
+      members.push(call);
+    }
   });
   return [...groups.values()].map((group) => ({ keys: keysOf(group), calls: group }));
 }
@@ -143,7 +154,9 @@ export function concurrency(calls: readonly Checked[]): number {
   const changes: [event: number, change: number][] = [];
   for (const { span } of calls) {
     changes.push([span.call, 1]);
-    if (span.operation.known) changes.push([span.completion as number, -1]);
+    if (span.operation.known) {
+      changes.push([span.completion as number, -1]);
+    }
   }
   changes.sort(([a], [b]) => a - b);
   let open = 0;

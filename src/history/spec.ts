@@ -8,9 +8,97 @@
 
 import { equal as compare } from "../matcher/compare.js";
 import { settings } from "../matcher/option.js";
+import { compareText } from "../order.js";
 
 /** The relaxations of the library's equality without an option. */
 const STRICT = settings([]);
+
+/** The most levels that the key of a state walks, where the library's equality stops comparing. */
+const MAX_DEPTH = 100;
+
+/** Returns the canonical texts of values, sorted. */
+function sortedKeys(
+  values: Iterable<unknown>,
+  depth: number,
+  seen: Set<object>,
+): string {
+  return [...values]
+    .map((value) => keyAt(value, depth, seen))
+    .sort(compareText)
+    .join(",");
+}
+
+/** Returns the key of an object, by the shape that the library's equality reads. */
+function objectKey(value: object, depth: number, seen: Set<object>): string {
+  const inner = (v: unknown) => keyAt(v, depth + 1, seen);
+  if ([Number, String, Boolean, BigInt, Symbol].some((box) => value instanceof box)) {
+    return `boxed:${value.constructor.name}:${inner(value.valueOf())}`;
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(inner).join(",")}]`;
+  }
+  if (ArrayBuffer.isView(value) && !(value instanceof DataView)) {
+    const items = Array.from(value as unknown as ArrayLike<unknown>, inner);
+    return `${value.constructor.name}[${items.join(",")}]`;
+  }
+  if (value instanceof Map) {
+    const entries = [...value].map(([k, v]) => `${inner(k)}=${inner(v)}`);
+    return `map{${entries.sort(compareText).join(",")}}`;
+  }
+  if (value instanceof Set) {
+    return `set{${sortedKeys(value, depth + 1, seen)}}`;
+  }
+  if (value instanceof Date) {
+    return `date:${value.getTime()}`;
+  }
+  if (value instanceof RegExp) {
+    return `regexp:${String(value)}`;
+  }
+  if (value instanceof Error) {
+    return `error:${value.name}:${value.message}`;
+  }
+  const fields = Object.keys(value)
+    .sort(compareText)
+    .map(
+      (name) =>
+        `${JSON.stringify(name)}=${inner((value as Record<string, unknown>)[name])}`,
+    );
+  return `{${fields.join(",")}}`;
+}
+
+/** Returns the key of value at a depth of the walk, with the objects around it in seen. */
+function keyAt(value: unknown, depth: number, seen: Set<object>): string {
+  if (depth > MAX_DEPTH) {
+    return "deep";
+  }
+  switch (typeof value) {
+    case "number":
+      return Number.isNaN(value) ? "NaN" : `number:${value === 0 ? 0 : value}`;
+    case "bigint":
+      return `bigint:${value}`;
+    case "string":
+      return `string:${JSON.stringify(value)}`;
+    case "boolean":
+      return `${value}`;
+    case "undefined":
+      return "undefined";
+    case "object":
+      if (value === null) {
+        return "null";
+      }
+      if (seen.has(value)) {
+        return "cycle";
+      }
+      seen.add(value);
+      try {
+        return objectKey(value, depth, seen);
+      } finally {
+        seen.delete(value);
+      }
+    default:
+      return typeof value;
+  }
+}
 
 /**
  * A call as a spec sees it: its operation and its arguments, and its output
@@ -115,77 +203,6 @@ export interface Costed<S> extends Spec<S> {
   readonly [COST]: (state: S) => number;
 }
 
-/** The most levels that the key of a state walks, where the library's equality stops comparing. */
-const MAX_DEPTH = 100;
-
-/** Returns the canonical texts of values, sorted. */
-function sortedKeys(
-  values: Iterable<unknown>,
-  depth: number,
-  seen: Set<object>,
-): string {
-  return [...values]
-    .map((value) => keyAt(value, depth, seen))
-    .sort()
-    .join(",");
-}
-
-/** Returns the key of an object, by the shape that the library's equality reads. */
-function objectKey(value: object, depth: number, seen: Set<object>): string {
-  const inner = (v: unknown) => keyAt(v, depth + 1, seen);
-  if ([Number, String, Boolean, BigInt, Symbol].some((box) => value instanceof box)) {
-    return `boxed:${value.constructor.name}:${inner(value.valueOf())}`;
-  }
-  if (Array.isArray(value)) return `[${value.map(inner).join(",")}]`;
-  if (ArrayBuffer.isView(value) && !(value instanceof DataView)) {
-    const items = Array.from(value as unknown as ArrayLike<unknown>, inner);
-    return `${value.constructor.name}[${items.join(",")}]`;
-  }
-  if (value instanceof Map) {
-    const entries = [...value].map(([k, v]) => `${inner(k)}=${inner(v)}`);
-    return `map{${entries.sort().join(",")}}`;
-  }
-  if (value instanceof Set) return `set{${sortedKeys(value, depth + 1, seen)}}`;
-  if (value instanceof Date) return `date:${value.getTime()}`;
-  if (value instanceof RegExp) return `regexp:${String(value)}`;
-  if (value instanceof Error) return `error:${value.name}:${value.message}`;
-  const fields = Object.keys(value)
-    .sort()
-    .map(
-      (name) =>
-        `${JSON.stringify(name)}=${inner((value as Record<string, unknown>)[name])}`,
-    );
-  return `{${fields.join(",")}}`;
-}
-
-/** Returns the key of value at a depth of the walk, with the objects around it in seen. */
-function keyAt(value: unknown, depth: number, seen: Set<object>): string {
-  if (depth > MAX_DEPTH) return "deep";
-  switch (typeof value) {
-    case "number":
-      return Number.isNaN(value) ? "NaN" : `number:${value === 0 ? 0 : value}`;
-    case "bigint":
-      return `bigint:${value}`;
-    case "string":
-      return `string:${JSON.stringify(value)}`;
-    case "boolean":
-      return `${value}`;
-    case "undefined":
-      return "undefined";
-    case "object":
-      if (value === null) return "null";
-      if (seen.has(value)) return "cycle";
-      seen.add(value);
-      try {
-        return objectKey(value, depth, seen);
-      } finally {
-        seen.delete(value);
-      }
-    default:
-      return typeof value;
-  }
-}
-
 /**
  * Returns the default key of a state: a canonical text that every state
  * that check.isEqualTo reports equal to it shares, for a state without a cycle.
@@ -238,8 +255,12 @@ export function specFrom(
     initial: () => [],
     next(state, op) {
       const subject = factory();
-      for (const applied of state) subject(applied.name, applied.args);
-      if (!op.returned(subject(op.name, op.args))) return [];
+      for (const applied of state) {
+        subject(applied.name, applied.args);
+      }
+      if (!op.returned(subject(op.name, op.args))) {
+        return [];
+      }
       return [[...state, new CallOperation(op.name, op.args, false)]];
     },
     equal: (a, b) =>

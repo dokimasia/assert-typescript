@@ -168,7 +168,7 @@ describe("spec", () => {
       },
       {
         name: "two boxed numbers of one value",
-        give: [Object(1), Object(1)],
+        give: [new Object(1), new Object(1)],
         want: true,
       },
       {
@@ -208,7 +208,9 @@ describe("spec", () => {
     }) => {
       const nested = (leaf: number): unknown => {
         let value: unknown = leaf;
-        for (let i = 0; i < 101; i += 1) value = [value];
+        for (let i = 0; i < 101; i += 1) {
+          value = [value];
+        }
         return value;
       };
 

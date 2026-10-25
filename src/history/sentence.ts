@@ -8,7 +8,7 @@
 
 import type { Failure } from "../failure.js";
 import { show } from "../matcher/inspect.js";
-import type { Edge, Evidence, Observation } from "./derivation.js";
+import type { Edge, Evidence, Observation } from "./anomaly.js";
 import type { Span } from "./partition.js";
 
 /** Returns the text of the keys of a partition, and "every key" for a partition of every key. */
@@ -35,30 +35,6 @@ function spansText(label: string, spans: readonly Span[]): string {
     return `call ${call} ${operation.name}(${args})${outcome}`;
   });
   return `\n    ${label}: ${texts.length === 0 ? "none" : texts.join("; ")}`;
-}
-
-/**
- * Returns the sentence of a failing linearizability check's record: the
- * contract, the outcome with the reported partition and the limit, and then
- * the counts, the frontier's order of calls, its states and the calls that
- * the spec rejected there, each on a line of its own.
- *
- * @param failure - The record.
- * @returns The sentence.
- */
-export function sentence(failure: Failure): string {
-  const d = failure.detail;
-  const limit = d["limit"] === null ? "" : `, at the ${String(d["limit"])} limit`;
-  const states = (d["states"] as readonly unknown[])
-    .map((state) => show(state))
-    .join(", ");
-  return [
-    `${failure.contract}: ${String(d["outcome"])} in the partition of ${keysText(d["partition"] as readonly unknown[])}${limit}`,
-    `\n    steps ${String(d["steps"])}, partitions ${String(d["partitions"])}, calls ${String(d["calls"])}, concurrency ${String(d["concurrency"])}`,
-    spansText("linearized", d["linearized"] as readonly Span[]),
-    `\n    states: ${states}`,
-    spansText("rejected", d["candidates"] as readonly Span[]),
-  ].join("");
 }
 
 /** Returns the text of an edge of a cycle: its two calls and its relation, and the key and the values that prove it. */
@@ -88,11 +64,14 @@ function observationText(o: Observation): string {
       return `call ${call} read ${listText(read as unknown[])} from ${key}, which contains ${show(o.value)} twice`;
     case "internal-inconsistency": {
       let text = `call ${call} read ${listText(read as unknown[])} from ${key}`;
-      if (o.whole) text += `, and it knew the list was ${listText(o.expected)}`;
-      else if (o.expected.length > 0)
+      if (o.whole) {
+        text += `, and it knew the list was ${listText(o.expected)}`;
+      } else if (o.expected.length > 0) {
         text += `, and it knew the list ended with ${listText(o.expected)}`;
-      if (o.hasFuture)
+      }
+      if (o.hasFuture) {
         text += `, and ${show(o.future)} is a value that call ${call} appends later`;
+      }
       return text;
     }
     case "incompatible-order":
@@ -102,6 +81,30 @@ function observationText(o: Observation): string {
     default:
       return `call ${call} read ${key} ending in ${show(o.value)}, which call ${o.appender} followed with ${show(o.next)}`;
   }
+}
+
+/**
+ * Returns the sentence of a failing linearizability check's record: the
+ * contract, the outcome with the reported partition and the limit, and then
+ * the counts, the frontier's order of calls, its states and the calls that
+ * the spec rejected there, each on a line of its own.
+ *
+ * @param failure - The record.
+ * @returns The sentence.
+ */
+export function sentence(failure: Failure): string {
+  const d = failure.detail;
+  const limit = d["limit"] === null ? "" : `, at the ${String(d["limit"])} limit`;
+  const states = (d["states"] as readonly unknown[])
+    .map((state) => show(state))
+    .join(", ");
+  return [
+    `${failure.contract}: ${String(d["outcome"])} in the partition of ${keysText(d["partition"] as readonly unknown[])}${limit}`,
+    `\n    steps ${String(d["steps"])}, partitions ${String(d["partitions"])}, calls ${String(d["calls"])}, concurrency ${String(d["concurrency"])}`,
+    spansText("linearized", d["linearized"] as readonly Span[]),
+    `\n    states: ${states}`,
+    spansText("rejected", d["candidates"] as readonly Span[]),
+  ].join("");
 }
 
 /**

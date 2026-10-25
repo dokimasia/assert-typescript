@@ -11,7 +11,7 @@
  * unknown completion the error.
  */
 
-import { faultText } from "../matcher/verdict.js";
+import { faultText } from "../matcher/fault.js";
 import { detail as literalOf } from "../record/literal.js";
 
 /** The kind of an event: the invocation of a call, or how the call completed. */
@@ -85,6 +85,8 @@ export function eventJson(event: Event): Record<string, unknown> {
       keys: event.keys.map(literalOf),
     };
   }
-  if (event.kind === "ok") return { ...head, output: literalOf(event.output) };
+  if (event.kind === "ok") {
+    return { ...head, output: literalOf(event.output) };
+  }
   return { ...head, error: faultText(event.error) };
 }

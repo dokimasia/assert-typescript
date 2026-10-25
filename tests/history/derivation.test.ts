@@ -11,11 +11,11 @@
 import { describe } from "vitest";
 import {
   ANOMALIES,
-  Analysis,
   type Anomaly,
   type Instance,
   type Observation,
-} from "../../src/history/derivation.js";
+} from "../../src/history/anomaly.js";
+import { Analysis } from "../../src/history/derivation.js";
 import { History } from "../../src/history/history.js";
 import { transactions } from "../../src/history/transaction.js";
 import { check } from "../../src/index.js";
@@ -62,29 +62,6 @@ function crossedAppends(): History {
 }
 
 describe("derivation", () => {
-  describe("ANOMALIES", () => {
-    it("lists the eleven kinds in report order", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        ANOMALIES,
-        [
-          "garbage-read",
-          "duplicate-append",
-          "internal-inconsistency",
-          "incompatible-order",
-          "aborted-read",
-          "intermediate-read",
-          "G0",
-          "G1c",
-          "G-single",
-          "G-nonadjacent",
-          "G2",
-        ],
-        "the kinds",
-      );
-    });
-  });
-
   describe("new Analysis", () => {
     it("derives no anomaly of a serial history", ({ seat }) => {
       const history = new History();
@@ -229,7 +206,9 @@ describe("derivation", () => {
       seat,
     }) => {
       const history = new History();
-      for (const value of [1, 2, 3]) runTxn(history, value, append("x", value));
+      for (const value of [1, 2, 3]) {
+        runTxn(history, value, append("x", value));
+      }
       runTxn(history, 0, readOf("x", [1, 2]));
       runTxn(history, 0, readOf("x", [1, 3]));
 
@@ -531,11 +510,11 @@ describe("derivation", () => {
         invokeTxn(history, 1, append("y", 2)),
         invokeTxn(history, 2, readOf("x", null), readOf("y", null)),
         invokeTxn(history, 3, readOf("x", null), readOf("y", null)),
-      ];
-      calls[0]?.ok([append("x", 1)]);
-      calls[1]?.ok([append("y", 2)]);
-      calls[2]?.ok([readOf("x", [1]), readOf("y", [])]);
-      calls[3]?.ok([readOf("x", []), readOf("y", [2])]);
+      ] as const;
+      calls[0].ok([append("x", 1)]);
+      calls[1].ok([append("y", 2)]);
+      calls[2].ok([readOf("x", [1]), readOf("y", [])]);
+      calls[3].ok([readOf("x", []), readOf("y", [2])]);
 
       check.isEqualTo(
         seat,

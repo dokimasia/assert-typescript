@@ -19,6 +19,118 @@ import { detail as literalOf } from "../record/literal.js";
 import type { Event } from "./event.js";
 import { identityOf } from "./history.js";
 
+/** The elements of a micro-operation: its function, its key and its value. */
+const MOP_LENGTH = 3;
+
+/** Returns the micro-operation that one argument of an invocation states. */
+function invoked(call: number, position: number, raw: unknown): Mop {
+  if (
+    !Array.isArray(raw) ||
+    raw.length !== MOP_LENGTH ||
+    (raw[0] !== APPEND && raw[0] !== READ)
+  ) {
+    throw new TransactionError(
+      `argument ${position} of call ${call} is ${show(raw)}, not [append, key, value] or [read, key, null]`,
+    );
+  }
+  const [fn, key, value] = raw as [typeof APPEND | typeof READ, unknown, unknown];
+  if (fn === READ && value !== null && value !== undefined) {
+    throw new TransactionError(
+      `the read at argument ${position} of call ${call} states a list before it ran`,
+    );
+  }
+  identity(call, key);
+  if (fn === APPEND) {
+    identity(call, value);
+  }
+  return { fn, key, value: fn === READ ? undefined : value };
+}
+
+/** Returns one micro-operation of an ok output, which repeats mop with a read's list. */
+function repeated(call: number, position: number, mop: Mop, raw: unknown): Mop {
+  const repeats =
+    Array.isArray(raw) &&
+    raw.length === MOP_LENGTH &&
+    raw[0] === mop.fn &&
+    identityOf(raw[1]) === identity(call, mop.key) &&
+    (mop.fn === READ || identityOf(raw[2]) === identity(call, mop.value));
+  if (!repeats) {
+    throw new TransactionError(
+      `micro-operation ${position} of the output of call ${call} is ${show(raw)}, which does not repeat ${show([mop.fn, mop.key, mop.value ?? null])}`,
+    );
+  }
+  if (mop.fn === APPEND) {
+    return mop;
+  }
+  const [, , value] = raw as unknown[];
+  if (value === null || value === undefined) {
+    return { fn: READ, key: mop.key, value: [] };
+  }
+  if (!Array.isArray(value)) {
+    throw new TransactionError(
+      `the read at micro-operation ${position} of the output of call ${call} returned ${show(value)}, not a list`,
+    );
+  }
+  for (const element of value) {
+    identity(call, element);
+  }
+  return { fn: READ, key: mop.key, value };
+}
+
+/** Returns the micro-operations of an ok output, which repeat invoked with lists. */
+function returned(call: number, mops: readonly Mop[], output: unknown): Mop[] {
+  if (!Array.isArray(output) || output.length !== mops.length) {
+    throw new TransactionError(
+      `the output of call ${call} does not repeat the micro-operations of its invocation`,
+    );
+  }
+  return mops.map((mop, position) => repeated(call, position, mop, output[position]));
+}
+
+/** Returns the transaction of one call, whose completion is completion or undefined. */
+function transactionOf(invocation: Event, completion: Event | undefined): Transaction {
+  const call = invocation.index;
+  const { operation, args } = invocation as Event & { kind: "invoke" };
+  if (operation !== TXN) {
+    throw new TransactionError(
+      `call ${call} is ${JSON.stringify(operation)}, not ${JSON.stringify(TXN)}`,
+    );
+  }
+  const mops = args.map((raw, position) => invoked(call, position, raw));
+  const output = completion?.kind === "ok" ? completion.output : undefined;
+  return {
+    call,
+    completion: completion?.index,
+    kind: completion?.kind as Transaction["kind"],
+    process: invocation.process,
+    args,
+    output,
+    mops: completion?.kind === "ok" ? returned(call, mops, output) : mops,
+  };
+}
+
+/** Records each value that txn appends, under its key, and refuses a second append of one value. */
+function register(txn: Transaction, appended: Map<string, number>): void {
+  for (const mop of txn.mops.filter((one) => one.fn === APPEND)) {
+    const name = JSON.stringify([
+      identity(txn.call, mop.key),
+      identity(txn.call, mop.value),
+    ]);
+    const first = appended.get(name);
+    if (first === txn.call) {
+      throw new TransactionError(
+        `call ${txn.call} appends ${show(mop.value)} to the key ${show(mop.key)} twice`,
+      );
+    }
+    if (first !== undefined) {
+      throw new TransactionError(
+        `calls ${first} and ${txn.call} both append ${show(mop.value)} to the key ${show(mop.key)}`,
+      );
+    }
+    appended.set(name, txn.call);
+  }
+}
+
 /** The operation of a transaction's call. */
 export const TXN = "txn";
 
@@ -95,109 +207,6 @@ export function identity(call: number, value: unknown): string {
   return id;
 }
 
-/** Returns the micro-operation that one argument of an invocation states. */
-function invoked(call: number, position: number, raw: unknown): Mop {
-  if (
-    !Array.isArray(raw) ||
-    raw.length !== 3 ||
-    (raw[0] !== APPEND && raw[0] !== READ)
-  ) {
-    throw new TransactionError(
-      `argument ${position} of call ${call} is ${show(raw)}, not [append, key, value] or [read, key, null]`,
-    );
-  }
-  const [fn, key, value] = raw as [typeof APPEND | typeof READ, unknown, unknown];
-  if (fn === READ && value !== null && value !== undefined) {
-    throw new TransactionError(
-      `the read at argument ${position} of call ${call} states a list before it ran`,
-    );
-  }
-  identity(call, key);
-  if (fn === APPEND) identity(call, value);
-  return { fn, key, value: fn === READ ? undefined : value };
-}
-
-/** Returns one micro-operation of an ok output, which repeats mop with a read's list. */
-function repeated(call: number, position: number, mop: Mop, raw: unknown): Mop {
-  const repeats =
-    Array.isArray(raw) &&
-    raw.length === 3 &&
-    raw[0] === mop.fn &&
-    identityOf(raw[1]) === identity(call, mop.key) &&
-    (mop.fn === READ || identityOf(raw[2]) === identity(call, mop.value));
-  if (!repeats) {
-    throw new TransactionError(
-      `micro-operation ${position} of the output of call ${call} is ${show(raw)}, which does not repeat ${show([mop.fn, mop.key, mop.value ?? null])}`,
-    );
-  }
-  if (mop.fn === APPEND) return mop;
-  const value = (raw as unknown[])[2];
-  if (value === null || value === undefined)
-    return { fn: READ, key: mop.key, value: [] };
-  if (!Array.isArray(value)) {
-    throw new TransactionError(
-      `the read at micro-operation ${position} of the output of call ${call} returned ${show(value)}, not a list`,
-    );
-  }
-  for (const element of value) identity(call, element);
-  return { fn: READ, key: mop.key, value };
-}
-
-/** Returns the micro-operations of an ok output, which repeat invoked with lists. */
-function returned(call: number, mops: readonly Mop[], output: unknown): Mop[] {
-  if (!Array.isArray(output) || output.length !== mops.length) {
-    throw new TransactionError(
-      `the output of call ${call} does not repeat the micro-operations of its invocation`,
-    );
-  }
-  return mops.map((mop, position) => repeated(call, position, mop, output[position]));
-}
-
-/** Returns the transaction of one call, whose completion is completion or undefined. */
-function transactionOf(invocation: Event, completion: Event | undefined): Transaction {
-  const call = invocation.index;
-  const { operation, args } = invocation as Event & { kind: "invoke" };
-  if (operation !== TXN) {
-    throw new TransactionError(
-      `call ${call} is ${JSON.stringify(operation)}, not ${JSON.stringify(TXN)}`,
-    );
-  }
-  const mops = args.map((raw, position) => invoked(call, position, raw));
-  const output = completion?.kind === "ok" ? completion.output : undefined;
-  return {
-    call,
-    completion: completion?.index,
-    kind: completion?.kind as Transaction["kind"],
-    process: invocation.process,
-    args,
-    output,
-    mops: completion?.kind === "ok" ? returned(call, mops, output) : mops,
-  };
-}
-
-/** Records each value that txn appends, under its key, and refuses a second append of one value. */
-function register(txn: Transaction, appended: Map<string, number>): void {
-  for (const mop of txn.mops) {
-    if (mop.fn !== APPEND) continue;
-    const name = JSON.stringify([
-      identity(txn.call, mop.key),
-      identity(txn.call, mop.value),
-    ]);
-    const first = appended.get(name);
-    if (first === txn.call) {
-      throw new TransactionError(
-        `call ${txn.call} appends ${show(mop.value)} to the key ${show(mop.key)} twice`,
-      );
-    }
-    if (first !== undefined) {
-      throw new TransactionError(
-        `calls ${first} and ${txn.call} both append ${show(mop.value)} to the key ${show(mop.key)}`,
-      );
-    }
-    appended.set(name, txn.call);
-  }
-}
-
 /**
  * Returns a history's transactions in the order of their invocations.
  *
@@ -210,12 +219,13 @@ function register(txn: Transaction, appended: Map<string, number>): void {
 export function transactions(events: readonly Event[]): Transaction[] {
   const completions = new Map<number, Event>();
   for (const event of events) {
-    if (event.kind !== "invoke") completions.set(event.call, event);
+    if (event.kind !== "invoke") {
+      completions.set(event.call, event);
+    }
   }
   const appended = new Map<string, number>();
   const out: Transaction[] = [];
-  for (const event of events) {
-    if (event.kind !== "invoke") continue;
+  for (const event of events.filter((one) => one.kind === "invoke")) {
     const txn = transactionOf(event, completions.get(event.index));
     register(txn, appended);
     out.push(txn);

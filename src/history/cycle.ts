@@ -10,6 +10,19 @@
  * search visits the edges of a transaction in the order of their targets.
  */
 
+/** Returns the two positions of the first transaction that the walk visits twice. */
+function firstRepeat(walk: Walk): [number, number] | undefined {
+  const seen = new Map<number, number>();
+  for (const [position, [node]] of walk.entries()) {
+    const first = seen.get(node);
+    if (first !== undefined) {
+      return [first, position];
+    }
+    seen.set(node, position);
+  }
+  return undefined;
+}
+
 /** A dependency of one committed transaction on another. */
 export type Relation = "ww" | "wr" | "rw";
 
@@ -54,22 +67,36 @@ export function components(nodes: readonly number[], graph: Graph): number[][] {
   const leave = (node: number): void => {
     work.pop();
     const parent = work.at(-1);
-    if (parent !== undefined) lower(parent[0], low.get(node) as number);
-    if (low.get(node) !== order.get(node)) return;
+    if (parent !== undefined) {
+      lower(parent[0], low.get(node) as number);
+    }
+    if (low.get(node) !== order.get(node)) {
+      return;
+    }
     const component = stack.splice(stack.indexOf(node));
-    for (const member of component) onStack.delete(member);
-    if (component.length > 1) found.push(component.sort((a, b) => a - b));
+    for (const member of component) {
+      onStack.delete(member);
+    }
+    if (component.length > 1) {
+      found.push(component.sort((a, b) => a - b));
+    }
   };
   for (const root of nodes) {
-    if (!order.has(root)) enter(root);
+    if (!order.has(root)) {
+      enter(root);
+    }
     while (work.length > 0) {
       const top = work.at(-1) as [number, number];
       const [node, next] = top;
       const target = graph.get(node)?.[next];
       top[1] = next + 1;
-      if (target === undefined) leave(node);
-      else if (!order.has(target)) enter(target);
-      else if (onStack.has(target)) lower(node, order.get(target) as number);
+      if (target === undefined) {
+        leave(node);
+      } else if (!order.has(target)) {
+        enter(target);
+      } else if (onStack.has(target)) {
+        lower(node, order.get(target) as number);
+      }
     }
   }
   return found.sort((a, b) => (a[0] as number) - (b[0] as number));
@@ -94,8 +121,10 @@ export function path(
 ): number[] | undefined {
   const parent = new Map<number, number>([[start, start]]);
   const queue = [start];
-  for (let at = 0; at < queue.length; at += 1) {
-    let node = queue[at] as number;
+  // The iterator of an array reads its length at each step, so the loop
+  // visits each target that the loop appends.
+  for (const visited of queue) {
+    let node = visited;
     if (node === goal) {
       const found = [node];
       while (node !== start) {
@@ -110,17 +139,6 @@ export function path(
         queue.push(target);
       }
     }
-  }
-  return undefined;
-}
-
-/** Returns the two positions of the first transaction that the walk visits twice. */
-function firstRepeat(walk: Walk): [number, number] | undefined {
-  const seen = new Map<number, number>();
-  for (const [position, [node]] of walk.entries()) {
-    const first = seen.get(node);
-    if (first !== undefined) return [first, position];
-    seen.set(node, position);
   }
   return undefined;
 }
