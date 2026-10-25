@@ -7,6 +7,7 @@ import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import { describe, onTestFinished } from "vitest";
+import * as scrubbers from "../src/golden/scrub.js";
 import * as golden from "../src/golden.js";
 import { check, files, type Seat } from "../src/index.js";
 import { Recorder } from "../src/seat.js";
@@ -67,8 +68,11 @@ function project(seat: Seat, tree?: files.Tree): string {
 function updating(value: string | undefined): void {
   const before = process.env[golden.UPDATE_ENV];
   const assign = (v: string | undefined) => {
-    if (v === undefined) Reflect.deleteProperty(process.env, golden.UPDATE_ENV);
-    else process.env[golden.UPDATE_ENV] = v;
+    if (v === undefined) {
+      Reflect.deleteProperty(process.env, golden.UPDATE_ENV);
+    } else {
+      process.env[golden.UPDATE_ENV] = v;
+    }
   };
   assign(value);
   onTestFinished(() => assign(before));
@@ -120,57 +124,15 @@ describe("golden", () => {
     }
   });
 
-  describe("scrubTimestamps", () => {
-    it("replaces an ISO 8601 timestamp with SCRUBBED_TIMESTAMP", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        golden.scrubTimestamps()("started at 2026-08-30T11:22:33Z"),
-        "started at SCRUBBED_TIMESTAMP",
-        "the timestamp is scrubbed",
-      );
-    });
-  });
-
-  describe("scrubHashes", () => {
-    it("replaces a hex digest with SCRUBBED_HASH", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        golden.scrubHashes()(`digest ${"a1b2c3d4".repeat(8)}`),
-        "digest SCRUBBED_HASH",
-        "the digest is scrubbed",
-      );
-    });
-  });
-
-  describe("scrubRunIds", () => {
-    it("replaces an identifier of a run with SCRUBBED_RUN_ID", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        golden.scrubRunIds()("run run_0123456789abcdef finished"),
-        "run SCRUBBED_RUN_ID finished",
-        "the run id is scrubbed",
-      );
-    });
-  });
-
-  describe("scrubJsonFields", () => {
-    it("replaces the value of each field that it was given", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        golden.scrubJsonFields("id")('{"id": "01J8XY", "name": "kept"}'),
-        '{"id": "SCRUBBED", "name": "kept"}',
-        "the id is scrubbed and the name is kept",
-      );
-    });
-
-    it("returns the text unchanged without a field", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        golden.scrubJsonFields()('{"id": "01J8XY"}'),
-        '{"id": "01J8XY"}',
-        "nothing is scrubbed",
-      );
-    });
+  it("exports the scrubbers of the module scrub", ({ seat }) => {
+    check.isTrue(
+      seat,
+      golden.scrubTimestamps === scrubbers.scrubTimestamps &&
+        golden.scrubHashes === scrubbers.scrubHashes &&
+        golden.scrubRunIds === scrubbers.scrubRunIds &&
+        golden.scrubJsonFields === scrubbers.scrubJsonFields,
+      "the same functions",
+    );
   });
 
   describe("matchAt", () => {

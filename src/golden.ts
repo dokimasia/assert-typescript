@@ -27,85 +27,13 @@ import { readTree } from "./files/reader.js";
 import { type Comparison, comparison, missing, report } from "./files/record.js";
 import { pathFault } from "./files/tree.js";
 import { update as updateTree } from "./files/writer.js";
+import { type Scrubber, scrub } from "./golden/scrub.js";
 import { Fault, ofOperation } from "./matcher/fault.js";
 import { Mode, type Seat } from "./matcher/seat.js";
 import { fail, fault, pass, Running } from "./matcher/verdict.js";
 
-/** The variable that turns rewriting on. */
-export const UPDATE_ENV = "DOKIMI_ASSERT_UPDATE_GOLDEN";
-
-/** Where `match` and `matchTree` resolve a name, relative to the working directory. */
-export const GOLDEN_DIR = join("testdata", "golden");
-
 /** How JSON is written into a golden file. */
 const JSON_INDENT = 2;
-
-/** A replacement applied to both sides before they are compared. */
-export type Scrubber = (text: string) => string;
-
-const TIMESTAMP =
-  /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g;
-const HASH = /\b[0-9a-f]{32,128}\b/g;
-const RUN_ID = /\brun_[0-9a-zA-Z]{16}\b/g;
-
-/**
- * Reports whether this run may rewrite its golden files.
- *
- * @returns True when the update variable is set to anything but 0.
- */
-export function shouldUpdate(): boolean {
-  const set = process.env[UPDATE_ENV] ?? "";
-  return set !== "" && set !== "0";
-}
-
-/**
- * Replaces ISO-8601 and RFC-3339 timestamps.
- *
- * @returns A scrubber, to pass to a comparing call.
- */
-export function scrubTimestamps(): Scrubber {
-  return (text) => text.replace(TIMESTAMP, "SCRUBBED_TIMESTAMP");
-}
-
-/**
- * Replaces hex digests between 32 and 128 characters.
- *
- * @returns A scrubber, to pass to a comparing call.
- */
-export function scrubHashes(): Scrubber {
-  return (text) => text.replace(HASH, "SCRUBBED_HASH");
-}
-
-/**
- * Replaces identifiers shaped like `run_` and sixteen characters.
- *
- * @returns A scrubber, to pass to a comparing call.
- */
-export function scrubRunIds(): Scrubber {
-  return (text) => text.replace(RUN_ID, "SCRUBBED_RUN_ID");
-}
-
-/**
- * Replaces the value of each named JSON field.
- *
- * It matches the field's text rather than parsing, so it works on output
- * that is nearly JSON as well as on output that is.
- *
- * @param fields The field names whose values are replaced.
- * @returns A scrubber, to pass to a comparing call.
- */
-export function scrubJsonFields(...fields: string[]): Scrubber {
-  if (fields.length === 0) return (text) => text;
-
-  const names = fields.map((f) => f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const pattern = new RegExp(`("(?:${names.join("|")})"\\s*:\\s*)"[^"]*"`, "g");
-  return (text) => text.replace(pattern, '$1"SCRUBBED"');
-}
-
-/** Applies every scrubber, in the order given. */
-function scrub(text: string, scrubbers: readonly Scrubber[]): string {
-  return scrubbers.reduce((acc, s) => s(acc), text);
-}
 
 /** One call of a golden comparison: its seat, its assertion, its contract and its file. */
 interface Call {
@@ -132,7 +60,7 @@ function faulted(call: Call, what: string, err: unknown): void {
     Mode.Fatal,
     call.assertion,
     call.contract,
-    new Fault(call.path, what, err),
+    new Fault(call.path, what, { cause: err }),
   );
 }
 
@@ -153,7 +81,9 @@ function read(call: Call): string | null | undefined {
   try {
     return readFileSync(call.path, "utf8");
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
     faulted(call, "the golden file cannot be read", err);
     return undefined;
   }
@@ -168,7 +98,9 @@ function matchFile(
 ): void {
   const mine = scrub(got, scrubbers);
   const recorded = read(call);
-  if (recorded === undefined) return;
+  if (recorded === undefined) {
+    return;
+  }
   const theirs = recorded === null ? null : scrub(recorded, scrubbers);
   if (mine === theirs) {
     pass(call.seat, Mode.Fatal, call.assertion, call.contract);
@@ -182,6 +114,89 @@ function matchFile(
     want: theirs,
     got: mine,
   });
+}
+
+/** Reads the call's golden JSON object, an empty one for a missing file, or undefined after a fault. */
+function readObject(call: Call): Record<string, unknown> | undefined {
+  const text = read(call);
+  if (text === undefined) {
+    return undefined;
+  }
+  if (text === null) {
+    return {};
+  }
+
+  let document: unknown;
+  try {
+    document = JSON.parse(text);
+  } catch (err) {
+    faulted(call, "the golden file cannot be read as a JSON object", err);
+    return undefined;
+  }
+  if (document === null || typeof document !== "object" || Array.isArray(document)) {
+    faulted(call, "the golden file cannot be read as a JSON object", "it is no object");
+    return undefined;
+  }
+  return document as Record<string, unknown>;
+}
+
+/** Returns tree with scrubbers applied to the content of each file that is UTF-8 text. */
+function scrubbed(
+  tree: ReadonlyMap<string, Entry>,
+  scrubbers: readonly Scrubber[],
+): Map<string, Entry> {
+  return new Map(
+    [...tree].map(([path, e]) => [
+      path,
+      e.text === undefined ? e : withText(e, scrub(e.text, scrubbers)),
+    ]),
+  );
+}
+
+/**
+ * Compares the tree in dir with the golden tree in golden, and makes the
+ * golden tree equal it under update when they differ.
+ *
+ * @returns The record of the comparison, and undefined when the two trees
+ *   are equal.
+ */
+function compareTree(
+  name: string,
+  golden: string,
+  dir: string,
+  update: boolean,
+  scrubbers: readonly Scrubber[],
+): Comparison | undefined {
+  const refused = pathFault(name);
+  if (refused !== undefined) {
+    throw new Fault("", refused);
+  }
+  const output = scrubbed(readTree(dir, true), scrubbers);
+  const absent = statSync(golden, { throwIfNoEntry: false }) === undefined;
+  const recorded = absent
+    ? new Map<string, Entry>()
+    : scrubbed(readTree(golden, false), scrubbers);
+  const paths = differing(recorded, output, false);
+  if (update && (absent || paths.length > 0)) {
+    updateTree(golden, output);
+  }
+  return absent ? missing(output) : comparison(recorded, output, paths);
+}
+
+/** The variable that turns rewriting on. */
+export const UPDATE_ENV = "DOKIMI_ASSERT_UPDATE_GOLDEN";
+
+/** Where `match` and `matchTree` resolve a name, relative to the working directory. */
+export const GOLDEN_DIR = join("testdata", "golden");
+
+/**
+ * Reports whether this run may rewrite its golden files.
+ *
+ * @returns True when the update variable is set to anything but 0.
+ */
+export function shouldUpdate(): boolean {
+  const set = process.env[UPDATE_ENV] ?? "";
+  return set !== "" && set !== "0";
 }
 
 /**
@@ -284,7 +299,9 @@ export function matchJsonField(
   const mine = scrub(JSON.stringify(value, null, JSON_INDENT), scrubbers);
 
   const document = readObject(call);
-  if (document === undefined) return;
+  if (document === undefined) {
+    return;
+  }
 
   const present = Object.hasOwn(document, field);
   const theirs = present
@@ -304,65 +321,6 @@ export function matchJsonField(
     got: mine,
     field,
   });
-}
-
-/** Reads the call's golden JSON object, an empty one for a missing file, or undefined after a fault. */
-function readObject(call: Call): Record<string, unknown> | undefined {
-  const text = read(call);
-  if (text === undefined) return undefined;
-  if (text === null) return {};
-
-  let document: unknown;
-  try {
-    document = JSON.parse(text);
-  } catch (err) {
-    faulted(call, "the golden file cannot be read as a JSON object", err);
-    return undefined;
-  }
-  if (document === null || typeof document !== "object" || Array.isArray(document)) {
-    faulted(call, "the golden file cannot be read as a JSON object", "it is no object");
-    return undefined;
-  }
-  return document as Record<string, unknown>;
-}
-
-/** Returns tree with scrubbers applied to the content of each file that is UTF-8 text. */
-function scrubbed(
-  tree: ReadonlyMap<string, Entry>,
-  scrubbers: readonly Scrubber[],
-): Map<string, Entry> {
-  return new Map(
-    [...tree].map(([path, e]) => [
-      path,
-      e.text === undefined ? e : withText(e, scrub(e.text, scrubbers)),
-    ]),
-  );
-}
-
-/**
- * Compares the tree in dir with the golden tree in golden, and makes the
- * golden tree equal it under update when they differ.
- *
- * @returns The record of the comparison, and undefined when the two trees
- *   are equal.
- */
-function compareTree(
-  name: string,
-  golden: string,
-  dir: string,
-  update: boolean,
-  scrubbers: readonly Scrubber[],
-): Comparison | undefined {
-  const refused = pathFault(name);
-  if (refused !== undefined) throw new Fault("", refused);
-  const output = scrubbed(readTree(dir, true), scrubbers);
-  const absent = statSync(golden, { throwIfNoEntry: false }) === undefined;
-  const recorded = absent
-    ? new Map<string, Entry>()
-    : scrubbed(readTree(golden, false), scrubbers);
-  const paths = differing(recorded, output, false);
-  if (update && (absent || paths.length > 0)) updateTree(golden, output);
-  return absent ? missing(output) : comparison(recorded, output, paths);
 }
 
 /**
@@ -432,3 +390,11 @@ export function matchTree(
     callSite(),
   );
 }
+
+export {
+  type Scrubber,
+  scrubHashes,
+  scrubJsonFields,
+  scrubRunIds,
+  scrubTimestamps,
+} from "./golden/scrub.js";
