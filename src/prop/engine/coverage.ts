@@ -19,11 +19,8 @@ const Z = 6.109_410_191_663_286;
 /** A requirement is met when the lower bound is at least this fraction of the required share. */
 const TOLERANCE = 0.9;
 
-/** The checks, as multiples of `cases` valid cases. The last is the last check of the run. */
-export const CHECKS = [1, 2, 4, 8] as const;
-
-/** What a check decides about one requirement. */
-export type Verdict = "met" | "refuted" | "undecided" | "unmet";
+/** The divisor of the term z^2 / 4n^2 of the Wilson score interval. */
+const WILSON_DIVISOR = 4;
 
 /**
  * Returns the Wilson score bound of k successes in n trials at quantile z:
@@ -38,9 +35,15 @@ function bound(k: number, n: number, z: number): number {
   const p = k / n;
   const a = (z * z) / n;
   const centre = p + a / 2;
-  const spread = z * Math.sqrt((p * (1 - p)) / n + a / (4 * n));
+  const spread = z * Math.sqrt((p * (1 - p)) / n + a / (WILSON_DIVISOR * n));
   return (centre + spread) / (1 + a);
 }
+
+/** The checks, as multiples of `cases` valid cases: 1, 2, 4 and 8. The last is the last check of the run. */
+export const CHECKS: readonly number[] = [1, 1 << 1, 1 << 2, 1 << 3];
+
+/** What a check decides about one requirement. */
+export type Verdict = "met" | "refuted" | "undecided" | "unmet";
 
 /**
  * Returns the verdict on one requirement at one check. exact marks a run
@@ -63,11 +66,19 @@ export function verdict(
   last: boolean,
   exact: boolean,
 ): Verdict {
-  if (n < 1 || k < 0 || k > n) throw new RangeError(`prop: ${k} of ${n} is no share`);
+  if (n < 1 || k < 0 || k > n) {
+    throw new RangeError(`prop: ${k} of ${n} is no share`);
+  }
   if (!exact) {
-    if (bound(k, n, -Z) >= TOLERANCE * share) return "met";
-    if (bound(k, n, Z) < share) return "refuted";
-    if (!last) return "undecided";
+    if (bound(k, n, -Z) >= TOLERANCE * share) {
+      return "met";
+    }
+    if (bound(k, n, Z) < share) {
+      return "refuted";
+    }
+    if (!last) {
+      return "undecided";
+    }
   }
   return k / n >= TOLERANCE * share ? "met" : "unmet";
 }

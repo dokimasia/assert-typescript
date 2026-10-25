@@ -98,7 +98,9 @@ describe("source", () => {
         const shift = 64n - BigInt((n - 1n).toString(2).length);
         return Array.from({ length: 200 }, () => {
           let value = twin.next() >> shift;
-          while (value >= n) value = twin.next() >> shift;
+          while (value >= n) {
+            value = twin.next() >> shift;
+          }
           return value;
         });
       });

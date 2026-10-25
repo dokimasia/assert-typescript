@@ -30,6 +30,7 @@
  * `damaged` for any other file.
  */
 
+import { compareText } from "../../order.js";
 import type { Choice } from "./choice.js";
 import { JsonError, parse } from "./json.js";
 import { mix } from "./source.js";
@@ -42,10 +43,11 @@ const FORMAT = 1n;
 const TOKEN_VERSION = 1n;
 
 /** The largest line of an identity, the largest signed 32-bit integer. */
-const LINE_MAX = 2n ** 31n - 1n;
+const LINE_MAX = 2_147_483_647n;
 
-/** The most levels of objects and arrays that a file nests, the root included. */
-export const MAX_DEPTH = 64;
+/** The base and the digits of the key in a file's name. */
+const HEX_RADIX = 16;
+const NAME_DIGITS = 16;
 
 /** The levels above a draw's value: the root, the counterexample and the draw. */
 const ABOVE_VALUE = 3;
@@ -83,6 +85,111 @@ const TOKEN = /^prop([1-9][0-9]*):/;
 const VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const DATE = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/;
 
+/** The signal that an entry is of a later format or token version. */
+class Later extends Error {}
+
+/** Returns the levels of objects and arrays that node nests, 0 for a scalar. */
+function depth(node: unknown): number {
+  if (Array.isArray(node)) {
+    return 1 + Math.max(0, ...node.map(depth));
+  }
+  if (typeof node === "object" && node !== null) {
+    return 1 + Math.max(0, ...Object.values(node).map(depth));
+  }
+  return 0;
+}
+
+/** Reports whether value is a JSON object, as the strict reader returns one. */
+function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Returns the sorted keys of an object, joined by commas. */
+function keysOf(value: Readonly<Record<string, unknown>>): string {
+  return Object.keys(value).sort(compareText).join(",");
+}
+
+/** Reports whether value has the form of an identity's key. */
+function identityValue(key: string, value: unknown): boolean {
+  if (key === "line") {
+    return typeof value === "bigint" && value >= 1n && value <= LINE_MAX;
+  }
+  if (typeof value !== "string" || value === "") {
+    return false;
+  }
+  return key !== "file" || !(value.includes("/") || value.includes("\\"));
+}
+
+/**
+ * Reports whether found is a calendar date written as YYYY-MM-DD, from
+ * 0001-01-01 to 9999-12-31. A date that Date moves to another day, such as
+ * February 30, is no date.
+ */
+function isDate(found: unknown): boolean {
+  const match = typeof found === "string" ? DATE.exec(found) : null;
+  if (match === null) {
+    return false;
+  }
+  const [year, month, day] = [Number(match[1]), Number(match[2]) - 1, Number(match[3])];
+  const date = new Date(0);
+  date.setUTCFullYear(year, month, day);
+  return (
+    year >= 1 &&
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month &&
+    date.getUTCDate() === day
+  );
+}
+
+/** Reports whether every field of an entry of format 1 has its form. The token's own form is checked apart. */
+function wellFormed(document: Readonly<Record<string, unknown>>): boolean {
+  const identity = document["identity"];
+  const draws = document["counterexample"];
+  return (
+    typeof document["definition"] === "string" &&
+    VERSION.test(document["definition"]) &&
+    typeof document["property"] === "string" &&
+    isObject(identity) &&
+    IDENTITIES.includes(keysOf(identity)) &&
+    Object.entries(identity).every(([key, value]) => identityValue(key, value)) &&
+    typeof document["choices"] === "string" &&
+    Array.isArray(draws) &&
+    draws.every(
+      (draw) =>
+        isObject(draw) && DRAWS.has(keysOf(draw)) && typeof draw["label"] === "string",
+    ) &&
+    isDate(document["found"])
+  );
+}
+
+/** Returns the property and the choices of the entry that text states. */
+function parseEntry(text: string): readonly [string, Choice[]] {
+  const document = parse(text, MAX_DEPTH);
+  const version = isObject(document) ? document["store"] : undefined;
+  if (typeof version !== "bigint" || version < FORMAT) {
+    throw new JsonError("prop: store names no format");
+  }
+  if (version > FORMAT) {
+    throw new Later();
+  }
+  const entryOf = document as Readonly<Record<string, unknown>>;
+  if (keysOf(entryOf) !== FIELDS.join(",") || !wellFormed(entryOf)) {
+    throw new JsonError("prop: the entry's fields are not those of its format");
+  }
+  const token = entryOf["choices"] as string;
+  const stated = TOKEN.exec(token);
+  if (stated === null) {
+    throw new JsonError("prop: the token states no version");
+  }
+  if (BigInt(stated[1] as string) > TOKEN_VERSION) {
+    throw new Later();
+  }
+  return [entryOf["property"] as string, decode(token)];
+}
+
+/** The most levels of objects and arrays that a file nests, the root included. */
+export const MAX_DEPTH = 64;
+
 /** What a runner does with one file of the store. */
 export type Verdict = "replay" | "other" | "skip" | "damaged";
 
@@ -104,9 +211,6 @@ export interface Failure {
   readonly counterexample: readonly Readonly<Record<string, unknown>>[];
 }
 
-/** The signal that an entry is of a later format or token version. */
-class Later extends Error {}
-
 /**
  * Returns the file name of the entry for a contract and a minimal case.
  *
@@ -120,16 +224,7 @@ export function name(contract: string, choices: readonly Choice[]): string {
     Buffer.of(0),
     Buffer.from(encode(choices), "utf8"),
   ]);
-  return `${mix(data).toString(16).padStart(16, "0")}.json`;
-}
-
-/** Returns the levels of objects and arrays that node nests, 0 for a scalar. */
-function depth(node: unknown): number {
-  if (Array.isArray(node)) return 1 + Math.max(0, ...node.map(depth));
-  if (typeof node === "object" && node !== null) {
-    return 1 + Math.max(0, ...Object.values(node).map(depth));
-  }
-  return 0;
+  return `${mix(data).toString(HEX_RADIX).padStart(NAME_DIGITS, "0")}.json`;
 }
 
 /**
@@ -162,80 +257,6 @@ export function entry(
   };
 }
 
-/** Reports whether value is a JSON object, as the strict reader returns one. */
-function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** Returns the sorted keys of an object, joined by commas. */
-function keysOf(value: Readonly<Record<string, unknown>>): string {
-  return Object.keys(value).sort().join(",");
-}
-
-/** Reports whether value has the form of an identity's key. */
-function identityValue(key: string, value: unknown): boolean {
-  if (key === "line")
-    return typeof value === "bigint" && value >= 1n && value <= LINE_MAX;
-  if (typeof value !== "string" || value === "") return false;
-  return key !== "file" || !(value.includes("/") || value.includes("\\"));
-}
-
-/** Reports whether found is a calendar date written as YYYY-MM-DD, from 0001-01-01 to 9999-12-31. */
-function isDate(found: unknown): boolean {
-  const match = typeof found === "string" ? DATE.exec(found) : null;
-  if (match === null) return false;
-  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
-  const lengths = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  return (
-    year >= 1 &&
-    month >= 1 &&
-    month <= 12 &&
-    day >= 1 &&
-    day <= (lengths[month - 1] as number)
-  );
-}
-
-/** Reports whether every field of an entry of format 1 has its form. The token's own form is checked apart. */
-function wellFormed(document: Readonly<Record<string, unknown>>): boolean {
-  const identity = document["identity"];
-  const draws = document["counterexample"];
-  return (
-    typeof document["definition"] === "string" &&
-    VERSION.test(document["definition"]) &&
-    typeof document["property"] === "string" &&
-    isObject(identity) &&
-    IDENTITIES.includes(keysOf(identity)) &&
-    Object.entries(identity).every(([key, value]) => identityValue(key, value)) &&
-    typeof document["choices"] === "string" &&
-    Array.isArray(draws) &&
-    draws.every(
-      (draw) =>
-        isObject(draw) && DRAWS.has(keysOf(draw)) && typeof draw["label"] === "string",
-    ) &&
-    isDate(document["found"])
-  );
-}
-
-/** Returns the property and the choices of the entry that text states. */
-function parseEntry(text: string): readonly [string, Choice[]] {
-  const document = parse(text, MAX_DEPTH);
-  const version = isObject(document) ? document["store"] : undefined;
-  if (typeof version !== "bigint" || version < FORMAT) {
-    throw new JsonError("prop: store names no format");
-  }
-  if (version > FORMAT) throw new Later();
-  const entryOf = document as Readonly<Record<string, unknown>>;
-  if (keysOf(entryOf) !== FIELDS.join(",") || !wellFormed(entryOf)) {
-    throw new JsonError("prop: the entry's fields are not those of its format");
-  }
-  const token = entryOf["choices"] as string;
-  const stated = TOKEN.exec(token);
-  if (stated === null) throw new JsonError("prop: the token states no version");
-  if (BigInt(stated[1] as string) > TOKEN_VERSION) throw new Later();
-  return [entryOf["property"] as string, decode(token)];
-}
-
 /**
  * Returns what a runner of the property contract does with a file's text.
  *
@@ -251,6 +272,8 @@ export function read(text: string, contract: string): Read {
     return { verdict: err instanceof Later ? "skip" : "damaged", choices: [] };
   }
   const [property, choices] = parsed;
-  if (property !== contract) return { verdict: "other", choices: [] };
+  if (property !== contract) {
+    return { verdict: "other", choices: [] };
+  }
   return { verdict: "replay", choices };
 }

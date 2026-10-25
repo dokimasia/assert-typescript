@@ -2,21 +2,14 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * The spec of the shrinker: the replay before it, the smallest case of each
- * failure, and the explanation. Each shrunk case, each count of runs and
- * each explanation is the result of the definition's reference
+ * The spec of the shrinker: the smallest case of each failure. Each shrunk
+ * case and each count of runs is the result of the definition's reference
  * implementation on the same body and choices.
  */
 
 import { describe } from "vitest";
 import { check } from "../../../src/index.js";
-import {
-  type Case,
-  DECODE,
-  type Decoder,
-  MAX_CHOICES,
-  Replaying,
-} from "../../../src/prop/engine/case.js";
+import { MAX_CHOICES } from "../../../src/prop/engine/case.js";
 import {
   type Choice,
   FloatBounds,
@@ -24,33 +17,25 @@ import {
   SequenceBounds,
 } from "../../../src/prop/engine/choice.js";
 import { Sizes } from "../../../src/prop/engine/collection.js";
-import {
-  type Body,
-  type Execution,
-  execute,
-} from "../../../src/prop/engine/execution.js";
+import type { Body, Execution } from "../../../src/prop/engine/execution.js";
 import {
   Bytes,
   Float,
-  type Generator,
   Integer,
   Just,
   List,
-  Mapped,
   Recursive,
 } from "../../../src/prop/engine/generator.js";
+import { replaced } from "../../../src/prop/engine/shrink/nodes.js";
 import {
-  confirm,
   DEFAULT_BUDGET,
   Exhausted,
-  explain,
-  explainSeed,
-  nodesOf,
   Shrinker,
 } from "../../../src/prop/engine/shrink.js";
 import { canonical } from "../../../src/prop/engine/value.js";
 import { drive } from "../../../src/prop/engine/work.js";
 import { test as it } from "../../../src/vitest.js";
+import { body, executed, integers, shrinkerOf } from "../../helpers.js";
 
 const DIGIT = new Integer(new IntegerBounds(0n, 9n));
 const WIDE = new Integer(new IntegerBounds(0n, 1_000_000_000n));
@@ -78,32 +63,6 @@ const NARROW = new Float(new FloatBounds(2.6, 2.9));
 
 /** The trees that the body of the run of siblings fails for: [[9, 5]], [9, 5] and [9]. */
 const EXACT = new Set([canonical([[9n, 5n]]), canonical([9n, 5n]), canonical([9n])]);
-
-/** A digit that rejects its case unless it is 7. */
-const SEVEN: Decoder<bigint> = {
-  [DECODE]: (c: Case) => {
-    const value = DIGIT[DECODE](c);
-    c.assume(value === 7n);
-    return value;
-  },
-};
-
-/** Returns integer choices of values. */
-function integers(...values: bigint[]): Choice[] {
-  return values.map((value) => ({ kind: "integer", value }));
-}
-
-/** Returns a body of a function that returns nothing. */
-function body(fn: (c: Case) => void): Body {
-  return (c) => {
-    fn(c);
-  };
-}
-
-/** Returns the execution of body on recorded choices. */
-function executed(of: Body, choices: readonly Choice[]): Promise<Execution> {
-  return drive(execute(of, new Replaying(choices), MAX_CHOICES));
-}
 
 /** Returns a shrinker that starts from the failing case of choices, after its shrink. */
 async function shrunk(
@@ -134,7 +93,9 @@ function sum(values: readonly bigint[]): bigint {
 }
 
 const above = body((c) => {
-  if (c.draw(WIDE, "n") > 1000n) c.fail("above");
+  if (c.draw(WIDE, "n") > 1000n) {
+    c.fail("above");
+  }
 });
 
 describe("shrink", () => {
@@ -154,214 +115,6 @@ describe("shrink", () => {
         ["Exhausted", "prop: the shrink budget is spent"],
         "the name and the message",
       );
-    });
-  });
-
-  describe("nodesOf", () => {
-    it("returns each choice of a case with its request", async ({ seat }) => {
-      const execution = await executed(above, integers(2000n));
-      const [node] = nodesOf(execution.case);
-
-      check.isEqualTo(
-        seat,
-        [node?.choice, node?.request === execution.case.requests[0]],
-        [{ kind: "integer", value: 2000n }, true],
-        "one node",
-      );
-    });
-  });
-
-  describe("explainSeed", () => {
-    it("returns the seed plus (draw + 1) × 2^32 plus the filling modulo 2^64", ({
-      seat,
-    }) => {
-      check.isEqualTo(
-        seat,
-        [
-          explainSeed(7n, 0, 0),
-          explainSeed(7n, 2, 3),
-          explainSeed(2n ** 64n - 1n, 0, 1),
-        ],
-        [7n + 2n ** 32n, 7n + 3n * 2n ** 32n + 3n, 2n ** 32n],
-        "three seeds",
-      );
-    });
-  });
-
-  describe("confirm", () => {
-    it("returns undefined for a replay that fails the same way", async ({ seat }) => {
-      check.isNil(
-        seat,
-        await drive(
-          confirm(above, await executed(above, integers(2000n)), MAX_CHOICES),
-        ),
-        "no divergence",
-      );
-    });
-
-    it("returns a verdict divergence for a replay that passes", async ({ seat }) => {
-      let calls = 0;
-      const once = body((c) => {
-        calls += 1;
-        c.place = { part: "settle" };
-        c.draw(WIDE, "n");
-        if (calls === 1) c.fail("once");
-      });
-      const divergence = await drive(
-        confirm(once, await executed(once, integers(5n)), MAX_CHOICES),
-      );
-
-      check.isEqualTo(
-        seat,
-        divergence,
-        { what: "verdict", index: 1, recorded: "once", replayed: undefined },
-        "the identity against a pass",
-      );
-    });
-
-    it("returns a request divergence with the label and the step of the replay's request", async ({
-      seat,
-    }) => {
-      let calls = 0;
-      const shifting = body((c) => {
-        calls += 1;
-        c.place = { part: "sequential", position: 1, action: "put" };
-        c.draw(calls === 1 ? WIDE : SMALL, "n");
-        c.fail("always");
-      });
-      const divergence = await drive(
-        confirm(shifting, await executed(shifting, integers(5n)), MAX_CHOICES),
-      );
-
-      check.isEqualTo(
-        seat,
-        divergence,
-        {
-          what: "request",
-          index: 0,
-          recorded: WIDE.bounds,
-          replayed: SMALL.bounds,
-          label: "n",
-          step: { part: "sequential", position: 1, action: "put" },
-        },
-        "the first request",
-      );
-    });
-
-    it("returns a request divergence without a label for a replay that ends before a request", async ({
-      seat,
-    }) => {
-      let calls = 0;
-      const shortening = body((c) => {
-        calls += 1;
-        if (calls === 1) c.draw(WIDE, "n");
-        c.fail("always");
-      });
-      const divergence = await drive(
-        confirm(shortening, await executed(shortening, integers(5n)), MAX_CHOICES),
-      );
-
-      check.isEqualTo(
-        seat,
-        divergence,
-        {
-          what: "request",
-          index: 0,
-          recorded: WIDE.bounds,
-          replayed: undefined,
-          label: undefined,
-          step: undefined,
-        },
-        "no request at the position",
-      );
-    });
-
-    it("returns a fingerprint divergence with the step of the replay's fingerprint", async ({
-      seat,
-    }) => {
-      let calls = 0;
-      const observing = body((c) => {
-        calls += 1;
-        c.draw(WIDE, "n");
-        c.place = { part: "drain", position: 0, action: "flush" };
-        c.observe(BigInt(calls));
-        c.fail("always");
-      });
-      const divergence = await drive(
-        confirm(observing, await executed(observing, integers(5n)), MAX_CHOICES),
-      );
-
-      check.isEqualTo(
-        seat,
-        divergence,
-        {
-          what: "fingerprint",
-          index: 0,
-          recorded: 1n,
-          replayed: 2n,
-          label: undefined,
-          step: { part: "drain", position: 0, action: "flush" },
-        },
-        "the fingerprints 1 and 2",
-      );
-    });
-
-    it("returns a fingerprint divergence without a step for a fingerprint that the replay did not observe", async ({
-      seat,
-    }) => {
-      let calls = 0;
-      const once = body((c) => {
-        calls += 1;
-        c.draw(WIDE, "n");
-        if (calls === 1) c.observe(1n);
-        c.fail("always");
-      });
-      const divergence = await drive(
-        confirm(once, await executed(once, integers(5n)), MAX_CHOICES),
-      );
-
-      check.isEqualTo(
-        seat,
-        divergence,
-        {
-          what: "fingerprint",
-          index: 0,
-          recorded: 1n,
-          replayed: undefined,
-          label: undefined,
-          step: undefined,
-        },
-        "no fingerprint",
-      );
-    });
-
-    it("returns undefined for a replay that observes the same fingerprints", async ({
-      seat,
-    }) => {
-      const observing = body((c) => {
-        c.observe(c.draw(WIDE, "n") % 7n);
-        c.observe(3n);
-        c.fail("always");
-      });
-
-      check.isNil(
-        seat,
-        await drive(
-          confirm(observing, await executed(observing, integers(5n)), MAX_CHOICES),
-        ),
-        "no divergence",
-      );
-    });
-
-    it("passes the replay to the observer under the phase replay", async ({ seat }) => {
-      const phases: string[] = [];
-      await drive(
-        confirm(above, await executed(above, integers(2000n)), MAX_CHOICES, (phase) =>
-          phases.push(phase),
-        ),
-      );
-
-      check.isEqualTo(seat, phases, ["replay"], "one replay");
     });
   });
 
@@ -432,6 +185,94 @@ describe("shrink", () => {
     });
   });
 
+  describe("Shrinker.sizeOf", () => {
+    it("returns the number of choices that a run of the choices recorded", async ({
+      seat,
+    }) => {
+      const shrinker = await shrinkerOf(above, integers(2000n));
+
+      check.isEqualTo(
+        seat,
+        [shrinker.sizeOf(integers(2000n)), shrinker.sizeOf(integers(5n))],
+        [1, undefined],
+        "the first case, and choices that no run had",
+      );
+    });
+  });
+
+  describe("Shrinker.consider", () => {
+    it("makes a smaller candidate that fails the same way the best case", async ({
+      seat,
+    }) => {
+      const shrinker = await shrinkerOf(above, integers(2000n));
+      const accepted = await drive(
+        shrinker.consider(replaced(shrinker.nodes, 0, 1500n)),
+      );
+
+      check.isEqualTo(
+        seat,
+        [accepted, drawn(shrinker.best.execution), shrinker.runs],
+        [true, [1500n], 1],
+        "1500 after one run",
+      );
+    });
+
+    it("refuses a candidate that passes", async ({ seat }) => {
+      const shrinker = await shrinkerOf(above, integers(2000n));
+
+      check.isEqualTo(
+        seat,
+        [
+          await drive(shrinker.consider(replaced(shrinker.nodes, 0, 5n))),
+          shrinker.runs,
+        ],
+        [false, 1],
+        "one run",
+      );
+    });
+
+    it("refuses a candidate that is no smaller without a run", async ({ seat }) => {
+      const shrinker = await shrinkerOf(above, integers(2000n));
+
+      check.isEqualTo(
+        seat,
+        [
+          await drive(shrinker.consider(replaced(shrinker.nodes, 0, 3000n))),
+          shrinker.runs,
+        ],
+        [false, 0],
+        "no run",
+      );
+    });
+  });
+
+  describe("Shrinker.sweep", () => {
+    it("tries the candidates of each new best case until none is accepted", async ({
+      seat,
+    }) => {
+      const shrinker = await shrinkerOf(above, integers(2000n));
+      const accepted = await drive(
+        shrinker.sweep(function* () {
+          const value = shrinker.nodes[0]?.choice.value as bigint;
+          yield replaced(shrinker.nodes, 0, value - 300n);
+        }),
+      );
+
+      check.isEqualTo(
+        seat,
+        [accepted, drawn(shrinker.best.execution)],
+        [true, [1100n]],
+        "steps of 300 down to 1100",
+      );
+    });
+
+    it("reports false when no candidate is accepted", async ({ seat }) => {
+      const shrinker = await shrinkerOf(above, integers(2000n));
+
+      check.isFalse(seat, await drive(shrinker.sweep(() => [])), "no candidate");
+    });
+  });
+
   describe("Shrinker.shrinkAll", () => {
     const tests: { name: string; give: [Body, Choice[]]; want: [unknown[], number] }[] =
       [
@@ -445,7 +286,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               const values = c.draw(PERCENT, "xs");
-              if ((values[0] ?? 0n) > 10n) c.fail("first");
+              if ((values[0] ?? 0n) > 10n) {
+                c.fail("first");
+              }
             }),
             integers(1n, 50n, ...Array.from({ length: 7 }, () => [1n, 3n]).flat(), 0n),
           ],
@@ -455,7 +298,9 @@ describe("shrink", () => {
           name: "a list to the smallest sum of 10",
           give: [
             body((c) => {
-              if (sum(c.draw(PERCENT, "xs")) >= 10n) c.fail("ten");
+              if (sum(c.draw(PERCENT, "xs")) >= 10n) {
+                c.fail("ten");
+              }
             }),
             integers(1n, 9n, 1n, 1n, 1n, 2n, 1n, 9n, 0n),
           ],
@@ -465,7 +310,9 @@ describe("shrink", () => {
           name: "a list to the one element that fails",
           give: [
             body((c) => {
-              if (c.draw(PERCENT, "xs").includes(50n)) c.fail("fifty");
+              if (c.draw(PERCENT, "xs").includes(50n)) {
+                c.fail("fifty");
+              }
             }),
             integers(1n, 3n, 1n, 50n, 0n),
           ],
@@ -475,7 +322,9 @@ describe("shrink", () => {
           name: "a tree to the subtree that contains a 9",
           give: [
             body((c) => {
-              if (contains(c.draw(TREE, "tree"), 9n)) c.fail("nine");
+              if (contains(c.draw(TREE, "tree"), 9n)) {
+                c.fail("nine");
+              }
             }),
             integers(1n, 1n, 0n, 9n, 0n),
           ],
@@ -486,7 +335,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               const value = c.draw(SIGNED, "x");
-              if ((value >= 2n || value <= -2n) && value !== 2n) c.fail("far");
+              if ((value >= 2n || value <= -2n) && value !== 2n) {
+                c.fail("far");
+              }
             }),
             integers(3n),
           ],
@@ -497,8 +348,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               const values = c.draw(SIGNED_LIST, "xs");
-              if (values.some((value, i) => value !== values[values.length - 1 - i]))
+              if (values.some((value, i) => value !== values.at(-1 - i))) {
                 c.fail("reverse");
+              }
             }),
             integers(1n, 0n, 1n, -1n, 0n),
           ],
@@ -508,7 +360,9 @@ describe("shrink", () => {
           name: "two lists to one list of two values",
           give: [
             body((c) => {
-              if (new Set(c.draw(NESTED, "xss").flat()).size >= 2) c.fail("mixed");
+              if (new Set(c.draw(NESTED, "xss").flat()).size >= 2) {
+                c.fail("mixed");
+              }
             }),
             integers(1n, 1n, 1n, 0n, 1n, 1n, 2n, 0n, 0n),
           ],
@@ -520,7 +374,9 @@ describe("shrink", () => {
             body((c) => {
               const x = c.draw(POSITIVE, "x");
               const y = c.draw(POSITIVE, "y");
-              if (x >= 10n && (x - y === 1n || y - x === 1n)) c.fail("one");
+              if (x >= 10n && (x - y === 1n || y - x === 1n)) {
+                c.fail("one");
+              }
             }),
             integers(36n, 37n),
           ],
@@ -531,7 +387,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               const x = c.draw(SIGNED, "x");
-              if (c.draw(SIGNED, "y") - x >= 7n) c.fail("spread");
+              if (c.draw(SIGNED, "y") - x >= 7n) {
+                c.fail("spread");
+              }
             }),
             integers(-3n, 4n),
           ],
@@ -542,7 +400,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               c.draw(UNIT, "v");
-              if (c.draw(WIDE, "n") > 1000n) c.fail("above");
+              if (c.draw(WIDE, "n") > 1000n) {
+                c.fail("above");
+              }
             }),
             [
               { kind: "float", value: 3.75 },
@@ -555,7 +415,9 @@ describe("shrink", () => {
           name: "a byte string to its one high byte",
           give: [
             body((c) => {
-              if (c.draw(BYTES, "b").some((byte) => byte > 200)) c.fail("high");
+              if (c.draw(BYTES, "b").some((byte) => byte > 200)) {
+                c.fail("high");
+              }
             }),
             [{ kind: "sequence", value: [1, 250, 3, 4] }],
           ],
@@ -569,7 +431,9 @@ describe("shrink", () => {
               const items = Array.from({ length: Number(count) }, () =>
                 c.draw(DIGIT, "item"),
               );
-              if (count >= 2n && items.at(-1) === 9n) c.fail("nine");
+              if (count >= 2n && items.at(-1) === 9n) {
+                c.fail("nine");
+              }
             }),
             integers(3n, 0n, 0n, 9n),
           ],
@@ -580,8 +444,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               const count = Number(c.draw(DIGIT, "count"));
-              if (c.draw(new List(DIGIT, new Sizes(count, count)), "xs").includes(9n))
+              if (c.draw(new List(DIGIT, new Sizes(count, count)), "xs").includes(9n)) {
                 c.fail("nine");
+              }
             }),
             integers(3n, 1n, 0n, 1n, 0n, 1n, 9n, 0n),
           ],
@@ -593,7 +458,9 @@ describe("shrink", () => {
             body((c) => {
               const values = c.draw(PERCENT, "xs");
               const index = Number(c.draw(DIGIT, "i"));
-              if ((values[index] ?? 0n) > 50n) c.fail("indexed");
+              if ((values[index] ?? 0n) > 50n) {
+                c.fail("indexed");
+              }
             }),
             integers(1n, 0n, 1n, 60n, 0n, 1n),
           ],
@@ -605,7 +472,9 @@ describe("shrink", () => {
             body((c) => {
               const value = c.draw(BYTES, "b");
               const index = Number(c.draw(DIGIT, "i"));
-              if ((value[index] ?? 0) > 200) c.fail("high");
+              if ((value[index] ?? 0) > 200) {
+                c.fail("high");
+              }
             }),
             [
               { kind: "sequence", value: [1, 250] },
@@ -620,7 +489,9 @@ describe("shrink", () => {
             body((c) => {
               const value = c.draw(PAIR_BYTES, "b");
               const index = Number(c.draw(DIGIT, "i"));
-              if ((value[index] ?? 0) > 200) c.fail("high");
+              if ((value[index] ?? 0) > 200) {
+                c.fail("high");
+              }
             }),
             [
               { kind: "sequence", value: [1, 250] },
@@ -634,7 +505,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               c.draw(JUST, "j");
-              if (c.draw(SMALL, "n") > 50n) c.fail("above");
+              if (c.draw(SMALL, "n") > 50n) {
+                c.fail("above");
+              }
             }),
             integers(60n),
           ],
@@ -645,7 +518,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               const values = c.draw(PERCENT, "xs");
-              if (values.includes(3n) && values.includes(5n)) c.fail("both");
+              if (values.includes(3n) && values.includes(5n)) {
+                c.fail("both");
+              }
             }),
             integers(1n, 5n, 1n, 3n, 0n),
           ],
@@ -655,7 +530,9 @@ describe("shrink", () => {
           name: "a sum of two integers onto the second",
           give: [
             body((c) => {
-              if (c.draw(SMALL, "x") + c.draw(SMALL, "y") > 500n) c.fail("sum");
+              if (c.draw(SMALL, "x") + c.draw(SMALL, "y") > 500n) {
+                c.fail("sum");
+              }
             }),
             integers(300n, 300n),
           ],
@@ -666,7 +543,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               const x = c.draw(SMALL, "x");
-              if (x === c.draw(SMALL, "y") && x > 0n) c.fail("equal");
+              if (x === c.draw(SMALL, "y") && x > 0n) {
+                c.fail("equal");
+              }
             }),
             integers(400n, 400n),
           ],
@@ -679,7 +558,9 @@ describe("shrink", () => {
               const x = c.draw(SMALL, "x");
               const y = c.draw(SMALL, "y");
               c.draw(SMALL, "z");
-              if (x === y && x > 0n) c.fail("equal");
+              if (x === y && x > 0n) {
+                c.fail("equal");
+              }
             }),
             integers(400n, 400n, 7n),
           ],
@@ -690,7 +571,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               const value = c.draw(UNIT, "v");
-              if (value > 2.5 && !Number.isInteger(value)) c.fail("fraction");
+              if (value > 2.5 && !Number.isInteger(value)) {
+                c.fail("fraction");
+              }
             }),
             [{ kind: "float", value: 2.875 }],
           ],
@@ -700,7 +583,9 @@ describe("shrink", () => {
           name: "a fraction away from its target to an integer",
           give: [
             body((c) => {
-              if (c.draw(UNIT, "v") > 2.5) c.fail("bigger");
+              if (c.draw(UNIT, "v") > 2.5) {
+                c.fail("bigger");
+              }
             }),
             [{ kind: "float", value: 2.875 }],
           ],
@@ -710,7 +595,9 @@ describe("shrink", () => {
           name: "an integral float as an integer",
           give: [
             body((c) => {
-              if (c.draw(UNIT, "v") > 2.5) c.fail("bigger");
+              if (c.draw(UNIT, "v") > 2.5) {
+                c.fail("bigger");
+              }
             }),
             [{ kind: "float", value: 9 }],
           ],
@@ -720,7 +607,9 @@ describe("shrink", () => {
           name: "a negative integral float above zero",
           give: [
             body((c) => {
-              if (Math.abs(c.draw(SIGNED_FLOAT, "v")) >= 3) c.fail("large");
+              if (Math.abs(c.draw(SIGNED_FLOAT, "v")) >= 3) {
+                c.fail("large");
+              }
             }),
             [{ kind: "float", value: -9 }],
           ],
@@ -730,7 +619,9 @@ describe("shrink", () => {
           name: "a float of width 32 past the integers that the width cannot state",
           give: [
             body((c) => {
-              if (c.draw(WIDE32, "v") >= 2 ** 24 + 2) c.fail("big");
+              if (c.draw(WIDE32, "v") >= 2 ** 24 + 2) {
+                c.fail("big");
+              }
             }),
             [{ kind: "float", value: 2 ** 25 }],
           ],
@@ -741,7 +632,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               const x = c.draw(UNIT, "x");
-              if (x === c.draw(UNIT, "y") && x > 1) c.fail("same");
+              if (x === c.draw(UNIT, "y") && x > 1) {
+                c.fail("same");
+              }
             }),
             [
               { kind: "float", value: 5.5 },
@@ -760,8 +653,9 @@ describe("shrink", () => {
                 x.length > 0 &&
                 x.length === y.length &&
                 x.every((byte, i) => byte === y[i])
-              )
+              ) {
                 c.fail("same");
+              }
             }),
             [
               { kind: "sequence", value: [7, 9] },
@@ -790,8 +684,9 @@ describe("shrink", () => {
           name: "nothing for an infinite float",
           give: [
             body((c) => {
-              if (c.draw(ANY_FLOAT, "v") === Number.POSITIVE_INFINITY)
+              if (c.draw(ANY_FLOAT, "v") === Number.POSITIVE_INFINITY) {
                 c.fail("infinite");
+              }
             }),
             [{ kind: "float", value: Number.POSITIVE_INFINITY }],
           ],
@@ -802,7 +697,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               const value = c.draw(SIGNED_FLOAT, "v");
-              if (value < -2.5 && !Number.isInteger(value)) c.fail("fraction");
+              if (value < -2.5 && !Number.isInteger(value)) {
+                c.fail("fraction");
+              }
             }),
             [{ kind: "float", value: -2.875 }],
           ],
@@ -812,7 +709,9 @@ describe("shrink", () => {
           name: "nothing for a fraction whose roundings leave its bounds",
           give: [
             body((c) => {
-              if (c.draw(NARROW, "v") > 2.8) c.fail("narrow");
+              if (c.draw(NARROW, "v") > 2.8) {
+                c.fail("narrow");
+              }
             }),
             [{ kind: "float", value: 2.875 }],
           ],
@@ -824,7 +723,9 @@ describe("shrink", () => {
             body((c) => {
               c.draw(JUST, "j");
               c.draw(JUST, "k");
-              if (c.draw(SMALL, "n") > 50n) c.fail("above");
+              if (c.draw(SMALL, "n") > 50n) {
+                c.fail("above");
+              }
             }),
             integers(60n),
           ],
@@ -836,7 +737,9 @@ describe("shrink", () => {
             body((c) => {
               const x = c.draw(SIGNED, "x");
               const y = c.draw(SIGNED, "y");
-              if (x <= -10n && (x - y === 1n || y - x === 1n)) c.fail("one");
+              if (x <= -10n && (x - y === 1n || y - x === 1n)) {
+                c.fail("one");
+              }
             }),
             integers(-36n, -37n),
           ],
@@ -846,7 +749,9 @@ describe("shrink", () => {
           name: "a tree to its one leaf of 9 by deleting a run of siblings",
           give: [
             body((c) => {
-              if (EXACT.has(canonical(c.draw(TREE, "tree")))) c.fail("exact");
+              if (EXACT.has(canonical(c.draw(TREE, "tree")))) {
+                c.fail("exact");
+              }
             }),
             integers(1n, 1n, 1n, 1n, 0n, 9n, 1n, 0n, 5n, 0n, 0n),
           ],
@@ -857,7 +762,9 @@ describe("shrink", () => {
           give: [
             body((c) => {
               c.draw(BYTES, "b");
-              if (c.draw(WIDE, "n") > 1000n) c.fail("above");
+              if (c.draw(WIDE, "n") > 1000n) {
+                c.fail("above");
+              }
             }),
             [
               { kind: "sequence", value: [] },
@@ -872,7 +779,9 @@ describe("shrink", () => {
             body((c) => {
               const x = c.draw(SMALL, "x");
               const y = c.draw(SMALL, "y");
-              if (x + y > 500n && y <= 400n) c.fail("sum");
+              if (x + y > 500n && y <= 400n) {
+                c.fail("sum");
+              }
             }),
             integers(300n, 300n),
           ],
@@ -897,7 +806,9 @@ describe("shrink", () => {
     }) => {
       const shrinker = await shrunk(
         body((c) => {
-          if (c.random() > 1000n) c.fail("above");
+          if (c.random() > 1000n) {
+            c.fail("above");
+          }
         }),
         integers(5000n),
       );
@@ -916,9 +827,15 @@ describe("shrink", () => {
       const three = body((c) => {
         const x = c.draw(SMALL, "x");
         const y = c.draw(SMALL, "y");
-        if (y === 0n && x >= 100n) c.fail("p");
-        if (x === 75n) c.fail("q");
-        if (x >= 100n && y >= 100n) c.fail("a");
+        if (y === 0n && x >= 100n) {
+          c.fail("p");
+        }
+        if (x === 75n) {
+          c.fail("q");
+        }
+        if (x >= 100n && y >= 100n) {
+          c.fail("a");
+        }
       });
       const shrinker = await shrunk(three, integers(150n, 150n));
 
@@ -949,9 +866,15 @@ describe("shrink", () => {
       const spots = body((c) => {
         const x = c.draw(SMALL, "x");
         const y = c.draw(SMALL, "y");
-        if (x > 800n && y > 300n) c.fail("big");
-        if (x === 0n && y >= 1n) c.fail("zero");
-        if (x === 450n) c.fail("half");
+        if (x > 800n && y > 300n) {
+          c.fail("big");
+        }
+        if (x === 0n && y >= 1n) {
+          c.fail("zero");
+        }
+        if (x === 450n) {
+          c.fail("half");
+        }
       });
       const shrinker = await shrunk(spots, integers(900n, 500n), 68);
 
@@ -975,8 +898,12 @@ describe("shrink", () => {
     }) => {
       const two = body((c) => {
         const value = c.draw(SMALL, "x");
-        if (value % 2n === 1n) c.fail("odd");
-        if (value > 50n) c.fail("big");
+        if (value % 2n === 1n) {
+          c.fail("odd");
+        }
+        if (value > 50n) {
+          c.fail("big");
+        }
       });
       const shrinker = await shrunk(two, integers(78n));
 
@@ -1007,7 +934,9 @@ describe("shrink", () => {
       let calls = 0;
       const breaking = body((c) => {
         calls += 1;
-        if (calls > 1) throw new TypeError("the body broke");
+        if (calls > 1) {
+          throw new TypeError("the body broke");
+        }
         c.draw(WIDE, "n");
         c.fail("first");
       });
@@ -1027,227 +956,6 @@ describe("shrink", () => {
         ),
         TypeError,
         "the body's error",
-      );
-    });
-  });
-
-  describe("explain", () => {
-    /** Returns the explanation of the failing case of choices from seed. */
-    async function explained(
-      of: Body,
-      choices: Choice[],
-      seed: bigint,
-      budget = DEFAULT_BUDGET,
-    ): Promise<[unknown[], number]> {
-      const shrinker = new Shrinker(
-        of,
-        await executed(of, choices),
-        MAX_CHOICES,
-        budget,
-      );
-      const explanation = await drive(explain(shrinker, shrinker.best, seed));
-      return [
-        explanation.map((one) => [
-          one.label,
-          one.value,
-          one.anyValueFails,
-          one.nearest?.value,
-        ]),
-        shrinker.runs,
-      ];
-    }
-
-    it("explains each draw of a failing case", async ({ seat }) => {
-      const noisy = body((c) => {
-        const value = c.draw(WIDE, "n");
-        c.draw(WIDE, "noise");
-        if (value > 1000n) c.fail("above");
-      });
-
-      check.isEqualTo(
-        seat,
-        await explained(noisy, integers(1001n, 3n), 7n),
-        [
-          [
-            ["n", 1001n, false, 1000n],
-            ["noise", 3n, true, undefined],
-          ],
-          7,
-        ],
-        "n's nearest passing value is 1000",
-      );
-    });
-
-    it("reports no nearest value when the step fails another way", async ({ seat }) => {
-      const limit = body((c) => {
-        const value = c.draw(WIDE, "n");
-        if (value > 1000n) c.fail("above");
-        if (value === 1000n) c.fail("limit");
-      });
-
-      check.isEqualTo(
-        seat,
-        await explained(limit, integers(1001n), 7n),
-        [[["n", 1001n, false, undefined]], 3],
-        "1000 fails too",
-      );
-    });
-
-    it("reports no nearest value for a draw at its target", async ({ seat }) => {
-      const zero = body((c) => {
-        if (c.draw(SIGNED, "v") === 0n) c.fail("zero");
-      });
-
-      check.isEqualTo(
-        seat,
-        await explained(zero, integers(0n), 7n),
-        [[["v", 0n, false, undefined]], 1],
-        "0 has no step towards 0",
-      );
-    });
-
-    it("reports the nearest value above a draw below its target", async ({ seat }) => {
-      const low = body((c) => {
-        if (c.draw(SIGNED, "v") < -4n) c.fail("low");
-      });
-
-      check.isEqualTo(
-        seat,
-        await explained(low, integers(-5n), 7n),
-        [[["v", -5n, false, -4n]], 3],
-        "-4 passes",
-      );
-    });
-
-    it("reports no explanation of a draw whose fillings decode no value", async ({
-      seat,
-    }) => {
-      const always = body((c) => {
-        c.draw(SEVEN, "seven");
-        c.fail("always");
-      });
-
-      check.isEqualTo(
-        seat,
-        await explained(always, integers(7n), 7n),
-        [[["seven", 7n, undefined, undefined]], 0],
-        "no run",
-      );
-    });
-
-    it("explains a draw from the fillings that decode", async ({ seat }) => {
-      const always = body((c) => {
-        c.draw(SEVEN, "seven");
-        c.fail("always");
-      });
-
-      check.isEqualTo(
-        seat,
-        await explained(always, integers(7n), 11n),
-        [[["seven", 7n, true, undefined]], 1],
-        "one filling decodes",
-      );
-    });
-
-    it("reports no explanation of a draw that makes no choice", async ({ seat }) => {
-      const afterJust = body((c) => {
-        c.draw(JUST, "j");
-        if (c.draw(WIDE, "n") > 1000n) c.fail("above");
-      });
-
-      check.isEqualTo(
-        seat,
-        await explained(afterJust, integers(1001n), 7n),
-        [
-          [
-            ["j", 7n, undefined, undefined],
-            ["n", 1001n, false, 1000n],
-          ],
-          4,
-        ],
-        "the just is unexplained",
-      );
-    });
-
-    it("reports the map of the nearest integer for a map of an integer", async ({
-      seat,
-    }) => {
-      const wrapped = new Mapped(WIDE, (value: bigint) => `a${value}b`);
-      const aboveWrapped = body((c) => {
-        if (BigInt(c.draw(wrapped, "n").slice(1, -1)) > 1000n) c.fail("above");
-      });
-      const [explanation] = await explained(aboveWrapped, integers(1001n), 7n);
-
-      check.isEqualTo(
-        seat,
-        (explanation[0] as unknown[]).slice(1),
-        ["a1001b", false, "a1000b"],
-        "the step wrapped in a and b",
-      );
-    });
-
-    it("reports no nearest value for a draw that is no integer", async ({ seat }) => {
-      const big = body((c) => {
-        if (c.draw(UNIT, "v") > 2.5) c.fail("bigger");
-      });
-      const [explanation] = await explained(big, [{ kind: "float", value: 3 }], 7n);
-
-      check.isEqualTo(
-        seat,
-        (explanation[0] as unknown[])[3],
-        undefined,
-        "no step of a float",
-      );
-    });
-
-    it("leaves the draws unexplained once the budget is spent", async ({ seat }) => {
-      const noisy = body((c) => {
-        const value = c.draw(WIDE, "n");
-        c.draw(WIDE, "noise");
-        if (value > 1000n) c.fail("above");
-      });
-
-      check.isEqualTo(
-        seat,
-        await explained(noisy, integers(1001n, 3n), 7n, 0),
-        [
-          [
-            ["n", 1001n, undefined, undefined],
-            ["noise", 3n, undefined, undefined],
-          ],
-          0,
-        ],
-        "no run is left",
-      );
-    });
-
-    it("throws an error of a filling's decode that is no signal", async ({ seat }) => {
-      let decodes = 0;
-      const brittle: Generator<bigint> = new Mapped(WIDE, (value: bigint) => {
-        decodes += 1;
-        if (decodes > 1) throw new TypeError("the decode broke");
-        return value;
-      });
-      const once = body((c) => {
-        c.draw(brittle, "n");
-        c.fail("always");
-      });
-      const shrinker = new Shrinker(
-        once,
-        await executed(once, integers(5n)),
-        MAX_CHOICES,
-        10,
-      );
-
-      check.errorIs(
-        seat,
-        check.doesThrow(
-          seat,
-          () => explain(shrinker, shrinker.best, 7n).next(),
-          "the filling throws",
-        ),
-        TypeError,
-        "the decode's error",
       );
     });
   });

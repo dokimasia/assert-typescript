@@ -11,12 +11,8 @@
 import { describe } from "vitest";
 import { check } from "../../../src/index.js";
 import { type CampaignSettings, campaign } from "../../../src/prop/engine/campaign.js";
-import {
-  Case,
-  DECODE,
-  type Decoder,
-  Generating,
-} from "../../../src/prop/engine/case.js";
+import { Generating } from "../../../src/prop/engine/case/providers.js";
+import { Case, DECODE, type Decoder } from "../../../src/prop/engine/case.js";
 import {
   type Choice,
   FloatBounds,
@@ -26,8 +22,9 @@ import {
 import { Sizes } from "../../../src/prop/engine/collection.js";
 import type { Body, Execution, Phase } from "../../../src/prop/engine/execution.js";
 import { Bytes, Float, Integer, List } from "../../../src/prop/engine/generator.js";
-import { type Outcome, Values } from "../../../src/prop/engine/runner.js";
+import { Values } from "../../../src/prop/engine/settings.js";
 import { caseSource } from "../../../src/prop/engine/source.js";
+import type { Outcome } from "../../../src/prop/engine/tally.js";
 import { drive } from "../../../src/prop/engine/work.js";
 import { test as it } from "../../../src/vitest.js";
 
@@ -91,7 +88,9 @@ function repeatedShare(values: readonly unknown[]): number {
   const seen = new Set<unknown>();
   let repeats = 0;
   for (const value of values) {
-    if (seen.has(value)) repeats += 1;
+    if (seen.has(value)) {
+      repeats += 1;
+    }
     seen.add(value);
   }
   return repeats / values.length;
@@ -198,7 +197,9 @@ describe("campaign", () => {
         const n = c.random();
         c.classify(`n${n % 1000n}`);
         const generator = generators[Number(n % 4n)];
-        if (generator !== undefined) c.draw(generator, "x");
+        if (generator !== undefined) {
+          c.draw(generator, "x");
+        }
       });
       const [outcome] = await explored(mixed, ticks(2000));
 
@@ -234,7 +235,9 @@ describe("campaign", () => {
       const concluded: Outcome[] = [];
       const [outcome, calls] = await explored(
         body((c) => {
-          if (c.draw(WIDE, "n") > HIGH) c.fail("high");
+          if (c.draw(WIDE, "n") > HIGH) {
+            c.fail("high");
+          }
         }),
         ticks(100, { concluded: (one) => concluded.push(one) }),
       );
@@ -260,9 +263,15 @@ describe("campaign", () => {
         body((c) => {
           const n = c.draw(WIDE, "n");
           const m = c.draw(WIDE, "m");
-          if (n > HIGH) c.fail("high n");
-          if (n === 0n) c.fail("zero n");
-          if (m > HIGH) c.fail("high m");
+          if (n > HIGH) {
+            c.fail("high n");
+          }
+          if (n === 0n) {
+            c.fail("zero n");
+          }
+          if (m > HIGH) {
+            c.fail("high m");
+          }
         }),
         ticks(300, { concluded: (one) => concluded.push(one) }),
       );
@@ -287,7 +296,9 @@ describe("campaign", () => {
         body((c) => {
           calls += 1;
           c.draw(WIDE, "n");
-          if (calls === 1) c.fail("first");
+          if (calls === 1) {
+            c.fail("first");
+          }
         }),
         ticks(10, { stored: [integers(5n)] }),
       );
@@ -327,7 +338,9 @@ describe("campaign", () => {
       const [outcome] = await explored(
         body((c) => {
           const n = c.draw(WIDE, "n");
-          if (n <= HIGH && failed) c.skip("the case skips after the failure");
+          if (n <= HIGH && failed) {
+            c.skip("the case skips after the failure");
+          }
           if (n > HIGH) {
             failed = true;
             c.fail("high");
@@ -351,7 +364,9 @@ describe("campaign", () => {
         body((c) => {
           calls += 1;
           c.draw(WIDE, "n");
-          if (calls === 3) c.fail("third");
+          if (calls === 3) {
+            c.fail("third");
+          }
         }),
         ticks(10),
       );
@@ -367,7 +382,9 @@ describe("campaign", () => {
     it("reports a failing example of values as found", async ({ seat }) => {
       const [outcome] = await explored(
         body((c) => {
-          if (c.draw(WIDE, "n") > HIGH) c.fail("high");
+          if (c.draw(WIDE, "n") > HIGH) {
+            c.fail("high");
+          }
         }),
         ticks(5, { examples: [new Values([HIGH + 9n])] }),
       );

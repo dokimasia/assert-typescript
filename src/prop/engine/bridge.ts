@@ -26,17 +26,20 @@
  * can keep.
  */
 
-import type { Provider, Request } from "./case.js";
+import type { Provider, Request } from "./case/providers.js";
 import type { FloatBounds, IntegerBounds, SequenceBounds, Value } from "./choice.js";
-import { fromBits, fromBits32 } from "./float.js";
+import { DOUBLE, fromBits, fromBits32 } from "./float.js";
 import { bitLength } from "./source.js";
 
 /** The lengths that a sequence without a maximum may take beyond its minimum, read from two bytes. */
 const UNBOUNDED_LENGTHS = 0xff_ff;
 
+/** The bits of a byte. */
+const BITS_PER_BYTE = 8;
+
 /** Returns the bytes that cover an integer range of span + 1 values. */
 function width(span: bigint): number {
-  return Math.ceil(bitLength(span) / 8);
+  return Math.ceil(bitLength(span) / BITS_PER_BYTE);
 }
 
 /** A provider that decodes every value from a fuzzer's bytes. */
@@ -60,7 +63,7 @@ export class Bridging implements Provider {
    * @returns The value.
    */
   value(request: Request): Value {
-    const bounds = request.bounds;
+    const { bounds } = request;
     switch (bounds.kind) {
       case "integer":
         return this.#integer(bounds);
@@ -107,11 +110,14 @@ export class Bridging implements Provider {
    * of one value, without NaN, reads no byte.
    */
   #float(bounds: FloatBounds): number {
-    if (bounds.lo === bounds.hi && bounds.lo !== 0 && !bounds.allowNan)
+    if (bounds.lo === bounds.hi && bounds.lo !== 0 && !bounds.allowNan) {
       return bounds.target;
-    const bits = this.#take(bounds.width / 8);
-    if (bits === undefined) return bounds.target;
-    const value = bounds.width === 64 ? fromBits(bits) : fromBits32(bits);
+    }
+    const bits = this.#take(bounds.width / BITS_PER_BYTE);
+    if (bits === undefined) {
+      return bounds.target;
+    }
+    const value = bounds.width === DOUBLE ? fromBits(bits) : fromBits32(bits);
     return bounds.coerce({ kind: "float", value });
   }
 
@@ -122,15 +128,21 @@ export class Bridging implements Provider {
         ? UNBOUNDED_LENGTHS
         : bounds.maxSize - bounds.minSize;
     const extra = this.#below(BigInt(spread));
-    if (extra === undefined) return bounds.target;
+    if (extra === undefined) {
+      return bounds.target;
+    }
     const elements: number[] = [];
     const span = BigInt(bounds.k - 1);
     for (let i = 0; i < bounds.minSize + Number(extra); i += 1) {
       const element = this.#below(span);
-      if (element === undefined) break;
+      if (element === undefined) {
+        break;
+      }
       elements.push(Number(element));
     }
-    while (elements.length < bounds.minSize) elements.push(0);
+    while (elements.length < bounds.minSize) {
+      elements.push(0);
+    }
     return elements;
   }
 }

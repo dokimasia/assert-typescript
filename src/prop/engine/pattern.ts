@@ -23,6 +23,29 @@ import type { Piece } from "./generator.js";
 const ALTERNATION = "alternation";
 const REPEAT = "repeat";
 
+/** Returns the piece of a parsed node. */
+function pieceOf(node: Node): Piece {
+  switch (node.kind) {
+    case "literal":
+      return new Literal(node.char);
+    case "class": {
+      const intervals = alphabet.merge(
+        node.ranges.flatMap(([first, last]) => alphabet.indices(first, last)),
+      );
+      if (intervals.length === 0) {
+        throw new RangeError("prop: a class in the pattern has no member");
+      }
+      return new Class(intervals);
+    }
+    case "sequence":
+      return new Sequence(node.items.map(pieceOf));
+    case "alternation":
+      return new Alternation(node.branches.map(pieceOf));
+    default:
+      return new Repeat(pieceOf(node.item), new Sizes(node.min, node.max));
+  }
+}
+
 /** One character, which makes no choice. */
 export class Literal implements Piece {
   /** The character. */
@@ -86,10 +109,14 @@ export class Class implements Piece {
    */
   offsetOf(char: string): number | undefined {
     const position = alphabet.indexOf(char);
-    if (position === undefined) return undefined;
+    if (position === undefined) {
+      return undefined;
+    }
     let offset = 0;
     for (const [start, end] of this.intervals) {
-      if (position >= start && position <= end) return offset + position - start;
+      if (position >= start && position <= end) {
+        return offset + position - start;
+      }
       offset += end - start + 1;
     }
     return undefined;
@@ -112,7 +139,9 @@ export class Sequence implements Piece {
 
   /** Decodes each piece in order. */
   emit(c: Case, out: string[]): void {
-    for (const item of this.items) item.emit(c, out);
+    for (const item of this.items) {
+      item.emit(c, out);
+    }
   }
 }
 
@@ -167,29 +196,6 @@ export class Repeat implements Piece {
         return [undefined, undefined] as const;
       }),
     );
-  }
-}
-
-/** Returns the piece of a parsed node. */
-function pieceOf(node: Node): Piece {
-  switch (node.kind) {
-    case "literal":
-      return new Literal(node.char);
-    case "class": {
-      const intervals = alphabet.merge(
-        node.ranges.flatMap(([first, last]) => alphabet.indices(first, last)),
-      );
-      if (intervals.length === 0) {
-        throw new RangeError("prop: a class in the pattern has no member");
-      }
-      return new Class(intervals);
-    }
-    case "sequence":
-      return new Sequence(node.items.map(pieceOf));
-    case "alternation":
-      return new Alternation(node.branches.map(pieceOf));
-    default:
-      return new Repeat(pieceOf(node.item), new Sizes(node.min, node.max));
   }
 }
 

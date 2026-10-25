@@ -23,31 +23,34 @@
 import type { Choice } from "./choice.js";
 import { bitsOf, fromBits, NAN_BITS } from "./float.js";
 
-/** The text that every token of this version starts with. */
-export const PREFIX = "prop1:";
-
 /** The tag byte before each choice value. */
 const TAG_NON_NEGATIVE = 0;
 const TAG_NEGATIVE = 1;
 const TAG_FLOAT = 2;
 const TAG_SEQUENCE = 3;
 
-/** The bytes of a float's payload. */
+/** The bytes of a float's payload, and the bits of a byte. */
 const FLOAT_BYTES = 8;
+const BYTE_BITS = 8n;
+
+/** The payload bits of a LEB128 byte, their mask, and the bit of a byte that another byte follows. */
+const PAYLOAD_BITS = 7n;
+const PAYLOAD_MASK = 0x7fn;
+const CONTINUATION = 0x80;
 
 /** Every number that a token encodes is below 2^64, and a negative integer's magnitude is at most 2^63. */
 const NUMBER_LIMIT = 1n << 64n;
 const NEGATIVE_LIMIT = 1n << 63n;
 
-/** The largest element that a sequence of this engine states; a larger one replays as it. */
-const ELEMENT_LIMIT = 2 ** 32 - 1;
+/** The largest element that a sequence of this engine states, 2^32 − 1. A larger one replays as it. */
+const ELEMENT_LIMIT = 0xff_ff_ff_ff;
 
 /** Appends number, at least 0, in unsigned LEB128. */
 function appendNumber(data: number[], number: bigint): void {
   let rest = number;
-  while (rest > 0x7fn) {
-    data.push(Number(rest & 0x7fn) | 0x80);
-    rest >>= 7n;
+  while (rest > PAYLOAD_MASK) {
+    data.push(Number(rest & PAYLOAD_MASK) | CONTINUATION);
+    rest >>= PAYLOAD_BITS;
   }
   data.push(Number(rest));
 }
@@ -58,7 +61,7 @@ function appendFloat(data: number[], value: number): void {
   data.push(TAG_FLOAT);
   for (let i = 0; i < FLOAT_BYTES; i += 1) {
     data.push(Number(bits & 0xffn));
-    bits >>= 8n;
+    bits >>= BYTE_BITS;
   }
 }
 
@@ -66,7 +69,7 @@ function appendFloat(data: number[], value: number): void {
 function appendChoice(data: number[], choice: Choice): void {
   switch (choice.kind) {
     case "integer": {
-      const value = choice.value;
+      const { value } = choice;
       data.push(value < 0n ? TAG_NEGATIVE : TAG_NON_NEGATIVE);
       appendNumber(data, value < 0n ? -value : value);
       return;
@@ -77,20 +80,10 @@ function appendChoice(data: number[], choice: Choice): void {
     default:
       data.push(TAG_SEQUENCE);
       appendNumber(data, BigInt(choice.value.length));
-      for (const element of choice.value) appendNumber(data, BigInt(element));
+      for (const element of choice.value) {
+        appendNumber(data, BigInt(element));
+      }
   }
-}
-
-/**
- * Returns the token of a choice sequence.
- *
- * @param choices - The choices.
- * @returns The token.
- */
-export function encode(choices: readonly Choice[]): string {
-  const data: number[] = [];
-  for (const choice of choices) appendChoice(data, choice);
-  return PREFIX + Buffer.from(data).toString("base64url");
 }
 
 /** The bytes of a token, read once from the start. */
@@ -110,7 +103,9 @@ class Reader {
   /** Returns the next byte, or throws when none is left. */
   #byte(): number {
     const byte = this.#data[this.#at];
-    if (byte === undefined) throw new RangeError("prop: a token ends inside a choice");
+    if (byte === undefined) {
+      throw new RangeError("prop: a token ends inside a choice");
+    }
     this.#at += 1;
     return byte;
   }
@@ -121,17 +116,17 @@ class Reader {
     let shift = 0n;
     for (;;) {
       const byte = this.#byte();
-      number |= BigInt(byte & 0x7f) << shift;
+      number |= (BigInt(byte) & PAYLOAD_MASK) << shift;
       if (number >= NUMBER_LIMIT) {
         throw new RangeError("prop: a token states a number of 2^64 or more");
       }
-      if (byte < 0x80) {
+      if (byte < CONTINUATION) {
         if (byte === 0 && shift > 0n) {
           throw new RangeError("prop: a token states a number with a superfluous byte");
         }
         return number;
       }
-      shift += 7n;
+      shift += PAYLOAD_BITS;
     }
   }
 
@@ -151,7 +146,7 @@ class Reader {
       case TAG_FLOAT: {
         let bits = 0n;
         for (let i = 0n; i < BigInt(FLOAT_BYTES); i += 1n) {
-          bits |= BigInt(this.#byte()) << (8n * i);
+          bits |= BigInt(this.#byte()) << (BYTE_BITS * i);
         }
         const value = fromBits(bits);
         if (Number.isNaN(value) && bits !== NAN_BITS) {
@@ -174,6 +169,23 @@ class Reader {
         throw new RangeError(`prop: a token states tag ${tag}`);
     }
   }
+}
+
+/** The text that every token of this version starts with. */
+export const PREFIX = "prop1:";
+
+/**
+ * Returns the token of a choice sequence.
+ *
+ * @param choices - The choices.
+ * @returns The token.
+ */
+export function encode(choices: readonly Choice[]): string {
+  const data: number[] = [];
+  for (const choice of choices) {
+    appendChoice(data, choice);
+  }
+  return PREFIX + Buffer.from(data).toString("base64url");
 }
 
 /**
@@ -204,6 +216,8 @@ export function decode(token: string): Choice[] {
   }
   const reader = new Reader(data);
   const choices: Choice[] = [];
-  while (!reader.done()) choices.push(reader.choice());
+  while (!reader.done()) {
+    choices.push(reader.choice());
+  }
   return choices;
 }

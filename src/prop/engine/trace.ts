@@ -26,7 +26,9 @@
  * case runs.
  */
 
-import type { Case, Decoder, Provider, Request, Step } from "./case.js";
+import type { Provider, Request } from "./case/providers.js";
+import type { Step } from "./case/record.js";
+import type { Case, Decoder } from "./case.js";
 import type { Choice, Value } from "./choice.js";
 import type { Generator } from "./generator.js";
 import { inverseOf } from "./inverse.js";
@@ -91,8 +93,9 @@ export function entries(c: Case): Entry[] {
     }
     trace.push({ label: drawn.label, value: drawn.value });
   });
-  for (; next < c.steps.length; next += 1)
+  for (; next < c.steps.length; next += 1) {
     trace.push((c.steps[next] as [number, Step])[1]);
+  }
   return trace;
 }
 
@@ -134,11 +137,16 @@ export class Tracing implements Provider {
    */
   drawing(generator: Decoder, label: string): void {
     const entry = this.#entries[this.#at];
-    if (entry === undefined) return;
-    if (isStep(entry) || entry.label !== label)
+    if (entry === undefined) {
+      return;
+    }
+    if (isStep(entry) || entry.label !== label) {
       throw new TraceError(this.#at, label, "label");
+    }
     const choices = inverseOf(generator as Generator<unknown>, entry.value);
-    if (choices === undefined) throw new TraceError(this.#at, label, "value");
+    if (choices === undefined) {
+      throw new TraceError(this.#at, label, "value");
+    }
     this.#queue.push(...choices);
     this.#at += 1;
   }

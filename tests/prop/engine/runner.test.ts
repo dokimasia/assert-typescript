@@ -9,18 +9,9 @@
 
 import { describe } from "vitest";
 import { check } from "../../../src/index.js";
-import {
-  Case,
-  DECODE,
-  Generating,
-  MAX_CHOICES,
-  Replaying,
-} from "../../../src/prop/engine/case.js";
-import {
-  type Choice,
-  FloatBounds,
-  IntegerBounds,
-} from "../../../src/prop/engine/choice.js";
+import { Generating, Replaying } from "../../../src/prop/engine/case/providers.js";
+import { Case, DECODE, MAX_CHOICES } from "../../../src/prop/engine/case.js";
+import { FloatBounds, IntegerBounds } from "../../../src/prop/engine/choice.js";
 import { Sizes } from "../../../src/prop/engine/collection.js";
 import {
   type Body,
@@ -36,26 +27,15 @@ import {
   List,
   SampledFrom,
 } from "../../../src/prop/engine/generator.js";
-import {
-  concludeCase,
-  DEFAULT_CASES,
-  knownCases,
-  type Outcome,
-  type Requirement,
-  resolve,
-  run,
-  runStored,
-  type Settings,
-  shortfallOf,
-  Tally,
-  Values,
-} from "../../../src/prop/engine/runner.js";
+import { concludeCase, run, runStored } from "../../../src/prop/engine/runner.js";
+import { type Settings, Values } from "../../../src/prop/engine/settings.js";
 import { caseSource } from "../../../src/prop/engine/source.js";
+import type { Outcome } from "../../../src/prop/engine/tally.js";
 import { decode } from "../../../src/prop/engine/token.js";
-import { TraceError, Tracing } from "../../../src/prop/engine/trace.js";
+import { TraceError } from "../../../src/prop/engine/trace.js";
 import { drive } from "../../../src/prop/engine/work.js";
 import { test as it } from "../../../src/vitest.js";
-import { thrown } from "../../helpers.js";
+import { body, integers } from "../../helpers.js";
 
 const SEED = 7n;
 const DIGIT = new Integer(new IntegerBounds(0n, 9n));
@@ -64,18 +44,6 @@ const BOOLEAN = new Bool({ num: 1n, den: 2n });
 const THREE = new SampledFrom([1n, 2n, 3n]);
 const WIDE = new Integer(new IntegerBounds(0n, 2n ** 32n));
 const MILLION = 1_000_000n;
-
-/** Returns a body of a function that returns nothing. */
-function body(fn: (c: Case) => void): Body {
-  return (c) => {
-    fn(c);
-  };
-}
-
-/** Returns integer choices of values. */
-function integers(...values: bigint[]): Choice[] {
-  return values.map((value) => ({ kind: "integer", value }));
-}
 
 /** The calls of the body that a run made, each with its phase and its status. */
 class Seen {
@@ -102,181 +70,19 @@ const passes = body((c) => {
 });
 
 const aboveMillion = body((c) => {
-  if (c.draw(WIDE, "n") > MILLION) c.fail("big");
+  if (c.draw(WIDE, "n") > MILLION) {
+    c.fail("big");
+  }
 });
 
 /** A body that classifies each tenth of the wide integers. */
 const tenths = body((c) => {
-  if (c.draw(WIDE, "n") % 10n === 0n) c.classify("tenth");
+  if (c.draw(WIDE, "n") % 10n === 0n) {
+    c.classify("tenth");
+  }
 });
 
 describe("runner", () => {
-  describe("DEFAULT_CASES", () => {
-    it("aims for 100 valid cases", ({ seat }) => {
-      check.isEqualTo(seat, DEFAULT_CASES, 100, "the cases");
-    });
-  });
-
-  describe("new Values", () => {
-    it("keeps the values of the draws", ({ seat }) => {
-      check.isEqualTo(seat, new Values([1n, "x"]).values, [1n, "x"], "two values");
-    });
-  });
-
-  describe("resolve", () => {
-    it("fills in every default", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        resolve({ seed: SEED }),
-        {
-          seed: SEED,
-          cases: 100,
-          maxChoices: MAX_CHOICES,
-          requirements: [],
-          traces: [],
-          examples: [],
-          stored: [],
-          shrink: 2000,
-          shrinkTime: 0,
-          explain: true,
-          replay: undefined,
-        },
-        "the defaults",
-      );
-    });
-
-    it("throws a RangeError for a run of no case", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        thrown(() => resolve({ seed: SEED, cases: 0 })),
-        "prop: a run of 0 cases tests nothing",
-        "the refusal",
-      );
-    });
-  });
-
-  describe("knownCases", () => {
-    it("returns the stored cases after every case of the example phase", ({ seat }) => {
-      const known = knownCases(
-        resolve({
-          seed: SEED,
-          traces: [[{ label: "n", value: 5n }]],
-          examples: [integers(3n), new Values([4n])],
-          stored: [integers(6n)],
-        }),
-      );
-
-      check.isEqualTo(
-        seat,
-        known.map(([phase, provider]) => [phase, provider.constructor.name]),
-        [
-          ["example", Tracing.name],
-          ["example", "Replaying"],
-          ["example", "Valuing"],
-          ["stored", "Replaying"],
-        ],
-        "four cases",
-      );
-    });
-  });
-
-  describe("new Tally", () => {
-    it("counts no case of its seed", ({ seat }) => {
-      const tally = new Tally(SEED);
-
-      check.isEqualTo(
-        seat,
-        [tally.seed, tally.valid, tally.rejected, tally.requested, tally.labels.size],
-        [SEED, 0, 0, false, 0],
-        "nothing counted",
-      );
-    });
-  });
-
-  describe("Tally.failureWithoutCounterexample", () => {
-    it("returns rejected for more than ten rejections per valid case", async ({
-      seat,
-    }) => {
-      const tally = new Tally(SEED);
-      const rejects = body((c) => {
-        c.draw(DIGIT, "n");
-        c.assume(false);
-      });
-      tally.take(await drive(execute(passes, new Replaying([]), MAX_CHOICES)));
-      for (let i = 0; i < 10; i += 1)
-        tally.take(await drive(execute(rejects, new Replaying([]), MAX_CHOICES)));
-      const atLimit = tally.failureWithoutCounterexample();
-      tally.take(await drive(execute(rejects, new Replaying([]), MAX_CHOICES)));
-
-      check.isEqualTo(
-        seat,
-        [atLimit, tally.failureWithoutCounterexample()?.kind],
-        [undefined, "rejected"],
-        "ten per valid case, then eleven",
-      );
-    });
-
-    it("returns vacuous for a run whose cases requested no input", async ({ seat }) => {
-      const tally = new Tally(SEED);
-      tally.take(
-        await drive(
-          execute(
-            body(() => undefined),
-            new Replaying([]),
-            MAX_CHOICES,
-          ),
-        ),
-      );
-
-      check.isEqualTo(
-        seat,
-        tally.failureWithoutCounterexample()?.kind,
-        "vacuous",
-        "nothing drawn",
-      );
-    });
-  });
-
-  describe("shortfallOf", () => {
-    it("returns the first requirement that the counts leave unmet", ({ seat }) => {
-      const tally = new Tally(SEED);
-      tally.valid = 10;
-      tally.labels.set("seven", 1);
-      const requirements: Requirement[] = [
-        { label: "seven", share: 0.1 },
-        { label: "never", share: 0.5 },
-      ];
-
-      check.isEqualTo(
-        seat,
-        shortfallOf(tally, requirements, true, true),
-        [
-          {
-            requirement: { label: "never", share: 0.5 },
-            counted: 0,
-            valid: 10,
-            verdict: "unmet",
-          },
-          false,
-        ],
-        "the second requirement",
-      );
-    });
-
-    it("reports that the counts meet every requirement", ({ seat }) => {
-      const tally = new Tally(SEED);
-      tally.valid = 10;
-      tally.labels.set("seven", 1);
-
-      check.isEqualTo(
-        seat,
-        shortfallOf(tally, [{ label: "seven", share: 0.1 }], true, true),
-        [undefined, true],
-        "all met",
-      );
-    });
-  });
-
   describe("run", () => {
     it("passes a body that never fails after the default number of cases", async ({
       seat,
@@ -336,7 +142,9 @@ describe("runner", () => {
     it("finds a failure on the empty input in the simplest case", async ({ seat }) => {
       const outcome = await ran(
         body((c) => {
-          if (c.draw(DIGITS, "digits").length === 0) c.fail("empty");
+          if (c.draw(DIGITS, "digits").length === 0) {
+            c.fail("empty");
+          }
         }),
         { seed: SEED },
       );
@@ -352,7 +160,9 @@ describe("runner", () => {
     it("finds an overflow at the maximum in an edge case", async ({ seat }) => {
       const outcome = await ran(
         body((c) => {
-          if (c.draw(WIDE, "n") === 2n ** 32n) c.fail("overflow");
+          if (c.draw(WIDE, "n") === 2n ** 32n) {
+            c.fail("overflow");
+          }
         }),
         { seed: SEED },
       );
@@ -369,7 +179,9 @@ describe("runner", () => {
       const outcome = await ran(
         body((c) => {
           const digits = c.draw(DIGITS, "digits");
-          if (digits.reduce((sum, digit) => sum + digit, 0n) > 10n) c.fail("sum-above");
+          if (digits.reduce((sum, digit) => sum + digit, 0n) > 10n) {
+            c.fail("sum-above");
+          }
         }),
         { seed: SEED },
       );
@@ -390,7 +202,9 @@ describe("runner", () => {
     it("runs a stored failing case before any generated case", async ({ seat }) => {
       const outcome = await ran(
         body((c) => {
-          if (c.draw(DIGIT, "n") === 7n) c.fail("seven");
+          if (c.draw(DIGIT, "n") === 7n) {
+            c.fail("seven");
+          }
         }),
         { seed: SEED, stored: [integers(7n)] },
       );
@@ -421,7 +235,9 @@ describe("runner", () => {
     }) => {
       const nonzeroThenZero = body((c) => {
         const n = c.draw(WIDE, "n");
-        if (n !== 0n && c.draw(WIDE, "m") === 0n) c.fail("zero after nonzero");
+        if (n !== 0n && c.draw(WIDE, "m") === 0n) {
+          c.fail("zero after nonzero");
+        }
       });
       const outcome = await ran(nonzeroThenZero, { seed: SEED, shrink: 0 });
       const first = WIDE[DECODE](new Case(new Generating(caseSource(SEED, 0n))));
@@ -437,7 +253,9 @@ describe("runner", () => {
     it("runs a prefix case while the valid cases equal the limit", async ({ seat }) => {
       const nonzeroThenZero = body((c) => {
         const n = c.draw(WIDE, "n");
-        if (n !== 0n && c.draw(WIDE, "m") === 0n) c.fail("zero after nonzero");
+        if (n !== 0n && c.draw(WIDE, "m") === 0n) {
+          c.fail("zero after nonzero");
+        }
       });
       const outcome = await ran(nonzeroThenZero, { seed: SEED, cases: 20, shrink: 0 });
 
@@ -471,7 +289,9 @@ describe("runner", () => {
       const seen = new Seen();
       const outcome = await ran(
         body((c) => {
-          if (c.draw(WIDE, "n") === 2n ** 32n) c.fail("overflow");
+          if (c.draw(WIDE, "n") === 2n ** 32n) {
+            c.fail("overflow");
+          }
         }),
         { seed: SEED, cases: 1, shrink: 0 },
         seen,
@@ -541,8 +361,11 @@ describe("runner", () => {
       const outcome = await ran(
         body((c) => {
           calls += 1;
-          if (calls === 1) c.draw(DIGIT, "n");
-          else c.draw(BOOLEAN, "n");
+          if (calls === 1) {
+            c.draw(DIGIT, "n");
+          } else {
+            c.draw(BOOLEAN, "n");
+          }
         }),
         { seed: SEED },
       );
@@ -561,7 +384,9 @@ describe("runner", () => {
         body((c) => {
           calls += 1;
           c.draw(WIDE, "n");
-          if (calls === 2) c.fail("second");
+          if (calls === 2) {
+            c.fail("second");
+          }
         }),
         { seed: SEED },
       );
@@ -579,7 +404,9 @@ describe("runner", () => {
       const outcome = await ran(
         body((c) => {
           const n = c.draw(WIDE, "n");
-          if (failed) c.skip("the case skips after the failure");
+          if (failed) {
+            c.skip("the case skips after the failure");
+          }
           if (n > MILLION) {
             failed = true;
             c.fail("big");
@@ -600,7 +427,9 @@ describe("runner", () => {
       const seen = new Seen();
       const outcome = await ran(
         body((c) => {
-          if (c.draw(WIDE, "n") > MILLION) c.skip("the case needs a small n");
+          if (c.draw(WIDE, "n") > MILLION) {
+            c.skip("the case needs a small n");
+          }
         }),
         { seed: SEED },
         seen,
@@ -620,8 +449,12 @@ describe("runner", () => {
       const outcome = await ran(
         body((c) => {
           const n = c.draw(WIDE, "n");
-          if (n === 0n) c.skip("the case skips at 0");
-          if (n > MILLION) c.fail("big");
+          if (n === 0n) {
+            c.skip("the case skips at 0");
+          }
+          if (n > MILLION) {
+            c.fail("big");
+          }
         }),
         { seed: SEED, examples: [integers(MILLION * 5n)] },
       );
@@ -639,7 +472,9 @@ describe("runner", () => {
     }) => {
       const outcome = await ran(
         body((c) => {
-          if (c.draw(WIDE, "n") % 2n === 1n) c.skip("the case skips at an odd n");
+          if (c.draw(WIDE, "n") % 2n === 1n) {
+            c.skip("the case skips at an odd n");
+          }
           c.fail("always");
         }),
         { seed: SEED, examples: [integers(0n)] },
@@ -657,8 +492,12 @@ describe("runner", () => {
       const outcome = await ran(
         body((c) => {
           const n = c.draw(DIGIT, "n");
-          if (n === 4n) c.skip("the case skips at 4");
-          if (n >= 5n) c.fail("big");
+          if (n === 4n) {
+            c.skip("the case skips at 4");
+          }
+          if (n >= 5n) {
+            c.fail("big");
+          }
         }),
         { seed: SEED, examples: [integers(9n)] },
       );
@@ -677,7 +516,9 @@ describe("runner", () => {
 
     it("passes a requirement that the share meets", async ({ seat }) => {
       const even = body((c) => {
-        if (c.draw(WIDE, "n") % 2n === 0n) c.classify("even");
+        if (c.draw(WIDE, "n") % 2n === 0n) {
+          c.classify("even");
+        }
       });
       const outcome = await ran(even, {
         seed: SEED,
@@ -712,7 +553,9 @@ describe("runner", () => {
 
     it("compares the exact shares of an exhausted domain", async ({ seat }) => {
       const sevens = body((c) => {
-        if (c.draw(DIGIT, "n") === 7n) c.classify("seven");
+        if (c.draw(DIGIT, "n") === 7n) {
+          c.classify("seven");
+        }
       });
       const met = await ran(sevens, {
         seed: SEED,
@@ -927,7 +770,9 @@ describe("runner", () => {
       const tenThousand = new Integer(new IntegerBounds(0n, 10_000n));
       await ran(
         body((c) => {
-          if (c.draw(tenThousand, "n") > 1000n) c.fail("big");
+          if (c.draw(tenThousand, "n") > 1000n) {
+            c.fail("big");
+          }
         }),
         { seed: SEED },
         seen,
@@ -1116,8 +961,12 @@ describe("runner", () => {
       const outcome = await ran(
         body((c) => {
           const value = c.draw(small, "x");
-          if (value % 2n === 1n) c.fail("odd");
-          if (value > 50n) c.fail("big");
+          if (value % 2n === 1n) {
+            c.fail("odd");
+          }
+          if (value > 50n) {
+            c.fail("big");
+          }
         }),
         { seed: SEED },
       );
@@ -1175,7 +1024,9 @@ describe("runner", () => {
       const outcome = await drive(
         runStored(
           body((c) => {
-            if (c.draw(WIDE, "n") > 1n) c.skip("the stored case skips");
+            if (c.draw(WIDE, "n") > 1n) {
+              c.skip("the stored case skips");
+            }
           }),
           { seed: SEED, stored: [integers(1n), integers(2n), integers(3n)] },
         ),

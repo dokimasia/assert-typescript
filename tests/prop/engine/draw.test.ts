@@ -296,7 +296,9 @@ describe("draw", () => {
       const want = times(100, (_, seed) => {
         const twin = new Source(BigInt(seed));
         let coins = times(3, () => boolean(twin, HALF));
-        while (!coins.includes(1n)) coins = times(3, () => boolean(twin, HALF));
+        while (!coins.includes(1n)) {
+          coins = times(3, () => boolean(twin, HALF));
+        }
         return [coins[0] as bigint, twin.next()];
       });
 
@@ -430,8 +432,9 @@ describe("draw", () => {
       const want = times(100, (_, seed) => {
         const twin = new Source(BigInt(seed));
         const elements: number[] = [];
-        while (flag(twin, elements.length, 0, 16, averageLength(0, 16)) === 1n)
+        while (flag(twin, elements.length, 0, 16, averageLength(0, 16)) === 1n) {
           elements.push(Number(integer(twin, element)));
+        }
         return elements;
       });
 

@@ -9,13 +9,9 @@
 
 import { describe } from "vitest";
 import { check } from "../../../src/index.js";
-import {
-  Case,
-  DECODE,
-  Generating,
-  Rejected,
-  Replaying,
-} from "../../../src/prop/engine/case.js";
+import { Generating, Replaying } from "../../../src/prop/engine/case/providers.js";
+import { Rejected } from "../../../src/prop/engine/case/signals.js";
+import { Case, DECODE } from "../../../src/prop/engine/case.js";
 import {
   type Choice,
   FloatBounds,
@@ -43,13 +39,8 @@ import {
   SampledFrom,
   Text,
 } from "../../../src/prop/engine/generator.js";
-import {
-  CannotInvert,
-  emit,
-  inverseOf,
-  invert,
-  NoInverse,
-} from "../../../src/prop/engine/inverse.js";
+import { CannotInvert, NoInverse } from "../../../src/prop/engine/inverse/refusal.js";
+import { emit, inverseOf, invert } from "../../../src/prop/engine/inverse.js";
 import { piece } from "../../../src/prop/engine/pattern.js";
 import { read } from "../../../src/prop/engine/shape.js";
 import { caseSource } from "../../../src/prop/engine/source.js";
@@ -106,6 +97,22 @@ function textOf(value: unknown, unordered: boolean): string {
     : canonical(value);
 }
 
+/** Returns the value that generator decodes from case index of seed 17, and undefined for a case that it rejects. */
+function generated(
+  generator: Generator<unknown>,
+  index: number,
+): { readonly value: unknown } | undefined {
+  try {
+    const source = caseSource(17n, BigInt(index));
+    return { value: generator[DECODE](new Case(new Generating(source))) };
+  } catch (error) {
+    if (error instanceof Rejected) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
 /**
  * Returns the cases out of CASES whose generated value runs backwards to
  * choices that replay to it, and those that do not.
@@ -117,21 +124,17 @@ function roundTrip(
   let inverted = 0;
   const failed: number[] = [];
   for (let index = 0; index < CASES; index += 1) {
-    let value: unknown;
-    try {
-      value = generator[DECODE](
-        new Case(new Generating(caseSource(17n, BigInt(index)))),
-      );
-    } catch (error) {
-      if (error instanceof Rejected) continue;
-      throw error;
+    const decoded = generated(generator, index);
+    if (decoded !== undefined) {
+      const { value } = decoded;
+      if (
+        textOf(replayed(generator, invert(generator, value)), unordered) !==
+        textOf(value, unordered)
+      ) {
+        failed.push(index);
+      }
+      inverted += 1;
     }
-    if (
-      textOf(replayed(generator, invert(generator, value)), unordered) !==
-      textOf(value, unordered)
-    )
-      failed.push(index);
-    inverted += 1;
   }
   return [inverted, failed];
 }
@@ -141,38 +144,15 @@ function refusal(generator: Generator<unknown>, value: unknown): [string, boolea
   try {
     invert(generator, value);
   } catch (error) {
-    if (error instanceof CannotInvert)
+    if (error instanceof CannotInvert) {
       return [error.message, error instanceof NoInverse];
+    }
     throw error;
   }
   return ["", false];
 }
 
 describe("inverse", () => {
-  describe("new CannotInvert", () => {
-    it("returns the refusal of a value", ({ seat }) => {
-      const err = new CannotInvert("prop: int:10 is outside integer 0 9");
-
-      check.isEqualTo(
-        seat,
-        [err.name, err.message],
-        ["CannotInvert", "prop: int:10 is outside integer 0 9"],
-        "the name and the message",
-      );
-    });
-  });
-
-  describe("new NoInverse", () => {
-    it("returns a refusal of a value", ({ seat }) => {
-      check.errorIs(
-        seat,
-        new NoInverse("prop: a map does not run backwards"),
-        CannotInvert,
-        "a NoInverse is a CannotInvert",
-      );
-    });
-  });
-
   describe("invert", () => {
     const generators: [string, Generator<unknown>][] = [
       ["integer", DIGIT],
@@ -793,7 +773,9 @@ describe("inverse", () => {
       seat,
     }) => {
       const parsed = new Mapped(DIGIT, String, (text: string) => {
-        if (!/^[0-9]$/.test(text)) throw new SyntaxError(`${text} is no digit`);
+        if (!/^[0-9]$/.test(text)) {
+          throw new SyntaxError(`${text} is no digit`);
+        }
         return BigInt(text);
       });
 
@@ -933,7 +915,9 @@ describe("inverse", () => {
         DIGIT,
         (value: bigint) => {
           calls += 1;
-          if (calls > 1) throw new RangeError("the second call broke");
+          if (calls > 1) {
+            throw new RangeError("the second call broke");
+          }
           return value;
         },
         (value: bigint) => value,

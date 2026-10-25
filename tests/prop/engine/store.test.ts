@@ -9,6 +9,7 @@
 
 import { describe } from "vitest";
 import { check, prop } from "../../../src/index.js";
+import { compareText } from "../../../src/order.js";
 import type { Choice } from "../../../src/prop/engine/choice.js";
 import { mix } from "../../../src/prop/engine/source.js";
 import {
@@ -59,13 +60,17 @@ function verdictOf(document: unknown): string {
 /** Returns a list that nests levels arrays deep, the outer one included. */
 function nested(levels: number): unknown[] {
   let node: unknown[] = [];
-  for (let level = 1; level < levels; level += 1) node = [node];
+  for (let level = 1; level < levels; level += 1) {
+    node = [node];
+  }
   return node;
 }
 
 /** Returns the levels of objects and arrays that node nests. */
 function depthOf(node: unknown): number {
-  if (typeof node !== "object" || node === null) return 0;
+  if (typeof node !== "object" || node === null) {
+    return 0;
+  }
   return 1 + Math.max(0, ...Object.values(node).map(depthOf));
 }
 
@@ -126,7 +131,12 @@ describe("store", () => {
 
       check.isEqualTo(
         seat,
-        [Object.keys(one).sort(), one["store"], one["found"], one["choices"]],
+        [
+          Object.keys(one).sort(compareText),
+          one["store"],
+          one["found"],
+          one["choices"],
+        ],
         [
           [
             "choices",
@@ -394,7 +404,7 @@ describe("store", () => {
 
     it("returns damaged for an entry without a field of the format", ({ seat }) => {
       const missing = written();
-      delete missing["found"];
+      Reflect.deleteProperty(missing, "found");
 
       check.isEqualTo(seat, verdictOf(missing), "damaged", "no date");
     });

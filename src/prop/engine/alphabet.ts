@@ -13,13 +13,23 @@
  * code points above it.
  */
 
-/** An inclusive range of indices or code points. */
-export type Interval = readonly [first: number, last: number];
-
 /** The first 95 characters, in order. */
 const PRINTABLE =
   "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" +
   " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+
+/** The last control below space, and DEL. */
+const LAST_CONTROL = 0x1f;
+const DELETE = 0x7f;
+
+/** The code points just below and just above the surrogates. */
+const BELOW_SURROGATES = 0xd7_ff;
+const ABOVE_SURROGATES = 0xe0_00;
+
+/** The last code point of the Basic Multilingual Plane, the first above it, and the last code point. */
+const LAST_BMP = 0xff_ff;
+const FIRST_SUPPLEMENTARY = 0x1_00_00;
+const LAST_CODE_POINT = 0x10_ff_ff;
 
 /**
  * The code point ranges that follow the printable characters, inclusive
@@ -28,14 +38,11 @@ const PRINTABLE =
  * supplementary planes.
  */
 const REST: readonly Interval[] = [
-  [0x00, 0x1f],
-  [0x7f, 0xd7_ff],
-  [0xe0_00, 0xff_ff],
-  [0x1_00_00, 0x10_ff_ff],
+  [0, LAST_CONTROL],
+  [DELETE, BELOW_SURROGATES],
+  [ABOVE_SURROGATES, LAST_BMP],
+  [FIRST_SUPPLEMENTARY, LAST_CODE_POINT],
 ];
-
-/** The number of characters in the default alphabet: every Unicode scalar value. */
-export const SIZE = REST.reduce((sum, [lo, hi]) => sum + hi - lo + 1, PRINTABLE.length);
 
 /** The index of each printable character. */
 const PRINTABLE_INDEX = new Map([...PRINTABLE].map((char, index) => [char, index]));
@@ -43,6 +50,12 @@ const PRINTABLE_INDEX = new Map([...PRINTABLE].map((char, index) => [char, index
 /** The first and the last printable code points: space and tilde. */
 const FIRST_PRINTABLE = 0x20;
 const LAST_PRINTABLE = 0x7e;
+
+/** An inclusive range of indices or code points. */
+export type Interval = readonly [first: number, last: number];
+
+/** The number of characters in the default alphabet: every Unicode scalar value. */
+export const SIZE = REST.reduce((sum, [lo, hi]) => sum + hi - lo + 1, PRINTABLE.length);
 
 /**
  * Returns the character at index of the default alphabet.
@@ -55,7 +68,9 @@ export function character(index: number): string {
   if (index < 0 || index >= SIZE) {
     throw new RangeError(`prop: index ${index} is outside the default alphabet`);
   }
-  if (index < PRINTABLE.length) return PRINTABLE[index] as string;
+  if (index < PRINTABLE.length) {
+    return PRINTABLE[index] as string;
+  }
   let offset = index - PRINTABLE.length;
   let range = REST[0] as Interval;
   for (let at = 1; offset > range[1] - range[0]; at += 1) {
@@ -74,11 +89,15 @@ export function character(index: number): string {
  */
 export function indexOf(char: string): number | undefined {
   const printable = PRINTABLE_INDEX.get(char);
-  if (printable !== undefined) return printable;
+  if (printable !== undefined) {
+    return printable;
+  }
   const point = char.codePointAt(0) as number;
   let offset = PRINTABLE.length;
   for (const [lo, hi] of REST) {
-    if (point >= lo && point <= hi) return offset + point - lo;
+    if (point >= lo && point <= hi) {
+      return offset + point - lo;
+    }
     offset += hi - lo + 1;
   }
   return undefined;
@@ -107,7 +126,9 @@ export function indices(lo: number, hi: number): Interval[] {
   for (const [first, last] of REST) {
     const start = Math.max(lo, first);
     const end = Math.min(hi, last);
-    if (start <= end) found.push([offset + start - first, offset + end - first]);
+    if (start <= end) {
+      found.push([offset + start - first, offset + end - first]);
+    }
     offset += last - first + 1;
   }
   return merge(found);
@@ -126,8 +147,11 @@ export function merge(intervals: readonly Interval[]): Interval[] {
     (a, b) => a[0] - b[0] || a[1] - b[1],
   )) {
     const last = merged.at(-1);
-    if (last !== undefined && start <= last[1] + 1) last[1] = Math.max(last[1], end);
-    else merged.push([start, end]);
+    if (last !== undefined && start <= last[1] + 1) {
+      last[1] = Math.max(last[1], end);
+    } else {
+      merged.push([start, end]);
+    }
   }
   return merged;
 }

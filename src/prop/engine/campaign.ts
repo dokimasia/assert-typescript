@@ -21,15 +21,8 @@
  * The definition leaves these odds to each library.
  */
 
-import { Generating, type Provider, type Request, type Span, Valuing } from "./case.js";
-import {
-  type Bounds,
-  type Choice,
-  choiceOf,
-  UINT64_MAX,
-  type Value,
-} from "./choice.js";
-import * as draw from "./draw.js";
+import { Generating, type Provider, Valuing } from "./case/providers.js";
+import { UINT64_MAX } from "./choice.js";
 import {
   type Body,
   type Execution,
@@ -38,122 +31,16 @@ import {
   type Observer,
   unobserved,
 } from "./execution.js";
-import {
-  conclude,
-  knownCases,
-  type Outcome,
-  type Resolved,
-  resolve,
-  type Settings,
-  shortfallOf,
-  Tally,
-} from "./runner.js";
+import { type Member, Mutating, mutation } from "./mutation.js";
+import { conclude } from "./runner.js";
+import { knownCases, type Resolved, resolve, type Settings } from "./settings.js";
 import { caseSource, type Source } from "./source.js";
+import { type Outcome, shortfallOf, Tally } from "./tally.js";
 import type { Work } from "./work.js";
 
 /** The odds that a case of a campaign with a pool mutates a member of the pool: 3 in 4. */
 const MUTATE_NUM = 3n;
 const MUTATE_DEN = 4n;
-
-/**
- * The kinds of mutation of a member, among which a mutated case chooses
- * uniformly: a choice drawn again, a span deleted, a span repeated, and the
- * fourth, a span replaced.
- */
-const REDRAW = 0n;
-const DELETE = 1n;
-const REPEAT = 2n;
-const KINDS = 4n;
-
-/** What a campaign is asked to do: the settings of a run, and its budget. */
-export interface CampaignSettings extends Settings {
-  /** How long the campaign explores, in milliseconds. */
-  readonly budget: number;
-  /** Receives each failure that the campaign concludes, as the campaign concludes it. */
-  readonly concluded?: ((outcome: Outcome) => void) | undefined;
-  /** Returns the time that the budget is measured on, in milliseconds: performance.now by default. */
-  readonly now?: (() => number) | undefined;
-}
-
-/** A case of the pool: its choices, the bounds of the request of each, and its spans. */
-interface Member {
-  readonly choices: readonly Choice[];
-  readonly bounds: readonly Bounds[];
-  readonly spans: readonly Span[];
-}
-
-/** Returns one element of items, chosen uniformly from source. */
-function pick<T>(source: Source, items: readonly T[]): T {
-  return items[Number(source.below(BigInt(items.length)))] as T;
-}
-
-/** Returns a value drawn from bounds alone, as a value request of those bounds draws it. */
-function redrawn(bounds: Bounds, source: Source): Choice {
-  switch (bounds.kind) {
-    case "integer":
-      return choiceOf(bounds, draw.integer(source, bounds));
-    case "float":
-      return choiceOf(bounds, draw.floatValue(source, bounds));
-    default:
-      return choiceOf(bounds, draw.sequence(source, bounds));
-  }
-}
-
-/** Returns the choices of member with one of them, chosen uniformly, drawn again from its bounds. */
-function redrawOne(member: Member, source: Source): Choice[] {
-  const choices = [...member.choices];
-  const at = Number(source.below(BigInt(choices.length)));
-  choices[at] = redrawn(member.bounds[at] as Bounds, source);
-  return choices;
-}
-
-/**
- * Returns the choices of a mutation of a member of pool. A member without
- * spans takes the mutation that draws a choice again, and so does a
- * replacement whose donor has no span of the span's label. A member without
- * choices takes no mutation.
- */
-function mutation(pool: readonly Member[], source: Source): Choice[] {
-  const member = pick(source, pool);
-  const choices = member.choices;
-  if (choices.length === 0) return [];
-  const drawn = source.below(KINDS);
-  const kind = member.spans.length === 0 ? REDRAW : drawn;
-  if (kind === REDRAW) return redrawOne(member, source);
-  const span = pick(source, member.spans);
-  const before = choices.slice(0, span.start);
-  const after = choices.slice(span.end);
-  if (kind === DELETE) return [...before, ...after];
-  if (kind === REPEAT)
-    return [...choices.slice(0, span.end), ...choices.slice(span.start)];
-  const donor = pick(source, pool);
-  const same = donor.spans.filter((other) => other.label === span.label);
-  if (same.length === 0) return redrawOne(member, source);
-  const given = pick(source, same);
-  return [...before, ...donor.choices.slice(given.start, given.end), ...after];
-}
-
-/**
- * A provider that replays the choices of a mutated case, each fitted to its
- * request's bounds, and draws each request past them from the campaign's
- * stream.
- */
-class Mutating implements Provider {
-  readonly #choices: readonly Choice[];
-  readonly #source: Source;
-
-  constructor(choices: readonly Choice[], source: Source) {
-    this.#choices = choices;
-    this.#source = source;
-  }
-
-  value(request: Request, index: number): Value {
-    const choice = this.#choices[index];
-    return choice === undefined
-      ? request.draw(this.#source)
-      : request.bounds.coerce(choice);
-  }
-}
 
 /** The state of one campaign. */
 class Exploration {
@@ -186,9 +73,13 @@ class Exploration {
     for (const [phase, provider] of knownCases(this.#settings)) {
       const execution = yield* execute(this.#body, provider, this.#settings.maxChoices);
       this.#observer(phase, execution);
-      if (phase === "stored") this.#stored.push(execution);
+      if (phase === "stored") {
+        this.#stored.push(execution);
+      }
       const ended = yield* this.#take(execution, provider instanceof Valuing);
-      if (ended !== undefined) return ended;
+      if (ended !== undefined) {
+        return ended;
+      }
     }
     return undefined;
   }
@@ -216,10 +107,15 @@ class Exploration {
    */
   *#take(execution: Execution, valued: boolean): Work<Outcome | undefined> {
     const ended = this.#tally.take(execution);
-    if (execution.status === "failed") return yield* this.#fail(execution, valued);
-    if (execution.status === "passed") this.#admit(execution);
-    if (ended?.kind === "skipped" && this.#found === undefined)
+    if (execution.status === "failed") {
+      return yield* this.#fail(execution, valued);
+    }
+    if (execution.status === "passed") {
+      this.#admit(execution);
+    }
+    if (ended?.kind === "skipped" && this.#found === undefined) {
       return { ...ended, stored: this.#stored };
+    }
     return undefined;
   }
 
@@ -231,7 +127,9 @@ class Exploration {
    */
   *#fail(execution: Execution, valued: boolean): Work<Outcome | undefined> {
     const identity = identityOf(execution) as string;
-    if (this.#identities.has(identity)) return undefined;
+    if (this.#identities.has(identity)) {
+      return undefined;
+    }
     const found = {
       ...this.#tally.outcome("counterexample", { failing: execution }),
       valued,
@@ -245,9 +143,10 @@ class Exploration {
     const others: Execution[] = [];
     for (const other of outcome.others) {
       const key = identityOf(other) as string;
-      if (this.#identities.has(key)) continue;
-      this.#identities.add(key);
-      others.push(other);
+      if (!this.#identities.has(key)) {
+        this.#identities.add(key);
+        others.push(other);
+      }
     }
     const concluded = { ...outcome, others };
     this.#concluded(concluded);
@@ -280,11 +179,14 @@ class Exploration {
     }
     for (const [label, score] of c.targets) {
       const best = this.#best.get(label);
-      if (best !== undefined && !(score > best)) continue;
-      this.#best.set(label, score);
-      novel = true;
+      if (best === undefined || score > best) {
+        this.#best.set(label, score);
+        novel = true;
+      }
     }
-    if (!novel) return;
+    if (!novel) {
+      return;
+    }
     this.#pool.push({
       choices: [...c.choices],
       bounds: c.requests.map((request) => request.bounds),
@@ -304,11 +206,23 @@ class Exploration {
       return { ...this.#found, cases: tally.valid, rejected: tally.rejected, stored };
     }
     const missing = tally.failureWithoutCounterexample();
-    if (missing !== undefined) return { ...missing, stored };
+    if (missing !== undefined) {
+      return { ...missing, stored };
+    }
     const [shortfall] = shortfallOf(tally, this.#settings.requirements, true, false);
     const kind = shortfall === undefined ? "passed" : "coverage-unmet";
     return { ...tally.outcome(kind, { shortfall }), stored };
   }
+}
+
+/** What a campaign is asked to do: the settings of a run, and its budget. */
+export interface CampaignSettings extends Settings {
+  /** How long the campaign explores, in milliseconds. */
+  readonly budget: number;
+  /** Receives each failure that the campaign concludes, as the campaign concludes it. */
+  readonly concluded?: ((outcome: Outcome) => void) | undefined;
+  /** Returns the time that the budget is measured on, in milliseconds: performance.now by default. */
+  readonly now?: (() => number) | undefined;
 }
 
 /**
@@ -347,10 +261,14 @@ export function* campaign(
   const end = now() + settings.budget;
   const exploration = new Exploration(body, settings, observer);
   const known = yield* exploration.known();
-  if (known !== undefined) return known;
+  if (known !== undefined) {
+    return known;
+  }
   while (now() < end) {
     const ended = yield* exploration.next();
-    if (ended !== undefined) return ended;
+    if (ended !== undefined) {
+      return ended;
+    }
   }
   return exploration.result();
 }

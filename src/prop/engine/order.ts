@@ -46,10 +46,14 @@ export function choiceKey(bounds: Bounds, value: Value): Key {
  *   does, and 0 for equal sequences.
  */
 export function compareSequences(a: readonly Key[], b: readonly Key[]): number {
-  if (a.length !== b.length) return a.length - b.length;
+  if (a.length !== b.length) {
+    return a.length - b.length;
+  }
   for (let i = 0; i < a.length; i += 1) {
     const order = compareKeys(a[i] as Key, b[i] as Key);
-    if (order !== 0) return order;
+    if (order !== 0) {
+      return order;
+    }
   }
   return 0;
 }

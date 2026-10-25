@@ -5,12 +5,12 @@
 
 import { describe } from "vitest";
 import { check } from "../../../src/index.js";
+import { Replaying } from "../../../src/prop/engine/case/providers.js";
 import {
   type Case,
   DECODE,
   type Decoder,
   MAX_CHOICES,
-  Replaying,
 } from "../../../src/prop/engine/case.js";
 import { type Choice, IntegerBounds } from "../../../src/prop/engine/choice.js";
 import {

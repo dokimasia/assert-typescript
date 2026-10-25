@@ -14,6 +14,64 @@
 
 import { bitsOf, NAN_BITS } from "./float.js";
 
+/** The ids that canonical gives the values it cannot compare by value. */
+const IDENTITIES = new WeakMap<WeakKey, number>();
+let lastIdentity = 0;
+
+/** Returns the id of an object, a function or a symbol that canonical compares by identity. */
+function identityOf(value: WeakKey): string {
+  let id = IDENTITIES.get(value);
+  if (id === undefined) {
+    lastIdentity += 1;
+    id = lastIdentity;
+    IDENTITIES.set(value, id);
+  }
+  return `identity:${id}`;
+}
+
+/** Returns the canonical text of each element of values, sorted. */
+function sorted(values: Iterable<string>): string {
+  return [...values].sort().join(",");
+}
+
+/** Returns the canonical text of an object. */
+function canonicalObject(value: object): string {
+  if (value instanceof Uint8Array) {
+    return `bytes:${Buffer.from(value).toString("hex")}`;
+  }
+  if (Array.isArray(value)) {
+    return `list:[${value.map(canonical).join(",")}]`;
+  }
+  if (value instanceof Pairs) {
+    return `map:{${sorted(value.items.map(([k, v]) => `${canonical(k)}=${canonical(v)}`))}}`;
+  }
+  if (value instanceof Map) {
+    return `map:{${sorted([...value].map(([k, v]) => `${canonical(k)}=${canonical(v)}`))}}`;
+  }
+  if (value instanceof Set) {
+    return `set:{${sorted([...value].map(canonical))}}`;
+  }
+  if (value instanceof Fields) {
+    return `record:[${value.fields.map(([n, v]) => `${JSON.stringify(n)}=${canonical(v)}`).join(",")}]`;
+  }
+  if (value instanceof Variant) {
+    const payload = value.hasPayload ? `=${canonical(value.payload)}` : "";
+    return `variant:${JSON.stringify(value.name)}${payload}`;
+  }
+  const prototype = Object.getPrototypeOf(value) as object | null;
+  if (prototype === Object.prototype || prototype === null) {
+    const fields = Object.entries(value).map(
+      ([n, v]) => `${JSON.stringify(n)}=${canonical(v)}`,
+    );
+    return `object:{${fields.join(",")}}`;
+  }
+  const text = Object.prototype.toString.call(value);
+  if (text.startsWith("[object Temporal.") || value instanceof Date) {
+    return `${text}:${String(value)}`;
+  }
+  return identityOf(value);
+}
+
 /** A decoded dict: its entries in the order they were generated. No two keys are equal under canonical. */
 export class Pairs {
   /** The entries, each a key and a value. */
@@ -68,58 +126,6 @@ export class Variant {
     this.hasPayload = payload.length === 1;
     this.payload = payload[0];
   }
-}
-
-/** The ids that canonical gives the values it cannot compare by value. */
-const IDENTITIES = new WeakMap<WeakKey, number>();
-let lastIdentity = 0;
-
-/** Returns the id of an object, a function or a symbol that canonical compares by identity. */
-function identityOf(value: WeakKey): string {
-  let id = IDENTITIES.get(value);
-  if (id === undefined) {
-    lastIdentity += 1;
-    id = lastIdentity;
-    IDENTITIES.set(value, id);
-  }
-  return `identity:${id}`;
-}
-
-/** Returns the canonical text of each element of values, sorted. */
-function sorted(values: Iterable<string>): string {
-  return [...values].sort().join(",");
-}
-
-/** Returns the canonical text of an object. */
-function canonicalObject(value: object): string {
-  if (value instanceof Uint8Array) return `bytes:${Buffer.from(value).toString("hex")}`;
-  if (Array.isArray(value)) return `list:[${value.map(canonical).join(",")}]`;
-  if (value instanceof Pairs) {
-    return `map:{${sorted(value.items.map(([k, v]) => `${canonical(k)}=${canonical(v)}`))}}`;
-  }
-  if (value instanceof Map) {
-    return `map:{${sorted([...value].map(([k, v]) => `${canonical(k)}=${canonical(v)}`))}}`;
-  }
-  if (value instanceof Set) return `set:{${sorted([...value].map(canonical))}}`;
-  if (value instanceof Fields) {
-    return `record:[${value.fields.map(([n, v]) => `${JSON.stringify(n)}=${canonical(v)}`).join(",")}]`;
-  }
-  if (value instanceof Variant) {
-    const payload = value.hasPayload ? `=${canonical(value.payload)}` : "";
-    return `variant:${JSON.stringify(value.name)}${payload}`;
-  }
-  const prototype = Object.getPrototypeOf(value) as object | null;
-  if (prototype === Object.prototype || prototype === null) {
-    const fields = Object.entries(value).map(
-      ([n, v]) => `${JSON.stringify(n)}=${canonical(v)}`,
-    );
-    return `object:{${fields.join(",")}}`;
-  }
-  const text = Object.prototype.toString.call(value);
-  if (text.startsWith("[object Temporal.") || value instanceof Date) {
-    return `${text}:${String(value)}`;
-  }
-  return identityOf(value);
 }
 
 /**

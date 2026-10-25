@@ -10,19 +10,6 @@
  * as every language's JSON reader does.
  */
 
-/** A JSON text that is malformed, repeats a name, or nests too deep. */
-export class JsonError extends Error {
-  /**
-   * Returns the error of a text.
-   *
-   * @param message - What is wrong with the text.
-   */
-  constructor(message: string) {
-    super(message);
-    this.name = "JsonError";
-  }
-}
-
 /** The escapes of a JSON string, by the character after the backslash. */
 const ESCAPES: ReadonlyMap<string, string> = new Map([
   ['"', '"'],
@@ -37,6 +24,10 @@ const ESCAPES: ReadonlyMap<string, string> = new Map([
 
 /** A number of the JSON grammar. */
 const NUMBER = /-?(?:0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/y;
+
+/** The hexadecimal digits of a \u escape, and their form. */
+const ESCAPE_DIGITS = 4;
+const HEX_ESCAPE = /^[0-9a-fA-F]{4}$/;
 
 /** The reader of one text. */
 class Reader {
@@ -68,8 +59,9 @@ class Reader {
   document(): unknown {
     const value = this.#value(1);
     this.#skip();
-    if (this.#at !== this.#text.length)
+    if (this.#at !== this.#text.length) {
       this.#fail("the text continues after its value");
+    }
     return value;
   }
 
@@ -78,11 +70,14 @@ class Reader {
     this.#skip();
     const char = this.#text.charAt(this.#at);
     if (char === "{" || char === "[") {
-      if (depth > this.#maxDepth)
+      if (depth > this.#maxDepth) {
         this.#fail(`the value nests past ${this.#maxDepth} levels`);
+      }
       return char === "{" ? this.#object(depth) : this.#array(depth);
     }
-    if (char === '"') return this.#string();
+    if (char === '"') {
+      return this.#string();
+    }
     for (const [word, value] of [
       ["true", true],
       ["false", false],
@@ -110,21 +105,28 @@ class Reader {
     }
     for (;;) {
       this.#skip();
-      if (this.#text.charAt(this.#at) !== '"')
+      if (this.#text.charAt(this.#at) !== '"') {
         this.#fail("an object states a name that is no string");
+      }
       const name = this.#string();
-      if (Object.hasOwn(object, name))
+      if (Object.hasOwn(object, name)) {
         this.#fail(`an object repeats the name ${JSON.stringify(name)}`);
+      }
       this.#skip();
-      if (this.#text.charAt(this.#at) !== ":")
+      if (this.#text.charAt(this.#at) !== ":") {
         this.#fail("a name is not followed by a colon");
+      }
       this.#at += 1;
       object[name] = this.#value(depth + 1);
       this.#skip();
       const next = this.#text.charAt(this.#at);
       this.#at += 1;
-      if (next === "}") return object;
-      if (next !== ",") this.#fail("an object is not closed");
+      if (next === "}") {
+        return object;
+      }
+      if (next !== ",") {
+        this.#fail("an object is not closed");
+      }
     }
   }
 
@@ -142,8 +144,12 @@ class Reader {
       this.#skip();
       const next = this.#text.charAt(this.#at);
       this.#at += 1;
-      if (next === "]") return array;
-      if (next !== ",") this.#fail("an array is not closed");
+      if (next === "]") {
+        return array;
+      }
+      if (next !== ",") {
+        this.#fail("an array is not closed");
+      }
     }
   }
 
@@ -153,10 +159,16 @@ class Reader {
     let out = "";
     for (;;) {
       const char = this.#text.charAt(this.#at);
-      if (this.#at >= this.#text.length) this.#fail("a string is not closed");
+      if (this.#at >= this.#text.length) {
+        this.#fail("a string is not closed");
+      }
       this.#at += 1;
-      if (char === '"') return out;
-      if (char < " ") this.#fail("a string contains a control character");
+      if (char === '"') {
+        return out;
+      }
+      if (char < " ") {
+        this.#fail("a string contains a control character");
+      }
       out += char === "\\" ? this.#escaped() : char;
     }
   }
@@ -166,14 +178,17 @@ class Reader {
     const marker = this.#text.charAt(this.#at);
     this.#at += 1;
     if (marker === "u") {
-      const hex = this.#text.slice(this.#at, this.#at + 4);
-      if (!/^[0-9a-fA-F]{4}$/.test(hex))
+      const hex = this.#text.slice(this.#at, this.#at + ESCAPE_DIGITS);
+      if (!HEX_ESCAPE.test(hex)) {
         this.#fail("a string states a malformed escape");
-      this.#at += 4;
+      }
+      this.#at += ESCAPE_DIGITS;
       return String.fromCharCode(Number.parseInt(hex, 16));
     }
     const unescaped = ESCAPES.get(marker);
-    if (unescaped === undefined) this.#fail("a string states a malformed escape");
+    if (unescaped === undefined) {
+      this.#fail("a string states a malformed escape");
+    }
     return unescaped;
   }
 
@@ -181,10 +196,27 @@ class Reader {
   #number(): bigint | number {
     NUMBER.lastIndex = this.#at;
     const match = NUMBER.exec(this.#text);
-    if (match === null) this.#fail("no value starts here");
+    if (match === null) {
+      this.#fail("no value starts here");
+    }
     this.#at += match[0].length;
-    if (match[1] === undefined && match[2] === undefined) return BigInt(match[0]);
+    if (match[1] === undefined && match[2] === undefined) {
+      return BigInt(match[0]);
+    }
     return Number(match[0]);
+  }
+}
+
+/** A JSON text that is malformed, repeats a name, or nests too deep. */
+export class JsonError extends Error {
+  /**
+   * Returns the error of a text.
+   *
+   * @param message - What is wrong with the text.
+   */
+  constructor(message: string) {
+    super(message);
+    this.name = "JsonError";
   }
 }
 

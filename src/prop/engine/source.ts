@@ -16,19 +16,28 @@
 /** The bits of every value of the stream. */
 const BITS = 64n;
 
-/** The largest unsigned 64-bit integer. */
-export const MASK = (1n << BITS) - 1n;
-
 /** The constant that the initialisation puts in the first word. */
 const FIRST_WORD = 0xf1ea5eedn;
 
 /** The rounds that the initialisation discards, so that nearby seeds give unrelated streams. */
 const WARMUP_ROUNDS = 20;
 
+/** The three rotations of each step of the generator. */
+const FIRST_ROTATION = 7n;
+const SECOND_ROTATION = 13n;
+const THIRD_ROTATION = 37n;
+
+/** The bits of the word whose leading zeros Math.clz32 counts. */
+const WORD_BITS = 32;
+const WORD_SHIFT = BigInt(WORD_BITS);
+
 /** Returns value rotated left by count bits, modulo 2^64. */
 function rotl(value: bigint, count: bigint): bigint {
   return ((value << count) | (value >> (BITS - count))) & MASK;
 }
+
+/** The largest unsigned 64-bit integer. */
+export const MASK = (1n << BITS) - 1n;
 
 /**
  * Returns the number of bits of a non-negative integer below 2^64: 0 for
@@ -40,11 +49,11 @@ function rotl(value: bigint, count: bigint): bigint {
 export function bitLength(value: bigint): number {
   let bits = 0;
   let rest = value;
-  if (rest >= 1n << 32n) {
-    bits = 32;
-    rest >>= 32n;
+  if (rest >= 1n << WORD_SHIFT) {
+    bits = WORD_BITS;
+    rest >>= WORD_SHIFT;
   }
-  return bits + 32 - Math.clz32(Number(rest));
+  return bits + WORD_BITS - Math.clz32(Number(rest));
 }
 
 /** The stream of 64-bit values that one seed produces. Each case reads its own. */
@@ -68,14 +77,16 @@ export class Source {
     this.#b = seed;
     this.#c = seed;
     this.#d = seed;
-    for (let round = 0; round < WARMUP_ROUNDS; round += 1) this.next();
+    for (let round = 0; round < WARMUP_ROUNDS; round += 1) {
+      this.next();
+    }
   }
 
   /** Returns the next 64-bit value of the stream. */
   next(): bigint {
-    const e = (this.#a - rotl(this.#b, 7n)) & MASK;
-    this.#a = this.#b ^ rotl(this.#c, 13n);
-    this.#b = (this.#c + rotl(this.#d, 37n)) & MASK;
+    const e = (this.#a - rotl(this.#b, FIRST_ROTATION)) & MASK;
+    this.#a = this.#b ^ rotl(this.#c, SECOND_ROTATION);
+    this.#b = (this.#c + rotl(this.#d, THIRD_ROTATION)) & MASK;
     this.#c = (this.#d + e) & MASK;
     this.#d = (e + this.#a) & MASK;
     return this.#d;
@@ -95,11 +106,15 @@ export class Source {
     if (n < 1n || n > MASK + 1n) {
       throw new RangeError(`prop: below(${n}) needs 1 <= n <= 2^64`);
     }
-    if (n === 1n) return 0n;
+    if (n === 1n) {
+      return 0n;
+    }
     const shift = BITS - BigInt(bitLength(n - 1n));
     for (;;) {
       const value = this.next() >> shift;
-      if (value < n) return value;
+      if (value < n) {
+        return value;
+      }
     }
   }
 
@@ -142,6 +157,8 @@ export function caseSource(seed: bigint, index: bigint): Source {
  */
 export function mix(data: Uint8Array): bigint {
   let value = 0n;
-  for (const byte of data) value = new Source(value ^ BigInt(byte)).next();
+  for (const byte of data) {
+    value = new Source(value ^ BigInt(byte)).next();
+  }
   return value;
 }

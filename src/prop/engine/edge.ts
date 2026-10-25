@@ -19,19 +19,13 @@
  * maxSize is 0.
  */
 
-import type { Provider, Request } from "./case.js";
+import type { Provider, Request } from "./case/providers.js";
 import type { FloatBounds, IntegerBounds, SequenceBounds, Value } from "./choice.js";
 import { nextDown, nextUp } from "./float.js";
 
-/** The boundary that every value choice of one edge case takes. */
-export type Boundary = "min" | "max" | "above" | "below";
-
-/** The edge cases, in the order a run tries them. */
-export const BOUNDARIES: readonly Boundary[] = ["min", "max", "above", "below"];
-
 /** Returns an integer choice's value at the boundary. */
 function integerAt(bounds: IntegerBounds, boundary: Boundary): bigint {
-  const target = bounds.target;
+  const { target } = bounds;
   const values: Readonly<Record<Boundary, bigint>> = {
     min: bounds.lo,
     max: bounds.hi,
@@ -44,7 +38,7 @@ function integerAt(bounds: IntegerBounds, boundary: Boundary): bigint {
 
 /** Returns a float choice's value at the boundary. */
 function floatAt(bounds: FloatBounds, boundary: Boundary): number {
-  const target = bounds.target;
+  const { target } = bounds;
   const values: Readonly<Record<Boundary, number>> = {
     min: bounds.lo,
     max: bounds.hi,
@@ -58,7 +52,9 @@ function floatAt(bounds: FloatBounds, boundary: Boundary): number {
 /** Returns a sequence choice's value at the boundary. */
 function sequenceAt(bounds: SequenceBounds, boundary: Boundary): readonly number[] {
   let length = Math.max(bounds.minSize, 1);
-  if (bounds.maxSize !== undefined) length = Math.min(length, bounds.maxSize);
+  if (bounds.maxSize !== undefined) {
+    length = Math.min(length, bounds.maxSize);
+  }
   const values: Readonly<Record<Boundary, number>> = {
     min: 0,
     max: bounds.k - 1,
@@ -70,6 +66,12 @@ function sequenceAt(bounds: SequenceBounds, boundary: Boundary): readonly number
     element >= 0 && element < bounds.k ? element : 0,
   );
 }
+
+/** The boundary that every value choice of one edge case takes. */
+export type Boundary = "min" | "max" | "above" | "below";
+
+/** The edge cases, in the order a run tries them. */
+export const BOUNDARIES: readonly Boundary[] = ["min", "max", "above", "below"];
 
 /** A provider that gives every choice its value at one boundary. */
 export class Edge implements Provider {
@@ -91,7 +93,7 @@ export class Edge implements Provider {
    * @returns The value.
    */
   value(request: Request): Value {
-    const bounds = request.bounds;
+    const { bounds } = request;
     if (request.edge !== undefined) {
       return bounds.admits(request.edge) ? request.edge : bounds.target;
     }

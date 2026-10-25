@@ -14,18 +14,27 @@
  * starts at its flag. Deleting that span deletes the element whole.
  */
 
-import { type Case, Rejected } from "./case.js";
+import { Rejected } from "./case/signals.js";
+import type { Case } from "./case.js";
 import * as draw from "./draw.js";
-
-/** The span labels of one element of a collection and one entry of a dict. */
-export const ELEMENT = "element";
-export const ENTRY = "entry";
 
 /**
  * A collection that discards this many duplicates in a row stops. A
  * collection still below its minimum size then rejects the case.
  */
 const MAX_DISCARDS = 10;
+
+/** Returns the elements of a collection that its discards stopped, and rejects the case when they are fewer than the minimum. */
+function endAfterDiscards<T>(items: T[], sizes: Sizes): T[] {
+  if (items.length < sizes.minSize) {
+    throw new Rejected();
+  }
+  return items;
+}
+
+/** The span labels of one element of a collection and one entry of a dict. */
+export const ELEMENT = "element";
+export const ENTRY = "entry";
 
 /** The bounds on a collection's length, both inclusive. */
 export class Sizes {
@@ -115,16 +124,20 @@ export function collect<T>(
   for (;;) {
     const start = c.choices.length;
     const stopped = stop !== undefined && items.length >= sizes.minSize && stop();
-    if (!more(c, items.length, sizes, stopped)) return items;
-    const [item, key] = c.span(label, decode, start);
-    if (key !== undefined && seen.has(key)) {
-      discards += 1;
-      if (discards < MAX_DISCARDS) continue;
-      if (items.length < sizes.minSize) throw new Rejected();
+    if (!more(c, items.length, sizes, stopped)) {
       return items;
     }
-    discards = 0;
-    if (key !== undefined) seen.add(key);
-    items.push(item);
+    const [item, key] = c.span(label, decode, start);
+    const repeated = key !== undefined && seen.has(key);
+    discards = repeated ? discards + 1 : 0;
+    if (discards >= MAX_DISCARDS) {
+      return endAfterDiscards(items, sizes);
+    }
+    if (!repeated) {
+      if (key !== undefined) {
+        seen.add(key);
+      }
+      items.push(item);
+    }
   }
 }

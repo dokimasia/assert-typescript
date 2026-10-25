@@ -9,26 +9,22 @@
 
 import { describe } from "vitest";
 import { check, prop } from "../../../src/index.js";
-import { Case, DECODE, Generating, Replaying } from "../../../src/prop/engine/case.js";
-import {
-  type Choice,
-  INT64_MAX,
-  UINT64_MAX,
-  type Value,
-} from "../../../src/prop/engine/choice.js";
+import { Generating, Replaying } from "../../../src/prop/engine/case/providers.js";
+import { Case, DECODE } from "../../../src/prop/engine/case.js";
+import { INT64_MAX, type Value } from "../../../src/prop/engine/choice.js";
 import { Integer, Just } from "../../../src/prop/engine/generator.js";
-import {
-  halves,
-  Root,
-  read,
-  ShapeError,
-  secondPart,
-} from "../../../src/prop/engine/shape.js";
+import { ShapeError } from "../../../src/prop/engine/shape/error.js";
+import { Root } from "../../../src/prop/engine/shape/structure.js";
+import { read } from "../../../src/prop/engine/shape.js";
 import { caseSource } from "../../../src/prop/engine/source.js";
-import { canonical, Fields, Pairs, Variant } from "../../../src/prop/engine/value.js";
-import { ZONES } from "../../../src/prop/engine/zone.js";
+import {
+  canonical,
+  Fields,
+  Pairs,
+  type Variant,
+} from "../../../src/prop/engine/value.js";
 import { test as it } from "../../../src/vitest.js";
-import { thrown } from "../../helpers.js";
+import { choiceOf, thrown } from "../../helpers.js";
 
 /** The nodes that one value of a recursive shape may use. */
 const BUDGET = 100;
@@ -50,16 +46,6 @@ const TREE = {
     },
   },
 };
-
-/** The first offset change of Europe/Amsterdam. */
-const CHANGE = ZONES[1]?.changes[0] as (typeof ZONES)[number]["changes"][number];
-
-/** Returns a recorded choice of the kind that the type of value implies. */
-function choiceOf(value: Value): Choice {
-  if (Array.isArray(value)) return { kind: "sequence", value };
-  if (typeof value === "number") return { kind: "float", value };
-  return { kind: "integer", value: value as bigint };
-}
 
 /** Returns the value that a shape decodes from recorded values, and the case. */
 function decode(shape: unknown, ...values: Value[]): [unknown, Case] {
@@ -85,12 +71,6 @@ function instant(at: bigint, units: bigint): Fields {
   ]);
 }
 
-/** Returns the floor of a / b and its remainder. */
-function divmod(a: bigint, b: bigint): [bigint, bigint] {
-  const quotient = a / b - (a % b < 0n ? 1n : 0n);
-  return [quotient, a - quotient * b];
-}
-
 /** Returns the nodes of a tree value. */
 function nodes(value: unknown): number {
   const children = (value as Fields).fields[1]?.[1] as unknown[];
@@ -98,63 +78,6 @@ function nodes(value: unknown): number {
 }
 
 describe("shape", () => {
-  describe("new ShapeError", () => {
-    it("returns the error of a shape that does not read", ({ seat }) => {
-      const err = new ShapeError("prop: [] is not a shape");
-
-      check.isEqualTo(
-        seat,
-        [err.name, err.message],
-        ["ShapeError", "prop: [] is not a shape"],
-        "the name and the message",
-      );
-    });
-  });
-
-  describe("halves", () => {
-    it("returns the high and the low 64 bits of a 128-bit integer", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        [halves(2n ** 64n + 3n), halves(-1n)],
-        [
-          [1n, 3n],
-          [-1n, UINT64_MAX],
-        ],
-        "two splits",
-      );
-    });
-  });
-
-  describe("secondPart", () => {
-    const tests = [
-      {
-        name: "the whole range between the bounds",
-        give: 5n,
-        want: `integer 0 ${UINT64_MAX}`,
-      },
-      {
-        name: "the lower bound's second part at its first part",
-        give: 1n,
-        want: `integer 10 ${UINT64_MAX}`,
-      },
-      {
-        name: "the upper bound's second part at its first part",
-        give: 9n,
-        want: "integer 0 20",
-      },
-    ];
-    for (const tt of tests) {
-      it(`returns ${tt.name}`, ({ seat }) => {
-        check.isEqualTo(
-          seat,
-          secondPart(tt.give, [1n, 10n], [9n, 20n], UINT64_MAX).id,
-          tt.want,
-          "the bounds",
-        );
-      });
-    }
-  });
-
   describe("read", () => {
     it("reads a shape without recursion as the generator that it maps to", ({
       seat,
@@ -963,278 +886,6 @@ describe("shape", () => {
         }
       });
     });
-  });
-
-  describe("Int128Shape", () => {
-    const wide = { shape: "int", width: 128, signed: true };
-
-    it("decodes its signed high half before its low half", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        [
-          decode(wide, -1n, UINT64_MAX)[0],
-          decode(wide, 1n, 0n)[0],
-          decode(wide, -(2n ** 63n), 0n)[0],
-          decode({ ...wide, signed: false }, UINT64_MAX, UINT64_MAX)[0],
-        ],
-        [-1n, 2n ** 64n, -(2n ** 127n), 2n ** 128n - 1n],
-        "four values",
-      );
-    });
-
-    it("bounds its low half by the bound whose high half it shares", ({ seat }) => {
-      const bounded = {
-        shape: "int",
-        width: 128,
-        signed: false,
-        min: String(2n ** 64n + 10n),
-        max: String(2n ** 65n),
-      };
-
-      check.isEqualTo(
-        seat,
-        [
-          decode(bounded, 1n, 3n)[0],
-          decode(bounded, 2n, 9n)[0],
-          decode(bounded, 1n, 11n)[0],
-        ],
-        [2n ** 64n + 10n, 2n ** 65n, 2n ** 64n + 11n],
-        "the low halves at the bounds",
-      );
-    });
-  });
-
-  describe("InstantShape", () => {
-    it("decodes its seconds and its units", ({ seat }) => {
-      const [value, c] = decode({ shape: "instant", unit: "s" }, 253_402_300_799n);
-
-      check.isEqualTo(
-        seat,
-        [
-          decoded({ shape: "instant", unit: "ns" }, -1n, 999_999_999n),
-          canonical(value),
-          c.choices.length,
-        ],
-        [
-          canonical(instant(-1n, 999_999_999n)),
-          canonical(instant(253_402_300_799n, 0n)),
-          1,
-        ],
-        "two choices at nanoseconds, and one at seconds",
-      );
-    });
-
-    it("stops the units of the second of its bound", ({ seat }) => {
-      const start = seconds(2020, 1, 1);
-      const bounded = { shape: "instant", unit: "ms", min: "2020-01-01T00:00:00.5Z" };
-
-      check.isEqualTo(
-        seat,
-        [decoded(bounded, start, 3n), decoded(bounded, start + 1n, 3n)],
-        [canonical(instant(start, 500n)), canonical(instant(start + 1n, 3n))],
-        "500 at the bound's second, and 3 after it",
-      );
-    });
-
-    it("decodes from the first second of the year 1 by default", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        decoded({ shape: "instant", unit: "s" }, -62_135_596_800n),
-        canonical(instant(-62_135_596_800n, 0n)),
-        "0001-01-01T00:00:00Z",
-      );
-    });
-  });
-
-  describe("LocalDateTimeShape", () => {
-    it("stops the time of day of the date of its bound", ({ seat }) => {
-      const bounded = {
-        shape: "local-date-time",
-        unit: "s",
-        max: "1970-01-02T12:00:00",
-      };
-      const local = (day: bigint, time: bigint) =>
-        new Fields([
-          ["date", day],
-          ["time-of-day", time],
-        ]);
-
-      check.isEqualTo(
-        seat,
-        [decoded(bounded, 1n, 86_399n), decoded(bounded, 0n, 86_399n)],
-        [canonical(local(1n, 0n)), canonical(local(0n, 86_399n))],
-        "the bound's date, and the date before it",
-      );
-    });
-  });
-
-  describe("IpShape", () => {
-    it("decodes the bytes of the version that an index chooses", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        decode({ shape: "ip-address" }, 1n, new Array<number>(16).fill(1))[0],
-        new Uint8Array(16).fill(1),
-        "an address of version 6",
-      );
-    });
-  });
-
-  describe("ZonedShape", () => {
-    it("decodes the instant of a zone without a change over the whole range", ({
-      seat,
-    }) => {
-      const [value, c] = decode({ shape: "zoned-date-time", unit: "s" }, 0n, 42n);
-
-      check.isEqualTo(
-        seat,
-        [canonical(value), c.choices.length],
-        [
-          canonical(
-            new Fields([
-              ["instant", instant(42n, 0n)],
-              ["zone", "UTC"],
-            ]),
-          ),
-          2,
-        ],
-        "UTC makes no choice of a change",
-      );
-    });
-
-    it("decodes an instant one unit from a change", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        decoded({ shape: "zoned-date-time", unit: "ns" }, 1n, 1n, 0n, -1n),
-        canonical(
-          new Fields([
-            ["instant", instant(CHANGE.at - 1n, 999_999_999n)],
-            ["zone", "Europe/Amsterdam"],
-          ]),
-        ),
-        "a nanosecond before the change",
-      );
-    });
-
-    it("decodes an instant away from the changes over the whole range", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        decoded({ shape: "zoned-date-time", unit: "ms" }, 1n, 0n, 7n, 8n),
-        canonical(
-          new Fields([
-            ["instant", instant(7n, 8n)],
-            ["zone", "Europe/Amsterdam"],
-          ]),
-        ),
-        "the instant's two choices",
-      );
-    });
-
-    it("decodes about one case in four from the changes", ({ seat }) => {
-      const shape = read({ shape: "zoned-date-time", unit: "s" });
-      let near = 0;
-      let changed = 0;
-      for (let index = 0n; index < 4000n; index += 1n) {
-        const c = new Case(new Generating(caseSource(11n, index)));
-        shape[DECODE](c);
-        if ((ZONES[Number(c.choices[0]?.value)]?.changes.length ?? 0) > 0) {
-          changed += 1;
-          if (c.choices[1]?.value === 1n) near += 1;
-        }
-      }
-
-      check.isTrue(
-        seat,
-        changed > 3000 && Math.abs(near / changed - 0.25) <= 0.03,
-        "a quarter of the zones with changes",
-      );
-    });
-  });
-
-  describe("WallShape", () => {
-    for (const [side, offset] of [
-      [0n, CHANGE.before],
-      [1n, CHANGE.after],
-    ] as const) {
-      it(`decodes the change's instant in the offset ${side === 0n ? "before" : "after"} it`, ({
-        seat,
-      }) => {
-        const [day, time] = divmod(CHANGE.at + offset, 86_400n);
-
-        check.isEqualTo(
-          seat,
-          decoded({ shape: "wall-time", unit: "s" }, 1n, 1n, 0n, 0n, side),
-          canonical(
-            new Fields([
-              [
-                "local-date-time",
-                new Fields([
-                  ["date", day],
-                  ["time-of-day", time],
-                ]),
-              ],
-              ["zone", "Europe/Amsterdam"],
-            ]),
-          ),
-          "the wall time at the change",
-        );
-      });
-    }
-
-    it("decodes a wall time away from the changes over the whole range", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        decoded({ shape: "wall-time", unit: "s" }, 1n, 0n, 5n, 6n),
-        canonical(
-          new Fields([
-            [
-              "local-date-time",
-              new Fields([
-                ["date", 5n],
-                ["time-of-day", 6n],
-              ]),
-            ],
-            ["zone", "Europe/Amsterdam"],
-          ]),
-        ),
-        "the local date and time's two choices",
-      );
-    });
-
-    it("decodes about half of the wall times near a change in the offset after it", ({
-      seat,
-    }) => {
-      const shape = read({ shape: "wall-time", unit: "s" });
-      let near = 0;
-      let after = 0;
-      for (let index = 0n; index < 4000n; index += 1n) {
-        const c = new Case(new Generating(caseSource(13n, index)));
-        shape[DECODE](c);
-        const changes = ZONES[Number(c.choices[0]?.value)]?.changes.length ?? 0;
-        if (changes > 0 && c.choices[1]?.value === 1n) {
-          near += 1;
-          if (c.choices[4]?.value === 1n) after += 1;
-        }
-      }
-
-      check.isTrue(
-        seat,
-        near > 600 && Math.abs(after / near - 0.5) <= 0.06,
-        "half of the wall times near a change",
-      );
-    });
-  });
-
-  describe("OptionalShape", () => {
-    it("decodes a present value from the flag 1 alone", ({ seat }) => {
-      const optional = { shape: "optional", of: UINT8 };
-
-      check.isEqualTo(
-        seat,
-        [decode(optional)[0], decode(optional, 1n, 5n)[0]],
-        [undefined, 5n],
-        "absent, then 5",
-      );
-    });
 
     it("ends a linked list at an absent next", ({ seat }) => {
       const linked = {
@@ -1281,7 +932,7 @@ describe("shape", () => {
           odd: { shape: "record", fields: [["next", { shape: "ref", name: "even" }]] },
         },
       };
-      let value = decode(mutual, ...new Array<bigint>(400).fill(1n))[0];
+      let [value] = decode(mutual, ...new Array<bigint>(400).fill(1n));
       let depth = 0;
       while (value !== undefined) {
         value = (value as Fields).fields[0]?.[1];
@@ -1295,53 +946,8 @@ describe("shape", () => {
         "each pair of definitions counts two nodes",
       );
     });
-  });
 
-  describe("RecordShape", () => {
-    it("decodes its fields in order", ({ seat }) => {
-      const record = {
-        shape: "record",
-        fields: [
-          ["id", UINT8],
-          ["ok", { shape: "bool" }],
-        ],
-      };
-
-      check.isEqualTo(
-        seat,
-        decoded(record, 4n, 1n),
-        canonical(
-          new Fields([
-            ["id", 4n],
-            ["ok", true],
-          ]),
-        ),
-        "an id and a flag",
-      );
-    });
-  });
-
-  describe("EnumShape", () => {
-    const optional = {
-      shape: "enum",
-      variants: [
-        ["none", null],
-        ["some", UINT8],
-      ],
-    };
-
-    it("decodes the payload of the variant that an index chooses", ({ seat }) => {
-      const bare = decode(optional)[0] as Variant;
-
-      check.isEqualTo(
-        seat,
-        [bare.name, bare.hasPayload, decoded(optional, 1n, 9n)],
-        ["none", false, canonical(new Variant("some", 9n))],
-        "a bare variant and a payload",
-      );
-    });
-
-    it("takes its first exit once the budget is used", ({ seat }) => {
+    it("takes the first exit of an enum once the budget is used", ({ seat }) => {
       const nested = {
         shape: "ref",
         name: "node",
@@ -1375,9 +981,7 @@ describe("shape", () => {
         "the leaves end the value",
       );
     });
-  });
 
-  describe("Ref", () => {
     it("decodes a tree through its definition", ({ seat }) => {
       check.isEqualTo(
         seat,
@@ -1399,9 +1003,7 @@ describe("shape", () => {
         "a tree of one child",
       );
     });
-  });
 
-  describe("Root", () => {
     it("stops a tree from growing once its value has used the budget", ({ seat }) => {
       const shape = read(TREE);
       let largest = 0;
@@ -1414,9 +1016,7 @@ describe("shape", () => {
 
       check.isEqualTo(seat, largest, BUDGET, "the largest tree");
     });
-  });
 
-  describe("MapShape", () => {
     it("stops a map that refers back once the budget is used", ({ seat }) => {
       const keyed = {
         shape: "ref",

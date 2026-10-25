@@ -18,13 +18,20 @@
  */
 
 import {
+  DOUBLE,
   floatKey,
   type Key,
   representable,
+  SINGLE,
   sameFloat,
   simplestFloat,
   type Width,
 } from "./float.js";
+
+/** Returns the smaller of two integers. */
+function min(a: bigint, b: bigint): bigint {
+  return a < b ? a : b;
+}
 
 /** The bounds of the signed and the unsigned 64-bit ranges. */
 export const INT64_MIN = -(1n << 63n);
@@ -79,7 +86,9 @@ export class IntegerBounds {
    *   signed nor the unsigned 64-bit range.
    */
   constructor(lo: bigint, hi: bigint) {
-    if (lo > hi) throw new RangeError(`prop: integer bounds [${lo}, ${hi}] are empty`);
+    if (lo > hi) {
+      throw new RangeError(`prop: integer bounds [${lo}, ${hi}] are empty`);
+    }
     const signed = lo >= INT64_MIN && hi <= INT64_MAX;
     const unsigned = lo >= 0n && hi <= UINT64_MAX;
     if (!(signed || unsigned)) {
@@ -89,8 +98,11 @@ export class IntegerBounds {
     }
     this.lo = lo;
     this.hi = hi;
-    if (lo <= 0n && hi >= 0n) this.target = 0n;
-    else this.target = lo > 0n ? lo : hi;
+    if (lo <= 0n && hi >= 0n) {
+      this.target = 0n;
+    } else {
+      this.target = lo > 0n ? lo : hi;
+    }
     this.id = `integer ${lo} ${hi}`;
   }
 
@@ -116,10 +128,12 @@ export class IntegerBounds {
    * @returns The position.
    */
   rank(value: bigint): bigint {
-    const target = this.target;
+    const { target } = this;
     const shorter = min(this.hi - target, target - this.lo);
     const distance = value > target ? value - target : target - value;
-    if (distance > shorter) return shorter + distance;
+    if (distance > shorter) {
+      return shorter + distance;
+    }
     return value > target ? 2n * distance - 1n : 2n * distance;
   }
 
@@ -130,7 +144,7 @@ export class IntegerBounds {
    * @returns The value.
    */
   atRank(rank: bigint): bigint {
-    const target = this.target;
+    const { target } = this;
     const above = this.hi - target;
     const below = target - this.lo;
     const shorter = min(above, below);
@@ -165,11 +179,6 @@ export class IntegerBounds {
   }
 }
 
-/** Returns the smaller of two integers. */
-function min(a: bigint, b: bigint): bigint {
-  return a < b ? a : b;
-}
-
 /**
  * The bounds of a float choice: an inclusive range, NaN and a width. An
  * infinite bound admits that infinity. NaN is a value only when allowNan
@@ -202,7 +211,7 @@ export class FloatBounds {
    *   NaN or no value of the width, and a lo above hi.
    */
   constructor(lo: number, hi: number, allowNan = false, width: Width = 64) {
-    if (width !== 32 && width !== 64) {
+    if (width !== SINGLE && width !== DOUBLE) {
       throw new RangeError(`prop: float width ${width} is neither 32 nor 64`);
     }
     if (Number.isNaN(lo) || Number.isNaN(hi) || lo > hi) {
@@ -242,8 +251,12 @@ export class FloatBounds {
    * @returns True for a value of the bounds.
    */
   admits(value: unknown): value is number {
-    if (typeof value !== "number") return false;
-    if (Number.isNaN(value)) return this.allowNan;
+    if (typeof value !== "number") {
+      return false;
+    }
+    if (Number.isNaN(value)) {
+      return this.allowNan;
+    }
     return value >= this.lo && value <= this.hi && representable(value, this.width);
   }
 
@@ -255,7 +268,9 @@ export class FloatBounds {
    * @returns The value.
    */
   coerce(recorded: Choice): number {
-    if (recorded.kind !== "float" || !this.admits(recorded.value)) return this.target;
+    if (recorded.kind !== "float" || !this.admits(recorded.value)) {
+      return this.target;
+    }
     return Number.isNaN(recorded.value) ? Number.NaN : recorded.value;
   }
 }
@@ -289,7 +304,9 @@ export class SequenceBounds {
    *   below minSize.
    */
   constructor(k: number, minSize = 0, maxSize?: number) {
-    if (k < 1) throw new RangeError(`prop: a sequence with k = ${k} has no element`);
+    if (k < 1) {
+      throw new RangeError(`prop: a sequence with k = ${k} has no element`);
+    }
     if (minSize < 0 || (maxSize !== undefined && maxSize < minSize)) {
       throw new RangeError(`prop: sequence sizes [${minSize}, ${maxSize}] are empty`);
     }
@@ -317,8 +334,12 @@ export class SequenceBounds {
    * @returns True for an array of the sizes whose elements are in [0, k).
    */
   admits(value: unknown): value is readonly number[] {
-    if (!Array.isArray(value) || value.length < this.minSize) return false;
-    if (this.maxSize !== undefined && value.length > this.maxSize) return false;
+    if (!Array.isArray(value) || value.length < this.minSize) {
+      return false;
+    }
+    if (this.maxSize !== undefined && value.length > this.maxSize) {
+      return false;
+    }
     return value.every((e) => Number.isInteger(e) && e >= 0 && e < this.k);
   }
 
@@ -332,11 +353,15 @@ export class SequenceBounds {
    * @returns The value.
    */
   coerce(recorded: Choice): readonly number[] {
-    if (recorded.kind !== "sequence") return this.target;
+    if (recorded.kind !== "sequence") {
+      return this.target;
+    }
     const elements = recorded.value.map((e) => (e >= 0 && e < this.k ? e : 0));
     const kept =
       this.maxSize === undefined ? elements : elements.slice(0, this.maxSize);
-    while (kept.length < this.minSize) kept.push(0);
+    while (kept.length < this.minSize) {
+      kept.push(0);
+    }
     return kept;
   }
 }
@@ -350,7 +375,9 @@ export class SequenceBounds {
  * @returns True for one choice.
  */
 export function sameChoice(a: Choice, b: Choice): boolean {
-  if (a.kind === "float" && b.kind === "float") return sameFloat(a.value, b.value);
+  if (a.kind === "float" && b.kind === "float") {
+    return sameFloat(a.value, b.value);
+  }
   if (a.kind === "sequence" && b.kind === "sequence") {
     return (
       a.value.length === b.value.length && a.value.every((e, i) => e === b.value[i])

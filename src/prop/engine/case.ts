@@ -17,8 +17,10 @@
  * pass.
  */
 
+import type { Provider, Request } from "./case/providers.js";
+import type { Drawn, Mark, Observer, Place, Span, Step, Where } from "./case/record.js";
+import { Failed, Overrun, Rejected, Skipped } from "./case/signals.js";
 import {
-  type Bounds,
   type Choice,
   choiceOf,
   IntegerBounds,
@@ -27,7 +29,14 @@ import {
   type Value,
 } from "./choice.js";
 import * as draw from "./draw.js";
-import type { Source } from "./source.js";
+
+/** Returns what a value counts towards the cap: one, plus each element of a sequence. */
+function cost(value: Value): number {
+  return Array.isArray(value) ? 1 + value.length : 1;
+}
+
+/** The bounds of the values of rand(): the whole unsigned 64-bit range. */
+const RANDOM = new IntegerBounds(0n, UINT64_MAX);
 
 /** The most choices that one case may make. A sequence counts as one choice plus one for each element. */
 export const MAX_CHOICES = 8192;
@@ -42,298 +51,8 @@ export interface Decoder<T = unknown> {
    *
    * @throws Rejected when the choices decode to no value of the domain.
    */
-  [DECODE](c: Case): T;
+  [DECODE]: (c: Case) => T;
 }
-
-/** The signal that ends a case without a verdict. A rejected case is not counted and not shrunk. */
-export class Rejected extends Error {
-  /** Returns the signal. */
-  constructor() {
-    super("prop: the case is rejected");
-    this.name = "Rejected";
-  }
-}
-
-/** The signal of a case that asked for more choices than its cap allows. */
-export class Overrun extends Rejected {}
-
-/**
- * A body's failure, with the identity that the shrinker keeps it by. Two
- * failures are the same failure when their identities are equal.
- */
-export class Failed extends Error {
-  /** The identity of the failure. */
-  readonly identity: string;
-  /** What the case failed with, such as a failure record, for the run's report. */
-  readonly record: unknown;
-
-  /**
-   * Returns the failure of identity.
-   *
-   * @param identity - The identity.
-   * @param record - What the case failed with, or undefined.
-   */
-  constructor(identity: string, record?: unknown) {
-    super(`prop: the case fails as ${identity}`);
-    this.name = "Failed";
-    this.identity = identity;
-    this.record = record;
-  }
-}
-
-/**
- * The signal of a case that skips the run of its property. Before the run
- * finds a failing case, the run ends as skipped with the reason. After it,
- * the case counts as a case that does not fail.
- */
-export class Skipped extends Error {
-  /** Why the case skips. */
-  readonly reason: string;
-
-  /**
-   * Returns the skip of reason.
-   *
-   * @param reason - Why the case skips.
-   */
-  constructor(reason: string) {
-    super(`prop: the case skips the run: ${reason}`);
-    this.name = "Skipped";
-    this.reason = reason;
-  }
-}
-
-/**
- * One choice that a generator asks for. draw generates the value from a
- * source. A choice that decides the structure of what its generator
- * returns, such as a collection's continue flag or a one-of's index, states
- * edge: the value that the edge phase gives it. reuse marks a value of the
- * integer and duration generators, which a generated case may take from an
- * earlier choice with the same bounds.
- */
-export interface Request {
-  /** The bounds of the choice. */
-  readonly bounds: Bounds;
-  /** Draws the value from a source. */
-  readonly draw: (source: Source) => Value;
-  /** The value that the edge phase gives a structure choice, or undefined for a value choice. */
-  readonly edge?: bigint | undefined;
-  /** Whether a generated case may take the value of an earlier choice with the same bounds. */
-  readonly reuse?: boolean | undefined;
-}
-
-/** Where a case's values come from. */
-export interface Provider {
-  /** Returns the value for the request at index of the case. */
-  value(request: Request, index: number): Value;
-  /** Prepares the values of the draw of generator under label, for a provider that serves a trace. */
-  drawing?(generator: Decoder, label: string): void;
-  /** Returns the value of the next draw, for a provider that states the values of the draws. */
-  valued?(): { readonly value: unknown } | undefined;
-}
-
-/** What watches each choice as the case records it: the case tree. */
-export interface Observer {
-  /** Takes the choice at index, or throws a signal that ends the body. */
-  step(index: number, request: Request, value: Value): void;
-}
-
-/** One step that a machine took: its action's name, and where it ran. */
-export interface Step {
-  /** The action's name. */
-  readonly action: string;
-  /** The client of a step of a concurrent section. */
-  readonly client?: number | undefined;
-  /** Whether the step is a step of the drain. */
-  readonly drain?: boolean | undefined;
-}
-
-/**
- * The part of a machine's steps that was running, and its step. part is
- * swarm, setup, sequential, concurrent, drain or settle. position is the
- * step's position in its part, and action the step's action.
- */
-export interface Place {
-  /** The part. */
-  readonly part: string;
-  /** The step's position in its part, from 0. */
-  readonly position?: number | undefined;
-  /** The swarm choice's action or the step's action. */
-  readonly action?: string | undefined;
-}
-
-/** Where a case made a request or observed a fingerprint. */
-export interface Where {
-  /** The label of the innermost draw that was running. */
-  readonly label?: string | undefined;
-  /** The machine's part and step. */
-  readonly place?: Place | undefined;
-}
-
-/**
- * A provider that draws every value from a random source.
- *
- * A request marked reuse, whose bounds admit more than one value and match
- * the bounds of an earlier reuse request of the same case, first takes
- * `coin(1, 4)`. When it comes up, the value is one of the earlier values
- * with those bounds, chosen with `below(their count)`. Otherwise the
- * request draws as usual. The earlier values are those of the choices that
- * the case's record still contains, so a filter's next attempt never
- * reuses a rejected one.
- */
-export class Generating implements Provider {
-  readonly #source: Source;
-  readonly #earlier = new Map<string, [index: number, value: Value][]>();
-
-  /**
-   * Returns the provider that draws from source.
-   *
-   * @param source - The case's source.
-   */
-  constructor(source: Source) {
-    this.#source = source;
-  }
-
-  /**
-   * Returns the request's draw from the source, or an earlier value.
-   *
-   * @param request - The request.
-   * @param index - The number of choices in the case's record.
-   * @returns The value.
-   */
-  value(request: Request, index: number): Value {
-    for (const kept of this.#earlier.values()) {
-      while (kept.length > 0 && (kept.at(-1) as [number, Value])[0] >= index)
-        kept.pop();
-    }
-    const bounds = request.bounds;
-    const forced = bounds.kind === "integer" && bounds.lo === bounds.hi;
-    if (request.reuse !== true || forced) return request.draw(this.#source);
-    let earlier = this.#earlier.get(bounds.id);
-    if (earlier === undefined) {
-      earlier = [];
-      this.#earlier.set(bounds.id, earlier);
-    }
-    let value: Value;
-    if (earlier.length > 0 && this.#source.coin(1n, draw.REUSE_ODDS)) {
-      const at = Number(this.#source.below(BigInt(earlier.length)));
-      value = (earlier[at] as [number, Value])[1];
-    } else {
-      value = request.draw(this.#source);
-    }
-    earlier.push([index, value]);
-    return value;
-  }
-}
-
-/**
- * A provider that reads recorded choices back, in order. A recorded choice
- * that does not fit the request is coerced by the request's bounds, and a
- * request past the last recorded choice takes the target of its bounds.
- */
-export class Replaying implements Provider {
-  readonly #choices: readonly Choice[];
-
-  /**
-   * Returns the provider that replays choices.
-   *
-   * @param choices - The recorded choices.
-   */
-  constructor(choices: readonly Choice[]) {
-    this.#choices = choices;
-  }
-
-  /**
-   * Returns the recorded value at index, fitted to the request.
-   *
-   * @param request - The request.
-   * @param index - The number of choices in the case's record.
-   * @returns The value.
-   */
-  value(request: Request, index: number): Value {
-    const recorded = this.#choices[index];
-    return recorded === undefined
-      ? request.bounds.target
-      : request.bounds.coerce(recorded);
-  }
-}
-
-/**
- * A provider that states the values of a case's draws, in order. A draw
- * takes the next value without a choice. A draw past the last value
- * decodes, and every request takes the target of its bounds, as a replay
- * that runs out of choices does.
- */
-export class Valuing implements Provider {
-  readonly #values: readonly unknown[];
-  #at = 0;
-
-  /**
-   * Returns the provider that states values for the draws.
-   *
-   * @param values - The values of the draws, from the first.
-   */
-  constructor(values: readonly unknown[]) {
-    this.#values = values;
-  }
-
-  /**
-   * Returns the target of the request, which no stated value serves.
-   *
-   * @param request - The request.
-   * @returns The target.
-   */
-  value(request: Request): Value {
-    return request.bounds.target;
-  }
-
-  /** Returns the next stated value, or undefined when none is left. */
-  valued(): { readonly value: unknown } | undefined {
-    if (this.#at === this.#values.length) return undefined;
-    this.#at += 1;
-    return { value: this.#values[this.#at - 1] };
-  }
-}
-
-/** The choices that one generator, element or entry made: [start, end). */
-export interface Span {
-  /** The generator's id, `element` or `entry`. */
-  readonly label: string;
-  /** The first choice. */
-  readonly start: number;
-  /** The choice after the last. */
-  end: number;
-  /** The spans that were open when this one opened. */
-  readonly depth: number;
-  /** The index of the span that was open when this one opened, or undefined. */
-  readonly parent: number | undefined;
-}
-
-/** One value that a body drew: its label, its generator and the index of that generator's span. */
-export interface Drawn {
-  /** The draw's label. */
-  readonly label: string;
-  /** The value. */
-  readonly value: unknown;
-  /** The index of the first span that the generator opened. */
-  readonly span: number;
-  /** The generator. */
-  readonly generator: Decoder;
-}
-
-/** A point of a case's record, as the lengths of its choices, spans and draws. */
-export interface Mark {
-  readonly choices: number;
-  readonly spans: number;
-  readonly draws: number;
-}
-
-/** Returns what a value counts towards the cap: one, plus each element of a sequence. */
-function cost(value: Value): number {
-  return Array.isArray(value) ? 1 + value.length : 1;
-}
-
-/** The bounds of the values of rand(): the whole unsigned 64-bit range. */
-const RANDOM = new IntegerBounds(0n, UINT64_MAX);
 
 /**
  * The record of one call of a body. wheres states where the case made each
@@ -405,7 +124,7 @@ export class Case {
    * @throws Overrun when the value takes the case past its cap.
    */
   choose(request: Request): Value {
-    const bounds = request.bounds;
+    const { bounds } = request;
     if (
       bounds.kind === "sequence" &&
       this.#cost + 1 + bounds.minSize > this.#maxChoices
@@ -414,7 +133,9 @@ export class Case {
     }
     const value = this.#provider.value(request, this.choices.length);
     this.#cost += cost(value);
-    if (this.#cost > this.#maxChoices) throw new Overrun();
+    if (this.#cost > this.#maxChoices) {
+      throw new Overrun();
+    }
     this.choices.push(choiceOf(bounds, value));
     this.requests.push(request);
     this.wheres.push(this.where());
@@ -579,7 +300,9 @@ export class Case {
    * @throws Rejected when condition is false.
    */
   assume(condition: boolean): void {
-    if (!condition) throw new Rejected();
+    if (!condition) {
+      throw new Rejected();
+    }
   }
 
   /**
@@ -619,7 +342,9 @@ export class Case {
    */
   target(label: string, score: number): void {
     const best = this.targets.get(label);
-    if (best === undefined || score > best) this.targets.set(label, score);
+    if (best === undefined || score > best) {
+      this.targets.set(label, score);
+    }
   }
 
   /** Returns an integer choice over the whole unsigned 64-bit range. */

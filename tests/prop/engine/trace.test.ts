@@ -5,7 +5,8 @@
 
 import { describe } from "vitest";
 import { check } from "../../../src/index.js";
-import { Case, Replaying } from "../../../src/prop/engine/case.js";
+import { Replaying } from "../../../src/prop/engine/case/providers.js";
+import { Case } from "../../../src/prop/engine/case.js";
 import { IntegerBounds } from "../../../src/prop/engine/choice.js";
 import { Integer, Mapped, Optional } from "../../../src/prop/engine/generator.js";
 import {

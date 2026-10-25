@@ -5,9 +5,10 @@
 
 import { describe } from "vitest";
 import { check } from "../../../src/index.js";
-import { PatternError } from "../../../src/pattern/parse.js";
+import { PatternError } from "../../../src/pattern/cursor.js";
 import { SIZE } from "../../../src/prop/engine/alphabet.js";
-import { Case, DECODE, Generating, Replaying } from "../../../src/prop/engine/case.js";
+import { Generating, Replaying } from "../../../src/prop/engine/case/providers.js";
+import { Case, DECODE } from "../../../src/prop/engine/case.js";
 import { Sizes } from "../../../src/prop/engine/collection.js";
 import { Matching } from "../../../src/prop/engine/generator.js";
 import {

@@ -14,19 +14,57 @@
  * on one worker makes them.
  */
 
-import {
-  Case,
-  Failed,
-  Overrun,
-  type Place,
-  type Provider,
-  Rejected,
-  Skipped,
-  type Where,
-} from "./case.js";
+import type { Provider } from "./case/providers.js";
+import type { Place, Where } from "./case/record.js";
+import { Failed, Overrun, Rejected, Skipped } from "./case/signals.js";
+import { Case } from "./case.js";
 import type { Bounds } from "./choice.js";
 import { Diverged, type Ending, Repeated, type Tree } from "./tree.js";
 import type { Work } from "./work.js";
+
+/**
+ * Returns the tree's divergence as a request divergence of c. A request that
+ * diverged is the case's last recorded request, and the divergence takes
+ * its label and step. A case that ended where an earlier case made a
+ * request made no request there.
+ */
+function divergenceOf(diverged: Diverged, c: Case): Divergence {
+  const where: Where =
+    diverged.requested === undefined ? {} : (c.wheres[diverged.index] as Where);
+  return {
+    what: "request",
+    index: diverged.index,
+    recorded: diverged.recorded,
+    replayed: diverged.requested,
+    label: where.label,
+    step: where.place,
+  };
+}
+
+/**
+ * Returns the execution of a case that a signal ended before the case tree
+ * takes its leaf: a repeat, a divergence, an overrun and a skip. A
+ * rejection and a failure return undefined, and the case ends at its leaf.
+ * Any other error passes through.
+ */
+function earlyEnd(err: unknown, c: Case): Execution | undefined {
+  if (err instanceof Repeated) {
+    return { case: c, status: "repeated" };
+  }
+  if (err instanceof Diverged) {
+    return { case: c, status: "diverged", divergence: divergenceOf(err, c) };
+  }
+  if (err instanceof Overrun) {
+    return { case: c, status: "rejected" };
+  }
+  if (err instanceof Skipped) {
+    return { case: c, status: "skipped", reason: err.reason };
+  }
+  if (err instanceof Rejected || err instanceof Failed) {
+    return undefined;
+  }
+  throw err;
+}
 
 /**
  * A body: it receives the case, draws from it, and fails it or returns. A
@@ -124,25 +162,8 @@ export function identityOf(execution: Execution): string | undefined {
 export type Observer = (phase: Phase, execution: Execution) => void;
 
 /** Sees nothing, as a run that nobody records. */
-export function unobserved(): void {}
-
-/**
- * Returns the tree's divergence as a request divergence of c. A request that
- * diverged is the case's last recorded request, and the divergence takes
- * its label and step. A case that ended where an earlier case made a
- * request made no request there.
- */
-function divergenceOf(diverged: Diverged, c: Case): Divergence {
-  const where: Where =
-    diverged.requested === undefined ? {} : (c.wheres[diverged.index] as Where);
-  return {
-    what: "request",
-    index: diverged.index,
-    recorded: diverged.recorded,
-    replayed: diverged.requested,
-    label: where.label,
-    step: where.place,
-  };
+export function unobserved(): void {
+  // A run that nobody records keeps no call of its body.
 }
 
 /**
@@ -169,23 +190,17 @@ export function* execute(
   let failure: Failed | undefined;
   try {
     const work = body(c);
-    if (work !== undefined) yield* work;
+    if (work !== undefined) {
+      yield* work;
+    }
     ending = "passed";
   } catch (err) {
-    if (err instanceof Repeated) return { case: c, status: "repeated" };
-    if (err instanceof Diverged) {
-      return { case: c, status: "diverged", divergence: divergenceOf(err, c) };
+    const early = earlyEnd(err, c);
+    if (early !== undefined) {
+      return early;
     }
-    if (err instanceof Overrun) return { case: c, status: "rejected" };
-    if (err instanceof Skipped)
-      return { case: c, status: "skipped", reason: err.reason };
-    if (err instanceof Rejected) ending = "rejected";
-    else if (err instanceof Failed) {
-      ending = "failed";
-      failure = err;
-    } else {
-      throw err;
-    }
+    failure = err instanceof Failed ? err : undefined;
+    ending = failure === undefined ? "rejected" : "failed";
   }
   try {
     walker?.end(ending);
