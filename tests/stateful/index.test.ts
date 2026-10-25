@@ -5,6 +5,7 @@
 
 import { describe } from "vitest";
 import { check } from "../../src/index.js";
+import { compareText } from "../../src/order.js";
 import * as stateful from "../../src/stateful/index.js";
 import { test as it } from "../../src/vitest.js";
 
@@ -14,7 +15,7 @@ describe("index", () => {
   }) => {
     check.isEqualTo(
       seat,
-      Object.keys(stateful).sort(),
+      Object.keys(stateful).sort(compareText),
       [
         "Scheduler",
         "clients",

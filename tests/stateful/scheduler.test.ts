@@ -9,7 +9,7 @@
 
 import { describe } from "vitest";
 import { check } from "../../src/index.js";
-import { Generating } from "../../src/prop/engine/case.js";
+import { Generating } from "../../src/prop/engine/case/providers.js";
 import { IntegerBounds, UINT64_MAX } from "../../src/prop/engine/choice.js";
 import { Source } from "../../src/prop/engine/source.js";
 import { Scheduler } from "../../src/stateful/scheduler.js";
@@ -28,7 +28,9 @@ function task(scheduler: Scheduler, log: string[], name: string, parts: number) 
   return async () => {
     for (let part = 1; part <= parts; part += 1) {
       log.push(`${name}${part}`);
-      if (part < parts) await scheduler.yield();
+      if (part < parts) {
+        await scheduler.yield();
+      }
     }
   };
 }
@@ -163,8 +165,9 @@ describe("scheduler", () => {
         const { c, engine } = bodyCase(new Generating(new Source(seed)));
         const twin = new Source(seed);
         const scheduler = new Scheduler(c, uniform());
-        for (const name of ["a", "b", "c"])
+        for (const name of ["a", "b", "c"]) {
           scheduler.spawn(task(scheduler, [], name, 1));
+        }
         await scheduler.run();
         got.push(engine.choices.map((choice) => choice.value as bigint));
         want.push([twin.below(3n), twin.below(2n), 0n]);
@@ -322,8 +325,9 @@ describe("scheduler", () => {
 
     it("drops the task of a later change point lower still", async ({ seat }) => {
       const { scheduler, log } = started(pct(3), 9, 8, 7, 1, 0, 1, 1);
-      for (const name of ["a", "b", "c"])
+      for (const name of ["a", "b", "c"]) {
         scheduler.spawn(task(scheduler, log, name, 2));
+      }
       await scheduler.run();
 
       check.isEqualTo(

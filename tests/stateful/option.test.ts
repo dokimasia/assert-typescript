@@ -5,7 +5,8 @@
 
 import { describe } from "vitest";
 import { check } from "../../src/index.js";
-import { Case as Engine, Replaying } from "../../src/prop/engine/case.js";
+import { Replaying } from "../../src/prop/engine/case/providers.js";
+import { Case as Engine } from "../../src/prop/engine/case.js";
 import type { Seat } from "../../src/seat.js";
 import {
   clients,

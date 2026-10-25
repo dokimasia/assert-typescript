@@ -7,6 +7,23 @@
 
 import { Scheduler } from "./scheduler.js";
 
+/** The settings of a run that no option states, which the definition fixes. */
+const DEFAULTS: Config = {
+  mean: 30,
+  max: 100,
+  swarm: true,
+  clients: 1,
+  concurrent: 16,
+  scheduler: undefined,
+};
+
+/** Throws a RangeError for an n that is no integer of least or more. */
+function atLeast(call: string, n: number, least: number): void {
+  if (!Number.isSafeInteger(n) || n < least) {
+    throw new RangeError(`stateful: ${call}(${n}) is no integer of ${least} or more`);
+  }
+}
+
 /** What the options of one run of steps state. */
 export interface Config {
   /** The mean number of sequential steps. */
@@ -27,23 +44,6 @@ export interface Config {
 export interface Option {
   /** Returns the settings with the option's setting applied. */
   readonly set: (config: Config) => Config;
-}
-
-/** The settings of a run that no option states, which the definition fixes. */
-const DEFAULTS: Config = {
-  mean: 30,
-  max: 100,
-  swarm: true,
-  clients: 1,
-  concurrent: 16,
-  scheduler: undefined,
-};
-
-/** Throws a RangeError for an n that is no integer of least or more. */
-function atLeast(call: string, n: number, least: number): void {
-  if (!Number.isSafeInteger(n) || n < least) {
-    throw new RangeError(`stateful: ${call}(${n}) is no integer of ${least} or more`);
-  }
 }
 
 /**
@@ -136,6 +136,8 @@ export function tasks(scheduler: Scheduler): Option {
  */
 export function configure(options: readonly Option[]): Config {
   let config = DEFAULTS;
-  for (const option of options) config = option.set(config);
+  for (const option of options) {
+    config = option.set(config);
+  }
   return config;
 }

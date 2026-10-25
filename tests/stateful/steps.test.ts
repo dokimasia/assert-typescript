@@ -17,7 +17,8 @@ import {
 } from "../../src/history/spec.js";
 import { check } from "../../src/index.js";
 import type { Case, Failing } from "../../src/prop/case.js";
-import { Failed, Generating } from "../../src/prop/engine/case.js";
+import { Generating } from "../../src/prop/engine/case/providers.js";
+import { Failed } from "../../src/prop/engine/case/signals.js";
 import { IntegerBounds } from "../../src/prop/engine/choice.js";
 import { Integer } from "../../src/prop/engine/generator.js";
 import { Source } from "../../src/prop/engine/source.js";
@@ -59,7 +60,7 @@ class Log {
 
   /** Returns an action that records a call of its name, and logs its input and its run. */
   action(name: string, shape: Shape = {}): Action<unknown> {
-    const enabled = shape.enabled;
+    const { enabled } = shape;
     return {
       name,
       weight: shape.weight,
@@ -134,7 +135,9 @@ function section(c: Case, ...more: Option[]): Option[] {
  */
 function meanSteps(twin: Source, most: number): [number, IntegerBounds] {
   let taken = 0;
-  while (taken < most && twin.coin(3n, 4n)) taken += 1;
+  while (taken < most && twin.coin(3n, 4n)) {
+    taken += 1;
+  }
   return [taken, taken === most ? ONE : BINARY];
 }
 
@@ -681,7 +684,9 @@ describe("steps", () => {
         const twin = new Source(seed);
         await steps(c, { actions: [new Log().action("a")] }, ...section(c));
         const listed: bigint[] = [];
-        while (listed.length < 16 && twin.coin(5n, 6n)) listed.push(twin.below(3n));
+        while (listed.length < 16 && twin.coin(5n, 6n)) {
+          listed.push(twin.below(3n));
+        }
         got.push(engine.steps.map(([, step]) => step.client));
         want.push(listed.map(Number));
       }
@@ -1139,7 +1144,7 @@ describe("steps", () => {
       const { c, engine } = bodyCase(replaying(0, 1, 1, 0, 0, 0));
       await steps(
         c,
-        { actions: [{ name: "a", run: (c) => c.observe(9n) }] },
+        { actions: [{ name: "a", run: (one) => one.observe(9n) }] },
         ...section(c),
       );
       const listed = { label: undefined, place: { part: "concurrent", position: 0 } };

@@ -56,7 +56,7 @@ export class Scheduler {
   readonly #ready: Task[] = [];
   /** The level of the task that the last change point lowered. */
   #lowest = 0;
-  #running = false;
+  #running: boolean;
   /** The released task, and undefined while no task is released. */
   #current: Task | undefined;
   /** Ends the turn of the released task, and undefined once the turn has ended. */
@@ -73,6 +73,7 @@ export class Scheduler {
   constructor(c: Case, strategy: Strategy) {
     this.#case = c;
     this.#strategy = strategy;
+    this.#running = false;
   }
 
   /**
@@ -106,7 +107,9 @@ export class Scheduler {
    */
   yield(): Promise<void> {
     const task = this.#current;
-    if (task === undefined) return Promise.resolve();
+    if (task === undefined) {
+      return Promise.resolve();
+    }
     const end = this.#end;
     if (end === undefined) {
       throw new Error("stateful: a task called yield() again in one turn");
@@ -137,11 +140,14 @@ export class Scheduler {
       for (let release = 0n; this.#ready.length > 0; release += 1n) {
         const task = this.#next();
         for (const point of points) {
-          if (point !== release) continue;
-          this.#lowest -= 1;
-          task.level = this.#lowest;
+          if (point === release) {
+            this.#lowest -= 1;
+            task.level = this.#lowest;
+          }
         }
-        if ((await this.#release(task)) === "yielded") this.#ready.push(task);
+        if ((await this.#release(task)) === "yielded") {
+          this.#ready.push(task);
+        }
         const raised = this.#raised;
         if (raised !== undefined) {
           this.#raised = undefined;
@@ -159,7 +165,9 @@ export class Scheduler {
     return onEngine(this.#case, (e) => {
       const points: bigint[] = [];
       for (let i = 1; i < this.#strategy.depth; i += 1) {
-        if (e.integer(PRESENCE, 1n) === 1n) points.push(e.integer(UNSIGNED));
+        if (e.integer(PRESENCE, 1n) === 1n) {
+          points.push(e.integer(UNSIGNED));
+        }
       }
       return points;
     });
