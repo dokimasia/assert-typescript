@@ -5,6 +5,7 @@
 
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import process from "node:process";
 import { describe, onTestFinished } from "vitest";
 import * as golden from "../src/golden.js";
 import { check, files, type Seat } from "../src/index.js";

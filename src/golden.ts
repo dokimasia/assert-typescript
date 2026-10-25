@@ -19,6 +19,7 @@
 
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import process from "node:process";
 import { callSite } from "./failure.js";
 import { differing } from "./files/difference.js";
 import { type Entry, withText } from "./files/entry.js";
