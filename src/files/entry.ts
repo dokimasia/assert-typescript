@@ -8,14 +8,8 @@
 
 import { isUtf8 } from "node:buffer";
 
-/** The kind of an entry, as a record states it. */
-export type Kind = "file" | "directory" | "link";
-
-/** The nine permission bits: read, write and execute for the owner, the group and others. */
-export const PERMISSIONS = 0o777;
-
-/** The permission bit that lets the owner execute a file. */
-export const OWNER_EXECUTE = 0o100;
+/** The radix of the text of a mode. */
+const OCTAL = 8;
 
 /** The fields that state the kind of an entry, each with the kind that it states. */
 const KINDS = [
@@ -24,6 +18,44 @@ const KINDS = [
   ["directory", "directory"],
   ["link", "link"],
 ] as const;
+
+/** Returns an entry of fields. */
+function entry(fields: object): Entry {
+  return Object.assign(new Entry(), fields);
+}
+
+/** Returns the fields of e that state its kind and its content or target. */
+function partsOf(e: Entry): object {
+  return Object.fromEntries(
+    Object.entries(e).filter(([field]) => field !== "executable" && field !== "mode"),
+  );
+}
+
+/** Returns content, which the call named call states, after it checks that UTF-8 encodes it. */
+function wellFormed(call: string, content: string): string {
+  if (!content.isWellFormed()) {
+    throw new RangeError(
+      `files: ${call} states a string with a lone surrogate, which UTF-8 cannot encode`,
+    );
+  }
+  return content;
+}
+
+/** Returns the fields of a file of content: text when it is UTF-8 text, and a copy of the bytes otherwise. */
+function contentFields(content: Uint8Array): { text: string } | { bytes: Uint8Array } {
+  return isUtf8(content)
+    ? { text: Buffer.from(content).toString("utf8") }
+    : { bytes: Uint8Array.from(content) };
+}
+
+/** The kind of an entry, as a record states it. */
+export type Kind = "file" | "directory" | "link";
+
+/** The nine permission bits: read, write and execute for the owner, the group and others. */
+export const PERMISSIONS = 0o777;
+
+/** The permission bit that lets the owner execute a file. */
+export const OWNER_EXECUTE = 0o100;
 
 /**
  * A file, a directory or a symbolic link of a tree.
@@ -79,35 +111,6 @@ export class Entry {
     }
     return entry({ ...partsOf(this), mode });
   }
-}
-
-/** Returns an entry of fields. */
-function entry(fields: object): Entry {
-  return Object.assign(new Entry(), fields);
-}
-
-/** Returns the fields of e that state its kind and its content or target. */
-function partsOf(e: Entry): object {
-  return Object.fromEntries(
-    Object.entries(e).filter(([field]) => field !== "executable" && field !== "mode"),
-  );
-}
-
-/** Returns content, which the call named call states, after it checks that UTF-8 encodes it. */
-function wellFormed(call: string, content: string): string {
-  if (!content.isWellFormed()) {
-    throw new RangeError(
-      `files: ${call} states a string with a lone surrogate, which UTF-8 cannot encode`,
-    );
-  }
-  return content;
-}
-
-/** Returns the fields of a file of content: text when it is UTF-8 text, and a copy of the bytes otherwise. */
-function contentFields(content: Uint8Array): { text: string } | { bytes: Uint8Array } {
-  return isUtf8(content)
-    ? { text: Buffer.from(content).toString("utf8") }
-    : { bytes: Uint8Array.from(content) };
 }
 
 /**
@@ -200,7 +203,9 @@ export function withText(e: Entry, content: string): Entry {
  * @returns The kind, or undefined.
  */
 export function kindOf(value: unknown): Kind | undefined {
-  if (!(value instanceof Entry)) return undefined;
+  if (!(value instanceof Entry)) {
+    return undefined;
+  }
   const stated = KINDS.filter(([field]) => value[field] !== undefined);
   return stated.length === 1 ? (stated[0] as (typeof KINDS)[number])[1] : undefined;
 }
@@ -223,7 +228,9 @@ export function isPermissions(mode: number): boolean {
  * @returns The text.
  */
 export function modeText(mode: number): string {
-  return Number.isInteger(mode) && mode >= 0 ? `0o${mode.toString(8)}` : String(mode);
+  return Number.isInteger(mode) && mode >= 0
+    ? `0o${mode.toString(OCTAL)}`
+    : String(mode);
 }
 
 /**

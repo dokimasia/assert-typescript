@@ -31,7 +31,7 @@ function compareRead(
   dir: string,
   want: Tree,
   msg: string,
-  contains: boolean,
+  partial: boolean,
 ): void {
   seat.helper();
   const running = Running.of(seat);
@@ -48,8 +48,53 @@ function compareRead(
     running,
     assertion,
     msg,
-    comparison(wanted, read, differing(wanted, read, contains)),
+    comparison(wanted, read, differing(wanted, read, partial)),
     callSite(),
+  );
+}
+
+/** Returns the tree in dir, or undefined after the call ended with a fault. */
+function readOrEnd(
+  running: Running,
+  dir: string,
+  msg: string,
+): Map<string, Entry> | undefined {
+  try {
+    return readTree(dir, true);
+  } catch (err) {
+    running.fault(
+      Mode.Fatal,
+      "tree-unchanged",
+      msg,
+      ofOperation("files.unchanged", err),
+    );
+    return undefined;
+  }
+}
+
+/** Calls fn between two readings of the tree in dir, and reports the verdict. */
+async function around(
+  running: Running,
+  dir: string,
+  fn: () => unknown,
+  msg: string,
+  where: Where | undefined,
+): Promise<void> {
+  const before = readOrEnd(running, dir, msg);
+  if (before === undefined) {
+    return;
+  }
+  await fn();
+  const after = readOrEnd(running, dir, msg);
+  if (after === undefined) {
+    return;
+  }
+  report(
+    running,
+    "tree-unchanged",
+    msg,
+    comparison(before, after, differing(before, after, false)),
+    where,
   );
 }
 
@@ -97,47 +142,6 @@ export function equal(seat: Seat, dir: string, want: Tree, msg: string): void {
 export function contains(seat: Seat, dir: string, want: Tree, msg: string): void {
   seat.helper();
   compareRead(seat, "files.contains", "tree-contains", dir, want, msg, true);
-}
-
-/** Returns the tree in dir, or undefined after the call ended with a fault. */
-function readOrEnd(
-  running: Running,
-  dir: string,
-  msg: string,
-): Map<string, Entry> | undefined {
-  try {
-    return readTree(dir, true);
-  } catch (err) {
-    running.fault(
-      Mode.Fatal,
-      "tree-unchanged",
-      msg,
-      ofOperation("files.unchanged", err),
-    );
-    return undefined;
-  }
-}
-
-/** Calls fn between two readings of the tree in dir, and reports the verdict. */
-async function around(
-  running: Running,
-  dir: string,
-  fn: () => unknown,
-  msg: string,
-  where: Where | undefined,
-): Promise<void> {
-  const before = readOrEnd(running, dir, msg);
-  if (before === undefined) return;
-  await fn();
-  const after = readOrEnd(running, dir, msg);
-  if (after === undefined) return;
-  report(
-    running,
-    "tree-unchanged",
-    msg,
-    comparison(before, after, differing(before, after, false)),
-    where,
-  );
 }
 
 /**

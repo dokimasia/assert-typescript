@@ -25,7 +25,9 @@ import { full, pathsOf } from "./tree.js";
 
 /** Returns the permission bits that a comparison reads of an entry where w is wanted. */
 function compared(w: Entry): number {
-  if (w.mode !== undefined) return PERMISSIONS & HOST.recordedBits;
+  if (w.mode !== undefined) {
+    return PERMISSIONS & HOST.recordedBits;
+  }
   return kindOf(w) === "file" ? OWNER_EXECUTE & HOST.recordedBits : 0;
 }
 
@@ -38,7 +40,9 @@ function compared(w: Entry): number {
  * @returns True when the two differ.
  */
 export function differs(w: Entry, g: Entry | undefined): boolean {
-  if (g === undefined || kindOf(w) !== kindOf(g)) return true;
+  if (g === undefined || kindOf(w) !== kindOf(g)) {
+    return true;
+  }
   return (
     !Buffer.from(contentOf(w)).equals(contentOf(g)) ||
     w.link !== g.link ||
@@ -66,6 +70,8 @@ export function differing(
   const out = [...wanted.keys()].filter((path) =>
     differs(wanted.get(path) as Entry, got.get(path)),
   );
-  if (!contains) out.push(...[...got.keys()].filter((path) => !wanted.has(path)));
+  if (!contains) {
+    out.push(...[...got.keys()].filter((path) => !wanted.has(path)));
+  }
   return pathsOf(out);
 }

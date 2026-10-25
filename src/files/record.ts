@@ -22,6 +22,15 @@ import { type Entry, unstated } from "./entry.js";
 import { CONTENT_LIMIT, encode } from "./literal.js";
 import { full, pathsOf, treeOf } from "./tree.js";
 
+/**
+ * Returns read, an entry read where w is wanted, as the comparison read
+ * it: with its mode where both state one, and otherwise with the owner's
+ * execute bit of a file alone.
+ */
+function asCompared(read: Entry, w: Entry | undefined): Entry {
+  return read.mode !== undefined && w?.mode !== undefined ? read : unstated(read);
+}
+
 /** The most paths that a record lists. */
 export const MAX_PATHS = 64;
 
@@ -33,15 +42,6 @@ export interface Comparison {
   readonly got: ReadonlyMap<string, Entry>;
   /** The number of paths that differ. */
   readonly differences: number;
-}
-
-/**
- * Returns read, an entry read where w is wanted, as the comparison read
- * it: with its mode where both state one, and otherwise with the owner's
- * execute bit of a file alone.
- */
-function asCompared(read: Entry, w: Entry | undefined): Entry {
-  return read.mode !== undefined && w?.mode !== undefined ? read : unstated(read);
 }
 
 /**
@@ -58,15 +58,21 @@ export function comparison(
   got: ReadonlyMap<string, Entry>,
   paths: readonly string[],
 ): Comparison | undefined {
-  if (paths.length === 0) return undefined;
+  if (paths.length === 0) {
+    return undefined;
+  }
   const wanted = full(want);
   const listed = paths.slice(0, MAX_PATHS);
   const record = { want: new Map<string, Entry>(), got: new Map<string, Entry>() };
   for (const path of listed) {
     const w = wanted.get(path);
     const g = got.get(path);
-    if (w !== undefined) record.want.set(path, w);
-    if (g !== undefined) record.got.set(path, asCompared(g, w));
+    if (w !== undefined) {
+      record.want.set(path, w);
+    }
+    if (g !== undefined) {
+      record.got.set(path, asCompared(g, w));
+    }
   }
   return { ...record, differences: paths.length };
 }
@@ -109,7 +115,7 @@ export function report(
     running.pass(Mode.Fatal, assertion, contract);
     return;
   }
-  const want = record.want;
+  const { want } = record;
   const failure = new Failure(
     assertion,
     contract,

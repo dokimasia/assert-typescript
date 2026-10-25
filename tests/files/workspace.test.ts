@@ -27,7 +27,9 @@ class Cleaning extends Recorder implements Cleanups {
 
   /** Runs the cleanups, the last registered first. */
   end(): void {
-    for (const fn of [...this.cleanups].reverse()) fn();
+    for (const fn of [...this.cleanups].reverse()) {
+      fn();
+    }
   }
 }
 
@@ -88,8 +90,11 @@ describe("workspace", () => {
         const before = process.env["TMPDIR"];
         process.env["TMPDIR"] = join(temporary(), "missing");
         onTestFinished(() => {
-          if (before === undefined) Reflect.deleteProperty(process.env, "TMPDIR");
-          else process.env["TMPDIR"] = before;
+          if (before === undefined) {
+            Reflect.deleteProperty(process.env, "TMPDIR");
+          } else {
+            process.env["TMPDIR"] = before;
+          }
         });
         const cleaning = new Cleaning();
         const dir = workspace(cleaning, {});

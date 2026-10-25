@@ -8,6 +8,41 @@
 import { Fault } from "../matcher/fault.js";
 import { directory, type Entry, kindOf } from "./entry.js";
 
+/** A backslash or NUL, which no name of a path contains. */
+const FORBIDDEN_IN_NAME = /[\\\0]/;
+
+/** Reports whether target is UTF-8 text without NUL that is not empty. */
+function isTarget(target: string): boolean {
+  return target !== "" && !target.includes("\0") && target.isWellFormed();
+}
+
+/** Returns why the entry at path breaks a rule of a tree, or undefined. */
+function entryFault(
+  tree: ReadonlyMap<string, unknown>,
+  path: string,
+): string | undefined {
+  const fault = pathFault(path);
+  if (fault !== undefined) {
+    return fault;
+  }
+  const e = tree.get(path);
+  const kind = kindOf(e);
+  if (kind === undefined) {
+    return "the entry states no file, directory or link";
+  }
+  const target = (e as Entry).link as string;
+  if (kind === "link" && !isTarget(target)) {
+    return `the link to ${JSON.stringify(target)} states no target of UTF-8 text without NUL`;
+  }
+  for (const parent of parentsOf(path)) {
+    const above = kindOf(tree.get(parent));
+    if (above === "file" || above === "link") {
+      return `the entry is below ${JSON.stringify(parent)}, which is a ${above}`;
+    }
+  }
+  return undefined;
+}
+
 /**
  * A tree of files: each entry at its path, relative to the tree's root and
  * separated by slashes. A path is one or more names, none of them empty,
@@ -66,41 +101,17 @@ export function parentsOf(path: string): string[] {
  * @returns The reason, or undefined for a path that keeps the rules.
  */
 export function pathFault(path: string): string | undefined {
-  if (!path.isWellFormed()) return `the path ${JSON.stringify(path)} is no UTF-8 text`;
+  if (!path.isWellFormed()) {
+    return `the path ${JSON.stringify(path)} is no UTF-8 text`;
+  }
   const name = path
     .split("/")
-    .find((one) => one === "" || one === "." || one === ".." || /[\\\0]/.test(one));
+    .find(
+      (one) => one === "" || one === "." || one === ".." || FORBIDDEN_IN_NAME.test(one),
+    );
   return name === undefined
     ? undefined
     : `the path ${JSON.stringify(path)} has the name ${JSON.stringify(name)}`;
-}
-
-/** Reports whether target is UTF-8 text without NUL that is not empty. */
-function isTarget(target: string): boolean {
-  return target !== "" && !target.includes("\0") && target.isWellFormed();
-}
-
-/** Returns why the entry at path breaks a rule of a tree, or undefined. */
-function entryFault(
-  tree: ReadonlyMap<string, unknown>,
-  path: string,
-): string | undefined {
-  const fault = pathFault(path);
-  if (fault !== undefined) return fault;
-  const e = tree.get(path);
-  const kind = kindOf(e);
-  if (kind === undefined) return "the entry states no file, directory or link";
-  const target = (e as Entry).link as string;
-  if (kind === "link" && !isTarget(target)) {
-    return `the link to ${JSON.stringify(target)} states no target of UTF-8 text without NUL`;
-  }
-  for (const parent of parentsOf(path)) {
-    const above = kindOf(tree.get(parent));
-    if (above === "file" || above === "link") {
-      return `the entry is below ${JSON.stringify(parent)}, which is a ${above}`;
-    }
-  }
-  return undefined;
 }
 
 /**
@@ -115,7 +126,9 @@ function entryFault(
 export function check(tree: ReadonlyMap<string, unknown>): void {
   for (const path of pathsOf(tree.keys())) {
     const reason = entryFault(tree, path);
-    if (reason !== undefined) throw new Fault(path, reason);
+    if (reason !== undefined) {
+      throw new Fault(path, reason);
+    }
   }
 }
 
@@ -131,7 +144,9 @@ export function full(tree: ReadonlyMap<string, Entry>): Map<string, Entry> {
   const out = new Map(tree);
   for (const path of tree.keys()) {
     for (const parent of parentsOf(path)) {
-      if (!out.has(parent)) out.set(parent, directory());
+      if (!out.has(parent)) {
+        out.set(parent, directory());
+      }
     }
   }
   return out;

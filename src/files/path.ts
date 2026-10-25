@@ -61,7 +61,9 @@ function checkAt(
   const running = Running.of(seat);
   let e: Entry | undefined;
   try {
-    if (refused !== undefined) throw new Fault("", refused);
+    if (refused !== undefined) {
+      throw new Fault("", refused);
+    }
     e = readPath(path, content);
   } catch (err) {
     running.fault(Mode.Fatal, call.assertion, msg, ofOperation(call.op, err));
@@ -220,7 +222,9 @@ export function hasContent(
     refused,
     (e) => {
       const content = kindOf(e) === "file" ? contentOf(e as Entry) : undefined;
-      if (content !== undefined && Buffer.from(content).equals(wanted)) return;
+      if (content !== undefined && Buffer.from(content).equals(wanted)) {
+        return;
+      }
       return {
         want: contentValue(wanted),
         got: content === undefined ? null : contentValue(content),

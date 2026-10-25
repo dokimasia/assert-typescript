@@ -46,8 +46,12 @@ function outcome(call: (recorder: Recorder) => void): unknown[] {
   const recorder = new Recorder();
   call(recorder);
   const verdict = records(recorder)[0]?.["verdict"];
-  if (verdict === "fail") return [verdict, recorder.failures[0]?.detail];
-  if (verdict === "error") return [verdict, recorder.message];
+  if (verdict === "fail") {
+    return [verdict, recorder.failures[0]?.detail];
+  }
+  if (verdict === "error") {
+    return [verdict, recorder.message];
+  }
   return [verdict];
 }
 

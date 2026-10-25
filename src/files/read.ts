@@ -6,9 +6,8 @@
  * it.
  */
 
-import { Fault, ofOperation } from "../matcher/fault.js";
+import { end, Fault, ofOperation } from "../matcher/fault.js";
 import type { Seat } from "../matcher/seat.js";
-import { end } from "../matcher/verdict.js";
 import { contentOf, kindOf } from "./entry.js";
 import { readPath } from "./reader.js";
 
@@ -30,8 +29,9 @@ export function read(seat: Seat, path: string): string {
   seat.helper();
   try {
     const e = readPath(path, true);
-    if (kindOf(e) !== "file")
+    if (kindOf(e) !== "file") {
       throw new Fault("", `no file is at the path ${JSON.stringify(path)}`);
+    }
     return Buffer.from(contentOf(e as NonNullable<typeof e>)).toString("utf8");
   } catch (err) {
     end(seat, ofOperation("files.read", err));

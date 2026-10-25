@@ -6,9 +6,8 @@
  * edit between two runs of the code under test.
  */
 
-import { ofOperation } from "../matcher/fault.js";
+import { end, ofOperation } from "../matcher/fault.js";
 import type { Seat } from "../matcher/seat.js";
-import { end } from "../matcher/verdict.js";
 import { mapOf, type Tree } from "./tree.js";
 import { overwrite } from "./writer.js";
 

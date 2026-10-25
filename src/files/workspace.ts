@@ -9,9 +9,8 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ofOperation } from "../matcher/fault.js";
+import { end, ofOperation } from "../matcher/fault.js";
 import type { Cleanups, Seat } from "../matcher/seat.js";
-import { end } from "../matcher/verdict.js";
 import { mapOf, type Tree } from "./tree.js";
 import { create, unlock } from "./writer.js";
 

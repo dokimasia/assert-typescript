@@ -39,15 +39,6 @@ const CREATE_FILE = 0o600;
 /** The permission bits with which a write creates a directory, before it sets the directory's mode. */
 const CREATE_DIRECTORY = 0o700;
 
-/** The mode that a write sets on a file that states none. */
-export const FILE_MODE = 0o644;
-
-/** The mode that a write sets on an executable file that states none. */
-export const EXECUTABLE_MODE = 0o755;
-
-/** The mode that a write sets on a directory that states none. */
-export const DIRECTORY_MODE = 0o755;
-
 /** One operation of a write: the path of the tree that it writes, and the operation. */
 interface Step {
   readonly path: string;
@@ -57,20 +48,6 @@ interface Step {
 /** Returns the path of the operating system of the path of a tree in dir. */
 function osPath(dir: string, path: string): string {
   return join(dir, ...path.split("/"));
-}
-
-/**
- * Returns the mode that a write sets on the file or the directory e: its
- * stated mode, and where it states none {@link FILE_MODE},
- * {@link EXECUTABLE_MODE} or {@link DIRECTORY_MODE}.
- *
- * @param e - The entry.
- * @returns The mode.
- */
-export function modeOf(e: Entry): number {
-  if (e.mode !== undefined) return e.mode;
-  if (e.directory === true) return DIRECTORY_MODE;
-  return e.executable === true ? EXECUTABLE_MODE : FILE_MODE;
 }
 
 /** Creates the entry e at at: a file written with its content and given its mode, a directory, or a link. */
@@ -117,12 +94,14 @@ function creating(
 ): Step[] {
   const steps = [...before];
   const modes: Step[] = [];
-  for (const path of pathsOf(whole.keys())) {
-    if (kept.has(path)) continue;
+  const missing = pathsOf(whole.keys()).filter((path) => !kept.has(path));
+  for (const path of missing) {
     const e = whole.get(path) as Entry;
     const at = osPath(dir, path);
     steps.push({ path, run: () => createEntry(at, e) });
-    if (e.directory === true) modes.push({ path, run: () => chmodSync(at, modeOf(e)) });
+    if (e.directory === true) {
+      modes.push({ path, run: () => chmodSync(at, modeOf(e)) });
+    }
   }
   return [...steps, ...modes.reverse()];
 }
@@ -138,33 +117,15 @@ function apply(dir: string, plan: () => readonly Step[]): void {
   try {
     opendirSync(dir).closeSync();
   } catch (err) {
-    throw new Fault("", "the directory cannot be opened", err);
+    throw new Fault("", "the directory cannot be opened", { cause: err });
   }
   for (const step of plan()) {
     try {
       step.run();
     } catch (err) {
-      throw new Fault(step.path, "the entry cannot be written", err);
+      throw new Fault(step.path, "the entry cannot be written", { cause: err });
     }
   }
-}
-
-/**
- * Writes tree into dir, a directory that exists. It creates every entry
- * and writes over none: a file of its content, a directory, and a link of
- * its target, inside or outside dir. Each file and each directory gets its
- * stated mode, and where it states none the mode of {@link modeOf}.
- *
- * @param dir - The directory.
- * @param tree - The tree.
- * @throws Fault for a tree that breaks a rule of a tree, before it writes
- *   anything, for a dir that cannot be opened, and at the path of the first
- *   entry that cannot be written, such as one that the file system maps to
- *   an entry that the write already wrote.
- */
-export function create(dir: string, tree: ReadonlyMap<string, Entry>): void {
-  check(tree);
-  apply(dir, () => creating(dir, full(tree), new Set(), []));
 }
 
 /** Returns what lstat states of at, or undefined when nothing is there. */
@@ -172,7 +133,7 @@ function statsAt(at: string, path: string): BigIntStats | undefined {
   try {
     return lstatSync(at, { bigint: true, throwIfNoEntry: false });
   } catch (err) {
-    throw new Fault(path, "the entry cannot be read", err);
+    throw new Fault(path, "the entry cannot be read", { cause: err });
   }
 }
 
@@ -188,8 +149,9 @@ function refuse(
   read: ReadonlyMap<string, BigIntStats>,
 ): void {
   const kind = kindOfStats(stats);
-  if (kind === undefined)
+  if (kind === undefined) {
     throw new Fault(path, "the entry is no file, directory or link");
+  }
   if (kind !== kindOf(e)) {
     throw new Fault(path, `the entry is a ${kind}, and the tree states a ${kindOf(e)}`);
   }
@@ -220,14 +182,63 @@ function overwriting(dir: string, tree: ReadonlyMap<string, Entry>): Step[] {
     const e = whole.get(path) as Entry;
     const at = osPath(dir, path);
     const stats = statsAt(at, path);
-    if (stats === undefined) continue;
-    refuse(path, stats, e, read);
-    there.add(path);
-    read.set(path, stats);
-    if (e.directory !== true) replaced.push({ path, run: () => replace(at, e) });
-    else if (tree.has(path)) modes.push({ path, run: () => chmodSync(at, modeOf(e)) });
+    if (stats !== undefined) {
+      refuse(path, stats, e, read);
+      there.add(path);
+      read.set(path, stats);
+      if (e.directory !== true) {
+        replaced.push({ path, run: () => replace(at, e) });
+      } else if (tree.has(path)) {
+        modes.push({ path, run: () => chmodSync(at, modeOf(e)) });
+      }
+    }
   }
   return [...creating(dir, whole, there, replaced), ...modes.reverse()];
+}
+
+/** The mode that a write sets on a file that states none. */
+export const FILE_MODE = 0o644;
+
+/** The mode that a write sets on an executable file that states none. */
+export const EXECUTABLE_MODE = 0o755;
+
+/** The mode that a write sets on a directory that states none. */
+export const DIRECTORY_MODE = 0o755;
+
+/**
+ * Returns the mode that a write sets on the file or the directory e: its
+ * stated mode, and where it states none {@link FILE_MODE},
+ * {@link EXECUTABLE_MODE} or {@link DIRECTORY_MODE}.
+ *
+ * @param e - The entry.
+ * @returns The mode.
+ */
+export function modeOf(e: Entry): number {
+  if (e.mode !== undefined) {
+    return e.mode;
+  }
+  if (e.directory === true) {
+    return DIRECTORY_MODE;
+  }
+  return e.executable === true ? EXECUTABLE_MODE : FILE_MODE;
+}
+
+/**
+ * Writes tree into dir, a directory that exists. It creates every entry
+ * and writes over none: a file of its content, a directory, and a link of
+ * its target, inside or outside dir. Each file and each directory gets its
+ * stated mode, and where it states none the mode of {@link modeOf}.
+ *
+ * @param dir - The directory.
+ * @param tree - The tree.
+ * @throws Fault for a tree that breaks a rule of a tree, before it writes
+ *   anything, for a dir that cannot be opened, and at the path of the first
+ *   entry that cannot be written, such as one that the file system maps to
+ *   an entry that the write already wrote.
+ */
+export function create(dir: string, tree: ReadonlyMap<string, Entry>): void {
+  check(tree);
+  apply(dir, () => creating(dir, full(tree), new Set(), []));
 }
 
 /**
@@ -274,7 +285,7 @@ export function update(dir: string, tree: ReadonlyMap<string, Entry>): void {
   try {
     mkdirSync(dir, { recursive: true, mode: DIRECTORY_MODE });
   } catch (err) {
-    throw new Fault("", "the directory cannot be created", err);
+    throw new Fault("", "the directory cannot be created", { cause: err });
   }
   const current = readTree(dir, false);
   const wanted = new Map([...full(tree)].map(([path, e]) => [path, unstated(e)]));
@@ -284,12 +295,12 @@ export function update(dir: string, tree: ReadonlyMap<string, Entry>): void {
     const w = wanted.get(path);
     if (w !== undefined && !differs(w, current.get(path))) {
       kept.add(path);
-      continue;
+    } else {
+      removals.push({
+        path,
+        run: () => rmSync(osPath(dir, path), { recursive: true, force: true }),
+      });
     }
-    removals.push({
-      path,
-      run: () => rmSync(osPath(dir, path), { recursive: true, force: true }),
-    });
   }
   apply(dir, () => creating(dir, wanted, kept, removals));
 }
@@ -304,7 +315,11 @@ export function update(dir: string, tree: ReadonlyMap<string, Entry>): void {
  */
 export function unlock(dir: string): void {
   const stats = lstatSync(dir, { throwIfNoEntry: false });
-  if (stats === undefined || !stats.isDirectory()) return;
+  if (stats === undefined || !stats.isDirectory()) {
+    return;
+  }
   chmodSync(dir, (stats.mode & PERMISSIONS) | CREATE_DIRECTORY);
-  for (const name of readdirSync(dir)) unlock(join(dir, name));
+  for (const name of readdirSync(dir)) {
+    unlock(join(dir, name));
+  }
 }

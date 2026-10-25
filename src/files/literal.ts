@@ -11,6 +11,7 @@
 
 import { createHash } from "node:crypto";
 import { Fault } from "../matcher/fault.js";
+import { compareText } from "../order.js";
 import type { Literal } from "../record/literal.js";
 import {
   bytes,
@@ -26,8 +27,8 @@ import {
 } from "./entry.js";
 import { check, compareBytes, pathsOf } from "./tree.js";
 
-/** The longest content, in bytes, that a record states in full. */
-export const CONTENT_LIMIT = 65_536;
+/** The text of bytes: lowercase hexadecimal, two digits per byte. */
+const HEX_TEXT = /^(?:[0-9a-f]{2})*$/;
 
 /** The members that state the kind of an entry, of which an entry states exactly one. */
 const KIND_MEMBERS = ["text", "bytes", "directory", "link", "digest"] as const;
@@ -57,31 +58,22 @@ function contentLiteral(e: Entry, limit: number): Record<string, unknown> {
 function entryLiteral(path: string, e: Entry, limit: number): Record<string, unknown> {
   const out: Record<string, unknown> = { path };
   const kind = kindOf(e);
-  if (kind === "file") Object.assign(out, contentLiteral(e, limit));
-  if (kind === "directory") out["directory"] = true;
-  if (kind === "link") out["link"] = e.link;
-  if (e.executable === true) out["executable"] = true;
-  if (e.mode !== undefined) out["mode"] = e.mode;
+  if (kind === "file") {
+    Object.assign(out, contentLiteral(e, limit));
+  }
+  if (kind === "directory") {
+    out["directory"] = true;
+  }
+  if (kind === "link") {
+    out["link"] = e.link;
+  }
+  if (e.executable === true) {
+    out["executable"] = true;
+  }
+  if (e.mode !== undefined) {
+    out["mode"] = e.mode;
+  }
   return out;
-}
-
-/**
- * Returns the tree literal of tree: its entries in path order, each file
- * by its text when its content is UTF-8 text and by its bytes otherwise,
- * and by its digest and its size when its content is longer than limit.
- *
- * @param tree - The tree.
- * @param limit - The longest content in bytes that the literal states in
- *   full: {@link CONTENT_LIMIT} for a record, and Infinity for an input.
- * @returns The literal.
- */
-export function encode(tree: ReadonlyMap<string, Entry>, limit: number): Literal {
-  return {
-    type: "tree",
-    entries: pathsOf(tree.keys()).map((path) =>
-      entryLiteral(path, tree.get(path) as Entry, limit),
-    ),
-  };
 }
 
 /** Reports whether value is a JSON object. */
@@ -92,8 +84,9 @@ function isObject(value: unknown): value is Record<string, unknown> {
 /** Returns the string of member, or a fault at it for any other value. */
 function stringAt(raw: Record<string, unknown>, member: string, at: string): string {
   const value = raw[member];
-  if (typeof value !== "string")
+  if (typeof value !== "string") {
     throw new Fault(`${at}.${member}`, `the ${member} is no string`);
+  }
   return value;
 }
 
@@ -116,7 +109,9 @@ function stated(e: Entry, raw: Record<string, unknown>, at: string): Entry {
       `the mode ${JSON.stringify(mode)} is no integer from 0 to 511`,
     );
   }
-  if (mode !== undefined) return e.withMode(mode as number);
+  if (mode !== undefined) {
+    return e.withMode(mode as number);
+  }
   return execute === true ? unstated(e.withMode(OWNER_EXECUTE)) : e;
 }
 
@@ -129,14 +124,15 @@ function entryOf(raw: Record<string, unknown>, kind: string, at: string): Entry 
         "a digest states no content, and only a record states one",
       );
     case "directory":
-      if (raw["directory"] !== true)
+      if (raw["directory"] !== true) {
         throw new Fault(`${at}.directory`, "directory is not true");
+      }
       return stated(directory(), raw, at);
     case "link":
       return link(stringAt(raw, "link", at));
     case "bytes": {
       const hex = stringAt(raw, "bytes", at);
-      if (!/^(?:[0-9a-f]{2})*$/.test(hex)) {
+      if (!HEX_TEXT.test(hex)) {
         throw new Fault(
           `${at}.bytes`,
           `${JSON.stringify(hex)} is no lowercase hexadecimal`,
@@ -146,8 +142,9 @@ function entryOf(raw: Record<string, unknown>, kind: string, at: string): Entry 
     }
     default: {
       const content = stringAt(raw, "text", at);
-      if (!content.isWellFormed())
+      if (!content.isWellFormed()) {
         throw new Fault(`${at}.text`, "the text is no UTF-8 text");
+      }
       return stated(text(content), raw, at);
     }
   }
@@ -155,7 +152,9 @@ function entryOf(raw: Record<string, unknown>, kind: string, at: string): Entry 
 
 /** Returns the path and the entry that one entry of a tree literal states. */
 function decodeEntry(raw: unknown, at: string): [string, Entry] {
-  if (!isObject(raw)) throw new Fault(at, "the entry is no object");
+  if (!isObject(raw)) {
+    throw new Fault(at, "the entry is no object");
+  }
   const kinds = KIND_MEMBERS.filter((member) => Object.hasOwn(raw, member));
   if (kinds.length !== 1) {
     throw new Fault(
@@ -165,11 +164,34 @@ function decodeEntry(raw: unknown, at: string): [string, Entry] {
   }
   const kind = kinds[0] as string;
   const extra = Object.keys(raw)
-    .sort()
+    .sort(compareText)
     .find((member) => !(TAKES[kind] as readonly string[]).includes(member));
-  if (extra !== undefined)
+  if (extra !== undefined) {
     throw new Fault(`${at}.${extra}`, `a ${kind} entry takes no ${extra}`);
+  }
   return [stringAt(raw, "path", at), entryOf(raw, kind, at)];
+}
+
+/** The longest content, in bytes, that a record states in full. */
+export const CONTENT_LIMIT = 65_536;
+
+/**
+ * Returns the tree literal of tree: its entries in path order, each file
+ * by its text when its content is UTF-8 text and by its bytes otherwise,
+ * and by its digest and its size when its content is longer than limit.
+ *
+ * @param tree - The tree.
+ * @param limit - The longest content in bytes that the literal states in
+ *   full: {@link CONTENT_LIMIT} for a record, and Infinity for an input.
+ * @returns The literal.
+ */
+export function encode(tree: ReadonlyMap<string, Entry>, limit: number): Literal {
+  return {
+    type: "tree",
+    entries: pathsOf(tree.keys()).map((path) =>
+      entryLiteral(path, tree.get(path) as Entry, limit),
+    ),
+  };
 }
 
 /**
@@ -185,13 +207,16 @@ function decodeEntry(raw: unknown, at: string): [string, Entry] {
  *   tree.
  */
 export function decode(literal: unknown): Map<string, Entry> {
-  if (!isObject(literal)) throw new Fault("", "the literal is no object");
+  if (!isObject(literal)) {
+    throw new Fault("", "the literal is no object");
+  }
   if (literal["type"] !== "tree") {
     throw new Fault("type", `the type ${JSON.stringify(literal["type"])} is not tree`);
   }
   const entries = literal["entries"];
-  if (!Array.isArray(entries))
+  if (!Array.isArray(entries)) {
     throw new Fault("entries", "the literal states no list of entries");
+  }
   const tree = new Map<string, Entry>();
   let last = "";
   entries.forEach((raw: unknown, i) => {
