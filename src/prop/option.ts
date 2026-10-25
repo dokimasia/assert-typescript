@@ -14,14 +14,82 @@
 import type { Option as Relaxation } from "../matcher/option.js";
 import { MAX_CHOICES } from "./engine/case.js";
 import type { Generator } from "./engine/generator.js";
-import { DEFAULT_CASES, type Requirement } from "./engine/runner.js";
+import { DEFAULT_CASES } from "./engine/settings.js";
 import { DEFAULT_BUDGET } from "./engine/shrink.js";
+import type { Requirement } from "./engine/tally.js";
 
-/** The largest seed: every seed is an unsigned 64-bit integer. */
-const SEED_LIMIT = 2n ** 64n;
+/** The bound of every seed, 2^64: every seed is an unsigned 64-bit integer. */
+const SEED_LIMIT = 1n << 64n;
 
 /** The time that shrinking and explaining may take when no option states one, in milliseconds. */
 const DEFAULT_SHRINK_TIME = 30_000;
+
+/** Returns config with the setting of option applied. */
+function apply(config: Config, option: Option): Config {
+  switch (option.kind) {
+    case "cases":
+      return { ...config, cases: option.value };
+    case "seed":
+      return { ...config, seed: option.value };
+    case "replay":
+      return { ...config, replay: option.value };
+    case "require":
+      return { ...config, requirements: [...config.requirements, option.value] };
+    case "shrink":
+      return { ...config, shrink: option.value };
+    case "shrink-time":
+      return { ...config, shrinkTime: option.value };
+    case "max-choices":
+      return { ...config, maxChoices: option.value };
+    case "store":
+      return { ...config, store: option.value };
+    case "explain":
+      return { ...config, explain: option.value };
+    case "workers":
+      return config;
+    case "hermetic":
+      return { ...config, hermetic: true };
+    case "around":
+      return { ...config, around: option.value };
+    default:
+      return { ...config, draws: option.value };
+  }
+}
+
+/** Throws a RangeError for a count that is no whole number of at least min. */
+function counted(call: string, n: number, min: number): void {
+  if (!Number.isSafeInteger(n) || n < min) {
+    throw new RangeError(
+      `prop: ${call}(${n}) states no whole number of ${min} or more`,
+    );
+  }
+}
+
+/** Returns a safe integer as a bigint, and -1n, which no seed is, for any other number. */
+function bigintOf(n: number): bigint {
+  return Number.isSafeInteger(n) ? BigInt(n) : -1n;
+}
+
+/**
+ * Adds a coverage requirement: label must count at least share of the
+ * valid cases, as Case.classify counts them. A Wilson score test decides
+ * it after the stated number of cases, and again each time the number
+ * doubles, up to eight times the number. A run that refutes it or leaves
+ * it unmet fails as coverage-unmet.
+ *
+ * @param label - The label.
+ * @param share - The share, in [0, 1].
+ * @returns The option.
+ * @throws RangeError for a share outside [0, 1].
+ */
+function requireShare(label: string, share: number): Option {
+  if (!(share >= 0 && share <= 1)) {
+    throw new RangeError(
+      `prop: require(${JSON.stringify(label)}, ${share}) states a share outside [0, 1]`,
+    );
+  }
+  return { kind: "require", value: { label, share } };
+}
 
 /**
  * A wrapper of the runs of a property's body. It calls run once inside an
@@ -78,38 +146,6 @@ export interface Config {
   readonly draws: string | undefined;
 }
 
-/** Returns config with the setting of option applied. */
-function apply(config: Config, option: Option): Config {
-  switch (option.kind) {
-    case "cases":
-      return { ...config, cases: option.value };
-    case "seed":
-      return { ...config, seed: option.value };
-    case "replay":
-      return { ...config, replay: option.value };
-    case "require":
-      return { ...config, requirements: [...config.requirements, option.value] };
-    case "shrink":
-      return { ...config, shrink: option.value };
-    case "shrink-time":
-      return { ...config, shrinkTime: option.value };
-    case "max-choices":
-      return { ...config, maxChoices: option.value };
-    case "store":
-      return { ...config, store: option.value };
-    case "explain":
-      return { ...config, explain: option.value };
-    case "workers":
-      return config;
-    case "hermetic":
-      return { ...config, hermetic: true };
-    case "around":
-      return { ...config, around: option.value };
-    default:
-      return { ...config, draws: option.value };
-  }
-}
-
 /**
  * Returns what options state: the defaults, with each option applied in
  * order. The defaults are 100 cases, a shrink budget of 2,000 runs and 30
@@ -133,17 +169,10 @@ export function configure(options: readonly Option[]): Config {
     around: undefined,
     draws: undefined,
   };
-  for (const option of options) config = apply(config, option);
-  return config;
-}
-
-/** Throws a RangeError for a count that is no whole number of at least min. */
-function counted(call: string, n: number, min: number): void {
-  if (!Number.isSafeInteger(n) || n < min) {
-    throw new RangeError(
-      `prop: ${call}(${n}) states no whole number of ${min} or more`,
-    );
+  for (const option of options) {
+    config = apply(config, option);
   }
+  return config;
 }
 
 /**
@@ -170,7 +199,7 @@ export function cases(n: number): Option {
  * @throws RangeError that names call, for an s outside [0, 2^64).
  */
 export function seedValue(call: string, s: bigint | number): bigint {
-  const value = typeof s === "bigint" ? s : Number.isSafeInteger(s) ? BigInt(s) : -1n;
+  const value = typeof s === "bigint" ? s : bigintOf(s);
   if (value < 0n || value >= SEED_LIMIT) {
     throw new RangeError(`prop: ${call} states no integer in [0, 2^64)`);
   }
@@ -203,27 +232,6 @@ export function seed(s: bigint | number): Option {
  */
 export function replay(token: string): Option {
   return { kind: "replay", value: token };
-}
-
-/**
- * Adds a coverage requirement: label must count at least share of the
- * valid cases, as Case.classify counts them. A Wilson score test decides
- * it after the stated number of cases, and again each time the number
- * doubles, up to eight times the number. A run that refutes it or leaves
- * it unmet fails as coverage-unmet.
- *
- * @param label - The label.
- * @param share - The share, in [0, 1].
- * @returns The option.
- * @throws RangeError for a share outside [0, 1].
- */
-function requireShare(label: string, share: number): Option {
-  if (!(share >= 0 && share <= 1)) {
-    throw new RangeError(
-      `prop: require(${JSON.stringify(label)}, ${share}) states a share outside [0, 1]`,
-    );
-  }
-  return { kind: "require", value: { label, share } };
 }
 
 // A CommonJS module reserves the name require, so the function has a local

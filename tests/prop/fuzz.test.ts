@@ -11,7 +11,7 @@ import { nameTest } from "../../src/matcher/seat.js";
 import type { Case } from "../../src/prop/case.js";
 import { forAll } from "../../src/prop/forall.js";
 import { fuzz } from "../../src/prop/fuzz.js";
-import { bytes } from "../../src/prop/generators.js";
+import { bytes } from "../../src/prop/generators/collections.js";
 import { hermetic, seed, store } from "../../src/prop/option.js";
 import { AssertionFailed, Recorder } from "../../src/seat.js";
 import { test as it } from "../../src/vitest.js";

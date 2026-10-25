@@ -6,6 +6,7 @@
 import { describe } from "vitest";
 import { Failure, render } from "../../src/failure.js";
 import { check } from "../../src/index.js";
+import { compareText } from "../../src/order.js";
 import * as prop from "../../src/prop/index.js";
 import { test as it } from "../../src/vitest.js";
 
@@ -28,7 +29,7 @@ describe("index", () => {
   it("exports the names of the property engine", ({ seat }) => {
     check.isEqualTo(
       seat,
-      Object.keys(prop).sort(),
+      Object.keys(prop).sort(compareText),
       [
         "Case",
         "Generator",

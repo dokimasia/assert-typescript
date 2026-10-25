@@ -22,38 +22,21 @@ import { Running } from "../matcher/verdict.js";
 import type { Case } from "./case.js";
 import type { Choice } from "./engine/choice.js";
 import type { Generator } from "./engine/generator.js";
-import { CannotInvert, invert, NoInverse } from "./engine/inverse.js";
-import { Values } from "./engine/runner.js";
+import { CannotInvert, NoInverse } from "./engine/inverse/refusal.js";
+import { invert } from "./engine/inverse.js";
+import { Values } from "./engine/settings.js";
 import { configure, type FormOnly, type FormOption, type Option } from "./option.js";
 import { type Call, Property } from "./property.js";
 
-/** The label of the input of a form over a function and of a relation of one input. */
-export const INPUT: readonly string[] = ["input"];
-
-/** The labels of the two inputs of isCommutative. */
-export const PAIR: readonly string[] = ["a", "b"];
-
-/** The labels of the three inputs of isAssociative. */
-export const TRIPLE: readonly string[] = ["a", "b", "c"];
-
-/** What a property form states: its operation, its id, whether its assertion takes relaxations, and the labels of the arguments that it generates. */
-export interface Form {
-  /** The operation that the form's faults name, such as prop.isEqualTo. */
-  readonly op: string;
-  /** The form's id, the assertion of its record, such as prop-equal. */
-  readonly id: string;
-  /** Whether the form's assertion takes relaxations. */
-  readonly relaxed: boolean;
-  /** The labels of the arguments that each case generates, in order. */
-  readonly labels: readonly string[];
+/** Returns the form of the assertion id, which TypeScript names name. */
+function formOf(
+  name: string,
+  id: string,
+  relaxed: boolean,
+  labels: readonly string[] = INPUT,
+): Form {
+  return { op: `prop.${name}`, id: `prop-${id}`, relaxed, labels };
 }
-
-/** Runs a form's assertion on a case with the generated arguments and the relaxations. */
-export type Check = (
-  c: Case,
-  args: readonly unknown[],
-  relaxations: readonly Relaxation[],
-) => unknown;
 
 /** An option that states the values of cases. */
 type Example = Extract<FormOnly, { kind: "example" | "examples" }>;
@@ -107,13 +90,15 @@ function caseOf(
     try {
       choices.push(...invert(generator, value));
     } catch (err) {
-      if (err instanceof NoInverse) return new Values(values);
-      if (!(err instanceof CannotInvert)) throw err;
-      throw new Fault(
-        at(index),
-        "the input's generator does not produce the value",
-        err,
-      );
+      if (err instanceof NoInverse) {
+        return new Values(values);
+      }
+      if (!(err instanceof CannotInvert)) {
+        throw err;
+      }
+      throw new Fault(at(index), "the input's generator does not produce the value", {
+        cause: err,
+      });
     }
   }
   return choices;
@@ -144,16 +129,17 @@ function examplesOf(
         );
       }
       out.push(caseOf(generator, values, (j) => `${at}[${j}]`));
-      continue;
+    } else {
+      if (labels.length !== 1) {
+        throw new Fault(
+          at,
+          `the examples state one value per case, and the form generates ${labels.length}`,
+        );
+      }
+      for (const [j, value] of values.entries()) {
+        out.push(caseOf(generator, [value], () => `${at}[${j}]`));
+      }
     }
-    if (labels.length !== 1) {
-      throw new Fault(
-        at,
-        `the examples state one value per case, and the form generates ${labels.length}`,
-      );
-    }
-    for (const [j, value] of values.entries())
-      out.push(caseOf(generator, [value], () => `${at}[${j}]`));
   }
   return out;
 }
@@ -190,12 +176,86 @@ async function start(
     Property.fault(running, call, err);
     return;
   }
-  const relaxations = stated.relaxations;
+  const { relaxations } = stated;
   await property.run(seat, running, (c) => {
     const args = form.labels.map((label) => c.draw(generator, label));
     return check(c, args, relaxations);
   });
 }
+
+/** The label of the input of a form over a function and of a relation of one input. */
+export const INPUT: readonly string[] = ["input"];
+
+/** The labels of the two inputs of isCommutative. */
+export const PAIR: readonly string[] = ["a", "b"];
+
+/** The labels of the three inputs of isAssociative. */
+export const TRIPLE: readonly string[] = ["a", "b", "c"];
+
+/** What a property form states: its operation, its id, whether its assertion takes relaxations, and the labels of the arguments that it generates. */
+export interface Form {
+  /** The operation that the form's faults name, such as prop.isEqualTo. */
+  readonly op: string;
+  /** The form's id, the assertion of its record, such as prop-equal. */
+  readonly id: string;
+  /** Whether the form's assertion takes relaxations. */
+  readonly relaxed: boolean;
+  /** The labels of the arguments that each case generates, in order. */
+  readonly labels: readonly string[];
+}
+
+/** The forms, by their TypeScript name: the assertion's id, and whether the assertion takes relaxations. */
+export const FORMS = {
+  isEqualTo: formOf("isEqualTo", "equal", true),
+  isNotEqualTo: formOf("isNotEqualTo", "not-equal", true),
+  isTrue: formOf("isTrue", "true", false),
+  isFalse: formOf("isFalse", "false", false),
+  isNil: formOf("isNil", "nil", false),
+  isNotNil: formOf("isNotNil", "not-nil", false),
+  hasLength: formOf("hasLength", "length", false),
+  isEmpty: formOf("isEmpty", "empty", false),
+  isNotEmpty: formOf("isNotEmpty", "not-empty", false),
+  doesContain: formOf("doesContain", "contains", true),
+  doesNotContain: formOf("doesNotContain", "not-contains", true),
+  containsInOrder: formOf("containsInOrder", "contains-in-order", false),
+  isPermutation: formOf("isPermutation", "permutation", true),
+  hasPrefix: formOf("hasPrefix", "has-prefix", false),
+  hasSuffix: formOf("hasSuffix", "has-suffix", false),
+  doesMatch: formOf("doesMatch", "matches", false),
+  isCloseTo: formOf("isCloseTo", "close-to", false),
+  inRange: formOf("inRange", "in-range", false),
+  pairwise: formOf("pairwise", "pairwise", false),
+  noError: formOf("noError", "err-absent", false),
+  hasError: formOf("hasError", "err-present", false),
+  errorIs: formOf("errorIs", "err-is", false),
+  errorIsNot: formOf("errorIsNot", "err-is-not", false),
+  errorAs: formOf("errorAs", "err-as", false),
+  doesThrow: formOf("doesThrow", "throws", false),
+  doesNotThrow: formOf("doesNotThrow", "not-throws", false),
+  isPure: formOf("isPure", "pure", true),
+  isNotPure: formOf("isNotPure", "not-pure", true),
+  nullHandleSafe: formOf("nullHandleSafe", "nil-context-safe", false),
+  honoursCancellation: formOf("honoursCancellation", "honours-cancellation", false),
+  honoursDeadline: formOf("honoursDeadline", "honours-deadline", false),
+  isIdempotent: formOf("isIdempotent", "idempotent", true),
+  accumulates: formOf("accumulates", "accumulates", false),
+  isDeterministic: formOf("isDeterministic", "deterministic", true),
+  isCommutative: formOf("isCommutative", "commutative", true, PAIR),
+  isAssociative: formOf("isAssociative", "associative", true, TRIPLE),
+  roundTrip: formOf("roundTrip", "round-trip", true),
+} as const;
+
+/** The ids of the property forms, which their records state. */
+export const FORM_IDS: readonly string[] = Object.values(FORMS).map(
+  (stated) => stated.id,
+);
+
+/** Runs a form's assertion on a case with the generated arguments and the relaxations. */
+export type Check = (
+  c: Case,
+  args: readonly unknown[],
+  relaxations: readonly Relaxation[],
+) => unknown;
 
 /**
  * Runs the property form on seat, whose record states the form's id and

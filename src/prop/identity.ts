@@ -21,6 +21,18 @@
 import { basename } from "node:path";
 import { type Failure, siteIn, type Where } from "../failure.js";
 
+/** Returns the type of a raised value: the name of its class, or the kind of a primitive. */
+function typeOf(value: unknown): string {
+  if (value === null) {
+    return "null";
+  }
+  if (typeof value !== "object" && typeof value !== "function") {
+    return typeof value;
+  }
+  const name = (value as { constructor?: { name?: unknown } }).constructor?.name;
+  return typeof name === "string" && name !== "" ? name : "Object";
+}
+
 /** What a failure is kept by. */
 export interface Identity {
   /** The assertion that reported the failure, and undefined for a message and for an error. */
@@ -50,14 +62,6 @@ export function ofRecord(failure: Failure): Identity {
         : undefined,
     where: failure.where,
   };
-}
-
-/** Returns the type of a raised value: the name of its class, or the kind of a primitive. */
-function typeOf(value: unknown): string {
-  if (value === null) return "null";
-  if (typeof value !== "object" && typeof value !== "function") return typeof value;
-  const name = (value as { constructor?: { name?: unknown } }).constructor?.name;
-  return typeof name === "string" && name !== "" ? name : "Object";
 }
 
 /**
@@ -124,8 +128,12 @@ export function textOf(identity: Identity): string {
     identity.where === undefined
       ? ""
       : ` at ${basename(identity.where.file)}:${identity.where.line}`;
-  if (identity.error !== undefined) return `a ${identity.error} thrown${where}`;
-  if (identity.assertion === undefined) return `a message${where}`;
+  if (identity.error !== undefined) {
+    return `a ${identity.error} thrown${where}`;
+  }
+  if (identity.assertion === undefined) {
+    return `a message${where}`;
+  }
   const contract =
     identity.contract === undefined ? "" : ` of ${JSON.stringify(identity.contract)}`;
   return `${identity.assertion}${contract}${where}`;
@@ -140,9 +148,15 @@ export function textOf(identity: Identity): string {
  */
 export function entryOf(identity: Identity): Record<string, string | number> {
   const keys: Record<string, string | number> = {};
-  if (identity.assertion !== undefined) keys["assertion"] = identity.assertion;
-  if (identity.contract !== undefined) keys["contract"] = identity.contract;
-  if (identity.error !== undefined) keys["error"] = identity.error;
+  if (identity.assertion !== undefined) {
+    keys["assertion"] = identity.assertion;
+  }
+  if (identity.contract !== undefined) {
+    keys["contract"] = identity.contract;
+  }
+  if (identity.error !== undefined) {
+    keys["error"] = identity.error;
+  }
   if (identity.where !== undefined) {
     keys["file"] = basename(identity.where.file);
     keys["line"] = identity.where.line;

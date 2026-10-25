@@ -17,7 +17,7 @@ import {
   hermetic,
   maxChoices,
   replay,
-  require,
+  require as requirement,
   seed,
   seedValue,
   shrink,
@@ -136,7 +136,7 @@ describe("option", () => {
     it("returns the option of a coverage requirement", ({ seat }) => {
       check.isEqualTo(
         seat,
-        require("even", 0.25),
+        requirement("even", 0.25),
         { kind: "require", value: { label: "even", share: 0.25 } },
         "the requirement",
       );
@@ -145,7 +145,7 @@ describe("option", () => {
     it("throws a RangeError for a share above 1", ({ seat }) => {
       check.isEqualTo(
         seat,
-        thrown(() => require("even", 1.5)),
+        thrown(() => requirement("even", 1.5)),
         'prop: require("even", 1.5) states a share outside [0, 1]',
         "require refuses 1.5",
       );
@@ -154,7 +154,7 @@ describe("option", () => {
     it("throws a RangeError for a share of NaN", ({ seat }) => {
       check.isEqualTo(
         seat,
-        thrown(() => require("even", Number.NaN)),
+        thrown(() => requirement("even", Number.NaN)),
         'prop: require("even", NaN) states a share outside [0, 1]',
         "require refuses NaN",
       );
@@ -350,8 +350,8 @@ describe("option", () => {
           cases(5),
           seed(9n),
           replay("prop1:AA"),
-          require("a", 0.5),
-          require("b", 0.25),
+          requirement("a", 0.5),
+          requirement("b", 0.25),
           shrink(10),
           shrinkTime(20),
           maxChoices(30),

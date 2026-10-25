@@ -8,7 +8,9 @@
  * same inputs, and the inputs cover more paths than one literal does.
  */
 
-import { Case, DECODE, Generating, Rejected, Skipped } from "./engine/case.js";
+import { Generating } from "./engine/case/providers.js";
+import { Rejected, Skipped } from "./engine/case/signals.js";
+import { Case, DECODE } from "./engine/case.js";
 import type { Generator } from "./engine/generator.js";
 import { caseSource } from "./engine/source.js";
 import { seedValue } from "./option.js";
@@ -63,13 +65,17 @@ export function values<T>(
       if (err instanceof Skipped) {
         throw new Error(
           `prop: ${call} stops at a case that the generator skips: ${err.reason}`,
+          { cause: err },
         );
       }
-      if (!(err instanceof Rejected)) throw err;
+      if (!(err instanceof Rejected)) {
+        throw err;
+      }
       rejected += 1;
       if (rejected > REJECTIONS_PER_VALUE * n) {
         throw new Error(
           `prop: ${call} stops after the generator rejects ${rejected} cases for ${n} values`,
+          { cause: err },
         );
       }
     }

@@ -6,7 +6,9 @@
 import { describe } from "vitest";
 import { Failure } from "../../src/failure.js";
 import { check } from "../../src/index.js";
-import { Case, Failed, Replaying } from "../../src/prop/engine/case.js";
+import { Replaying } from "../../src/prop/engine/case/providers.js";
+import { Failed } from "../../src/prop/engine/case/signals.js";
+import { Case } from "../../src/prop/engine/case.js";
 import type { Choice } from "../../src/prop/engine/choice.js";
 import type { Execution } from "../../src/prop/engine/execution.js";
 import type { Generator } from "../../src/prop/engine/generator.js";
@@ -27,7 +29,9 @@ function failing(
   ...draws: [string, Generator<unknown>][]
 ): Execution {
   const c = new Case(new Replaying(choices));
-  for (const [label, generator] of draws) c.draw(generator, label);
+  for (const [label, generator] of draws) {
+    c.draw(generator, label);
+  }
   const failure = new Failure("equal", "the total", {}, WHERE);
   const identity = ofRecord(failure);
   return {

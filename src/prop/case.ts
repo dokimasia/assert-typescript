@@ -20,17 +20,24 @@
  */
 
 import type { Clock } from "../clock.js";
-import { callSite, Failure, type Where } from "../failure.js";
+import { Failure, type Where } from "../failure.js";
 import { History } from "../history/history.js";
 import { clockOf, type Reporter, type Seat, signalOf } from "../matcher/seat.js";
 import { own, run, type Slot } from "../record/calls.js";
 import { Standard } from "../seat.js";
-import { type Case as Engine, Failed, Rejected, Skipped } from "./engine/case.js";
+import {
+  CASES,
+  check,
+  failedWith,
+  locate,
+  STATES,
+  stateOf,
+  stop,
+} from "./case/state.js";
+import { Rejected, Skipped } from "./engine/case/signals.js";
+import type { Case as Engine } from "./engine/case.js";
 import type { Generator } from "./engine/generator.js";
-import { TraceError } from "./engine/trace.js";
-import { Diverged, Repeated } from "./engine/tree.js";
-import { pending, type Work } from "./engine/work.js";
-import { type Identity, keyOf, ofError, ofRecord } from "./identity.js";
+import type { Identity } from "./identity.js";
 
 /** What a failed case failed with: its record, and the identity that the shrinker keeps it by. */
 export interface Failing {
@@ -50,64 +57,6 @@ export interface Location {
    * calls.
    */
   readonly pinned: boolean;
-}
-
-/** The state of a case that only the property's run reads. */
-interface State {
-  readonly engine: Engine;
-  readonly seat: Seat;
-  readonly controller: AbortController;
-  readonly location: Location;
-  readonly records: Failure[];
-  raised: { readonly value: unknown } | undefined;
-  stopped: unknown;
-  readonly cleanups: (() => unknown)[];
-  history: History | undefined;
-}
-
-/** The state of each case. */
-const STATES = new WeakMap<Case, State>();
-
-/** The case of each engine case that a property's body runs on. */
-const CASES = new WeakMap<Engine, Case>();
-
-/** Returns the state of c. */
-function stateOf(c: Case): State {
-  return STATES.get(c) as State;
-}
-
-/** Reports whether err is a signal of the engine, which ends the case. */
-function isSignal(err: unknown): boolean {
-  return (
-    err instanceof Rejected ||
-    err instanceof Failed ||
-    err instanceof Skipped ||
-    err instanceof Repeated ||
-    err instanceof Diverged ||
-    err instanceof TraceError
-  );
-}
-
-/** Throws the signal that ended the case, when one did. */
-function check(state: State): void {
-  if (state.stopped !== undefined) throw state.stopped;
-}
-
-/** Keeps err as the signal that ended the case when it is one, and throws it. */
-function stop(state: State, err: unknown): never {
-  if (isSignal(err)) state.stopped ??= err;
-  throw err;
-}
-
-/** Returns the location of a record that the case's caller makes: the innermost frame of the caller's code, or the property's call site. */
-function locate(location: Location): Where | undefined {
-  return location.pinned ? location.site : (callSite() ?? location.site);
-}
-
-/** Returns the failure of a case whose first record is failure. */
-function failedWith(failure: Failure): Failed {
-  const identity = ofRecord(failure);
-  return new Failed(keyOf(identity), { failure, identity } satisfies Failing);
 }
 
 /**
@@ -148,8 +97,10 @@ export class Case implements Seat, Reporter {
     run(own(this), slot);
   }
 
-  /** Does nothing: a case's records state the frame of their own calls. */
-  helper(): void {}
+  /** Marks the calling function as a helper, which a case does not track. */
+  helper(): void {
+    // A case's records state the frame of their own calls.
+  }
 
   /**
    * Keeps a record without an assertion, whose contract is the message and
@@ -196,7 +147,9 @@ export class Case implements Seat, Reporter {
         ? new Failure(failure.assertion, failure.contract, failure.detail, site)
         : failure,
     );
-    if (aborting) stop(state, failedWith(state.records[0] as Failure));
+    if (aborting) {
+      stop(state, failedWith(state.records[0] as Failure));
+    }
   }
 
   /** Returns the clock of the property's seat, so every case runs under the test's clock. */
@@ -235,7 +188,9 @@ export class Case implements Seat, Reporter {
   assume(condition: boolean): void {
     const state = stateOf(this);
     check(state);
-    if (!condition) stop(state, new Rejected());
+    if (!condition) {
+      stop(state, new Rejected());
+    }
   }
 
   /**
@@ -396,81 +351,4 @@ export function onEngine<T>(c: Case, fn: (engine: Engine) => T): T {
 export function caseOf(engine: Engine): Case {
   const location: Location = { site: undefined, pinned: false };
   return CASES.get(engine) ?? new Case(engine, new Standard(), undefined, location);
-}
-
-/** Keeps what a body or a cleanup threw: a signal, or the first raised value. */
-function caught(state: State, err: unknown): void {
-  if (isSignal(err)) state.stopped ??= err;
-  else state.raised ??= { value: err };
-}
-
-/** Runs the cleanups of a case, the last registered first, each awaited when it returns a promise. */
-function* cleanUp(state: State): Work<void> {
-  for (let fn = state.cleanups.pop(); fn !== undefined; fn = state.cleanups.pop()) {
-    try {
-      const promise = pending(fn());
-      if (promise !== undefined) yield promise;
-    } catch (err) {
-      caught(state, err);
-    }
-  }
-}
-
-/**
- * Returns the failure of a case that failed: its first record, or a record
- * of what it raised. A record of a raised value has no assertion, its
- * contract is the value's text, and its detail states the value's type and
- * its stack.
- */
-function failureOf(state: State): Failed | undefined {
-  const first = state.records[0];
-  if (first !== undefined) return failedWith(first);
-  if (state.raised === undefined) return undefined;
-  const value = state.raised.value;
-  const identity = ofError(value, state.location.site);
-  const text = value instanceof Error ? value.message : String(value);
-  const stack = value instanceof Error ? String(value.stack) : "";
-  const failure = new Failure(
-    "",
-    text,
-    { error: identity.error, stack },
-    identity.where,
-  );
-  return new Failed(keyOf(identity), { failure, identity } satisfies Failing);
-}
-
-/**
- * Runs body on c as one case of a property, and ends the case: it aborts the
- * case's signal and runs its cleanups, then throws how the case ended. A case
- * that repeats a tested case, diverges, or follows a trace that it cannot
- * follow throws that signal. A case that failed, in the body or in a
- * cleanup, throws its failure, also when it was rejected, skipped or passed
- * its cap. A rejected case throws its rejection, a case that skipped throws
- * its skip, and a case that passed returns.
- *
- * @param c - The case.
- * @param body - The body, which may return a promise.
- * @returns The work of the case.
- */
-export function* execute(c: Case, body: (c: Case) => unknown): Work<void> {
-  const state = stateOf(c);
-  try {
-    const promise = pending(body(c));
-    if (promise !== undefined) yield promise;
-  } catch (err) {
-    caught(state, err);
-  }
-  state.controller.abort(new DOMException("the case ended", "AbortError"));
-  yield* cleanUp(state);
-  const signal = state.stopped;
-  if (
-    signal instanceof Repeated ||
-    signal instanceof Diverged ||
-    signal instanceof TraceError
-  ) {
-    throw signal;
-  }
-  const failed = failureOf(state);
-  if (failed !== undefined) throw failed;
-  if (signal !== undefined) throw signal;
 }

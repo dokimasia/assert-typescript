@@ -5,7 +5,8 @@
 
 import { describe } from "vitest";
 import { check } from "../../src/index.js";
-import { composite, integer, list } from "../../src/prop/generators.js";
+import { list } from "../../src/prop/generators/collections.js";
+import { composite, integer } from "../../src/prop/generators.js";
 import { values } from "../../src/prop/values.js";
 import { test as it } from "../../src/vitest.js";
 import { thrown } from "../helpers.js";

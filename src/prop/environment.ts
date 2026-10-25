@@ -26,29 +26,38 @@ import process from "node:process";
 import { Fault } from "../matcher/fault.js";
 import { mix } from "./engine/source.js";
 
-/** The variables of the engine. */
-export const SEED_VARIABLE = "DOKIMI_ASSERT_PROP_SEED";
-export const PROFILE_VARIABLE = "DOKIMI_ASSERT_PROP_PROFILE";
-export const BUDGET_VARIABLE = "DOKIMI_ASSERT_PROP_BUDGET";
-export const REPLAY_VARIABLE = "DOKIMI_ASSERT_PROP_REPLAY";
-
 /** The variable that a mutation run sets in every process that it instruments. */
 const MUTANT_VARIABLE = "DOKIMI_MUTATE_MUTANT";
 
 /** The largest budget, in seconds: 2^33 − 1, as for every other language. */
-const MAX_BUDGET = 2 ** 33 - 1;
+const MAX_BUDGET = 8_589_934_591;
 
-/** The largest seed: every seed is an unsigned 64-bit integer. */
-const SEED_LIMIT = 2n ** 64n;
+/** The bound of every seed, 2^64: every seed is an unsigned 64-bit integer. */
+const SEED_LIMIT = 1n << 64n;
 
-/** A set of defaults for a whole test run. */
-export type Profile = "default" | "ci" | "campaign";
+/** The bytes of a random seed. */
+const SEED_BYTES = 8;
+
+/** The milliseconds of a second. */
+const MILLISECONDS_PER_SECOND = 1000;
+
+/** The text of a whole number in decimal. */
+const DIGITS = /^[0-9]+$/;
 
 /** Returns the value of a variable, or undefined for an unset or empty one. */
 function variable(name: string): string | undefined {
   const value = process.env[name];
   return value === undefined || value === "" ? undefined : value;
 }
+
+/** The variables of the engine. */
+export const SEED_VARIABLE = "DOKIMI_ASSERT_PROP_SEED";
+export const PROFILE_VARIABLE = "DOKIMI_ASSERT_PROP_PROFILE";
+export const BUDGET_VARIABLE = "DOKIMI_ASSERT_PROP_BUDGET";
+export const REPLAY_VARIABLE = "DOKIMI_ASSERT_PROP_REPLAY";
+
+/** A set of defaults for a whole test run. */
+export type Profile = "default" | "ci" | "campaign";
 
 /**
  * Reports whether this process runs under a mutation run.
@@ -67,7 +76,9 @@ export function mutated(): boolean {
  */
 export function profileOf(): Profile {
   const name = variable(PROFILE_VARIABLE) ?? "default";
-  if (name === "default" || name === "ci" || name === "campaign") return name;
+  if (name === "default" || name === "ci" || name === "campaign") {
+    return name;
+  }
   throw new Fault(
     PROFILE_VARIABLE,
     `${JSON.stringify(name)} names none of the default, ci and campaign profiles`,
@@ -95,10 +106,12 @@ export function seedOf(
   hermetic: boolean,
 ): bigint {
   const profile = hermetic ? "default" : profileOf();
-  if (stated !== undefined) return stated;
+  if (stated !== undefined) {
+    return stated;
+  }
   const text = hermetic ? undefined : variable(SEED_VARIABLE);
   if (text !== undefined) {
-    const seed = /^[0-9]+$/.test(text) ? BigInt(text) : SEED_LIMIT;
+    const seed = DIGITS.test(text) ? BigInt(text) : SEED_LIMIT;
     if (seed >= SEED_LIMIT) {
       throw new Fault(
         SEED_VARIABLE,
@@ -107,8 +120,10 @@ export function seedOf(
     }
     return seed;
   }
-  if (mutated() || profile === "ci") return mix(Buffer.from(contract, "utf8"));
-  return randomBytes(8).readBigUInt64LE();
+  if (mutated() || profile === "ci") {
+    return mix(Buffer.from(contract, "utf8"));
+  }
+  return randomBytes(SEED_BYTES).readBigUInt64LE();
 }
 
 /**
@@ -124,16 +139,18 @@ export function seedOf(
  *   seconds from 1 to 2^33 − 1.
  */
 export function budgetOf(hermetic: boolean): number {
-  if (hermetic || mutated() || profileOf() !== "campaign") return 0;
+  if (hermetic || mutated() || profileOf() !== "campaign") {
+    return 0;
+  }
   const text = process.env[BUDGET_VARIABLE] ?? "";
-  const seconds = /^[0-9]+$/.test(text) ? Number(text) : 0;
+  const seconds = DIGITS.test(text) ? Number(text) : 0;
   if (seconds < 1 || seconds > MAX_BUDGET) {
     throw new Fault(
       BUDGET_VARIABLE,
       `${JSON.stringify(text)} is no whole number of seconds above 0`,
     );
   }
-  return seconds * 1000;
+  return seconds * MILLISECONDS_PER_SECOND;
 }
 
 /**
@@ -149,7 +166,9 @@ export function tokenOf(
   stated: string | undefined,
   hermetic: boolean,
 ): { readonly token: string; readonly source: string } | undefined {
-  if (stated !== undefined) return { token: stated, source: "replay" };
+  if (stated !== undefined) {
+    return { token: stated, source: "replay" };
+  }
   const token = hermetic ? undefined : variable(REPLAY_VARIABLE);
   return token === undefined ? undefined : { token, source: REPLAY_VARIABLE };
 }

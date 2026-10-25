@@ -48,7 +48,9 @@ function filled(
   dir: string,
   ...entries: { name: string; entry: Record<string, unknown> }[]
 ): string {
-  for (const one of entries) save(dir, one.name, one.entry);
+  for (const one of entries) {
+    save(dir, one.name, one.entry);
+  }
   return dir;
 }
 

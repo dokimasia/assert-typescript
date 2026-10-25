@@ -20,6 +20,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Fault } from "../matcher/fault.js";
 import { type Cleanups, type Seat, testOf } from "../matcher/seat.js";
+import { compareText } from "../order.js";
 import type { Choice } from "./engine/choice.js";
 import { read } from "./engine/store.js";
 
@@ -35,21 +36,8 @@ const FORBIDDEN = new Set(["%", "/", "\\", ":", "*", "?", '"', "<", ">", "|"]);
 /** The control characters, which no file name contains: those below space. */
 const FIRST_PRINTABLE = 0x20;
 
-/** An entry of a store that a property replays. */
-export interface Stored {
-  /** The file's name. */
-  readonly name: string;
-  /** The minimal case's choices. */
-  readonly choices: readonly Choice[];
-  /** Each draw of the counterexample, as the entry records it. */
-  readonly counterexample: readonly Readonly<Record<string, unknown>>[];
-}
-
-/** What a property reads from its store: its entries, oldest first, and the files that it skips. */
-export interface Loaded {
-  readonly entries: readonly Stored[];
-  readonly skipped: readonly string[];
-}
+/** The radix of the two digits of an escape. */
+const ESCAPE_RADIX = 16;
 
 /** The claims of the running properties on the entries of their contracts. */
 const CLAIMS = new Set<string>();
@@ -65,8 +53,10 @@ function escaped(segment: string): string {
     .map((char, i) => {
       const code = char.codePointAt(0) as number;
       const ending = i === chars.length - 1 && (char === "." || char === " ");
-      if (!FORBIDDEN.has(char) && code >= FIRST_PRINTABLE && !ending) return char;
-      return `%${code.toString(16).toUpperCase().padStart(2, "0")}`;
+      if (!FORBIDDEN.has(char) && code >= FIRST_PRINTABLE && !ending) {
+        return char;
+      }
+      return `%${code.toString(ESCAPE_RADIX).toUpperCase().padStart(2, "0")}`;
     })
     .join("");
 }
@@ -75,6 +65,45 @@ function escaped(segment: string): string {
 function below(root: readonly string[], seat: Seat): string {
   const path = testOf(seat);
   return path === undefined ? "" : join(...root, ...path.map(escaped));
+}
+
+/** Returns the names of the files of dir, or none for a directory that does not exist. */
+function filesOf(dir: string): string[] {
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => !entry.isDirectory() && entry.name.endsWith(".json"))
+      .map((entry) => entry.name);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw new Fault(dir, "the store cannot be read", { cause: err });
+  }
+}
+
+/** Returns the text of the file at path, or undefined for a file that is no UTF-8 text or that cannot be read. */
+function textOf(decoder: TextDecoder, path: string): string | undefined {
+  try {
+    return decoder.decode(readFileSync(path));
+  } catch {
+    return undefined;
+  }
+}
+
+/** An entry of a store that a property replays. */
+export interface Stored {
+  /** The file's name. */
+  readonly name: string;
+  /** The minimal case's choices. */
+  readonly choices: readonly Choice[];
+  /** Each draw of the counterexample, as the entry records it. */
+  readonly counterexample: readonly Readonly<Record<string, unknown>>[];
+}
+
+/** What a property reads from its store: its entries, oldest first, and the files that it skips. */
+export interface Loaded {
+  readonly entries: readonly Stored[];
+  readonly skipped: readonly string[];
 }
 
 /**
@@ -114,26 +143,18 @@ export function seedsOf(seat: Seat): string {
  */
 export function claim(seat: Seat, dir: string, contract: string): boolean {
   const cleanups = (seat as Partial<Cleanups>).cleanup;
-  if (dir === "" || typeof cleanups !== "function") return true;
+  if (dir === "" || typeof cleanups !== "function") {
+    return true;
+  }
   const key = `${dir}\u0000${contract}`;
-  if (CLAIMS.has(key)) return false;
+  if (CLAIMS.has(key)) {
+    return false;
+  }
   CLAIMS.add(key);
   cleanups.call(seat, () => {
     CLAIMS.delete(key);
   });
   return true;
-}
-
-/** Returns the names of the files of dir, or none for a directory that does not exist. */
-function filesOf(dir: string): string[] {
-  try {
-    return readdirSync(dir, { withFileTypes: true })
-      .filter((entry) => !entry.isDirectory() && entry.name.endsWith(".json"))
-      .map((entry) => entry.name);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw new Fault(dir, "the store cannot be read", err);
-  }
 }
 
 /**
@@ -152,36 +173,34 @@ export function load(dir: string, contract: string): Loaded {
   const skipped: string[] = [];
   const damaged: string[] = [];
   const decoder = new TextDecoder("utf-8", { fatal: true });
-  for (const name of filesOf(dir).sort()) {
-    let text: string;
-    try {
-      text = decoder.decode(readFileSync(join(dir, name)));
-    } catch {
+  for (const name of filesOf(dir).sort(compareText)) {
+    const text = textOf(decoder, join(dir, name));
+    if (text === undefined) {
       damaged.push(name);
-      continue;
-    }
-    const verdict = read(text, contract);
-    if (verdict.verdict === "replay") {
-      const parsed = JSON.parse(text) as {
-        found: string;
-        counterexample: Stored["counterexample"];
-      };
-      entries.push({
-        name,
-        choices: verdict.choices,
-        counterexample: parsed.counterexample,
-        found: parsed.found,
-      });
-    } else if (verdict.verdict === "skip") {
-      skipped.push(name);
-    } else if (verdict.verdict === "damaged") {
-      damaged.push(name);
+    } else {
+      const verdict = read(text, contract);
+      if (verdict.verdict === "replay") {
+        const parsed = JSON.parse(text) as {
+          found: string;
+          counterexample: Stored["counterexample"];
+        };
+        entries.push({
+          name,
+          choices: verdict.choices,
+          counterexample: parsed.counterexample,
+          found: parsed.found,
+        });
+      } else if (verdict.verdict === "skip") {
+        skipped.push(name);
+      } else if (verdict.verdict === "damaged") {
+        damaged.push(name);
+      }
     }
   }
   if (damaged.length > 0) {
     throw new Fault(dir, `the store has damaged files: ${damaged.join(", ")}`);
   }
-  entries.sort((a, b) => (a.found === b.found ? 0 : a.found < b.found ? -1 : 1));
+  entries.sort((a, b) => compareText(a.found, b.found));
   return { entries, skipped };
 }
 
@@ -206,7 +225,9 @@ export function save(
       flag: "wx",
     });
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "EEXIST") return false;
+    if ((err as NodeJS.ErrnoException).code === "EEXIST") {
+      return false;
+    }
     throw err;
   }
   return true;
@@ -225,10 +246,12 @@ export function seeds(dir: string): (readonly [name: string, data: Uint8Array])[
     return readdirSync(dir, { withFileTypes: true })
       .filter((entry) => entry.isFile())
       .map((entry) => entry.name)
-      .sort()
+      .sort(compareText)
       .map((name) => [name, Uint8Array.from(readFileSync(join(dir, name)))] as const);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw new Fault(dir, "the seed files cannot be read", err);
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw new Fault(dir, "the seed files cannot be read", { cause: err });
   }
 }

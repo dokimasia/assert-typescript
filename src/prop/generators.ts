@@ -12,59 +12,42 @@
  */
 
 import { type Case, caseOf } from "./case.js";
-import { durationOf, nanosecondsOf } from "./convert.js";
-import * as alphabet from "./engine/alphabet.js";
+import { durationOf, nanosecondsOf } from "./convert/time.js";
 import {
   FloatBounds,
   INT64_MAX,
   INT64_MIN,
   IntegerBounds,
-  SequenceBounds,
   UINT64_MAX,
 } from "./engine/choice.js";
-import { Sizes } from "./engine/collection.js";
 import type { Rational } from "./engine/draw.js";
 import type { Width } from "./engine/float.js";
 import {
   Bool,
-  Bytes,
   Composite,
-  Dict,
   Float,
   type Generator,
   Integer,
   Just,
-  List,
   Mapped,
-  Matching,
   OneOf,
   Optional,
-  Permutation,
   Recursive,
   SampledFrom,
-  Text,
 } from "./engine/generator.js";
-import { piece } from "./engine/pattern.js";
-import { Pairs } from "./engine/value.js";
 
-/** The sizes of a collection: the fewest and the most elements. */
-export interface SizeOption {
-  /** The fewest elements, 0 by default. */
-  readonly minSize?: number;
-  /** The most elements. Without it, the cap on choices per case bounds the size. */
-  readonly maxSize?: number;
-}
+/** The prefix of the message of an error of the engine. */
+const PREFIX = /^prop: /;
 
-/** The options of a list. */
-export interface ListOption extends SizeOption {
-  /** Whether no two elements are equal. An element equal to an earlier one is discarded. */
-  readonly unique?: boolean;
-}
-
-/** The options of a string. */
-export interface StringOption extends SizeOption {
-  /** The characters to draw from, the first the simplest. The default alphabet starts with the digits and the ASCII letters. */
-  readonly alphabet?: string;
+/** Returns the bigint of an integer that a number states, which must be safe. */
+function exact(call: string, value: number | bigint): bigint {
+  if (typeof value === "bigint") {
+    return value;
+  }
+  if (!Number.isSafeInteger(value)) {
+    refuse(call, `states ${value}, which is no safe integer`);
+  }
+  return BigInt(value);
 }
 
 /** The options of a float. */
@@ -88,40 +71,18 @@ export interface RecursiveOption {
 }
 
 /** Returns the options merged in order, a later field over an earlier one. */
-function merged<T extends object>(options: readonly T[]): T {
+export function merged<T extends object>(options: readonly T[]): T {
   return Object.assign({}, ...options) as T;
 }
 
 /** Throws a RangeError that names the call and states what its arguments lack. */
-function refuse(call: string, reason: string): never {
+export function refuse(call: string, reason: string): never {
   throw new RangeError(`prop: ${call} ${reason}`);
 }
 
 /** Returns the message of an error of the engine without its package's prefix. */
-function causeOf(err: unknown): string {
-  return (err as Error).message.replace(/^prop: /, "");
-}
-
-/** Returns the sizes that options state, refusing sizes that admit no length. */
-function sizesOf(call: string, options: SizeOption): Sizes {
-  const lo = options.minSize ?? 0;
-  const hi = options.maxSize;
-  const whole =
-    Number.isSafeInteger(lo) &&
-    lo >= 0 &&
-    (hi === undefined || Number.isSafeInteger(hi));
-  if (!whole || (hi !== undefined && hi < lo)) {
-    refuse(call, `states the sizes [${lo}, ${hi}], which admit no length`);
-  }
-  return new Sizes(lo, hi);
-}
-
-/** Returns the bigint of an integer that a number states, which must be safe. */
-function exact(call: string, value: number | bigint): bigint {
-  if (typeof value === "bigint") return value;
-  if (!Number.isSafeInteger(value))
-    refuse(call, `states ${value}, which is no safe integer`);
-  return BigInt(value);
+export function causeOf(err: unknown): string {
+  return (err as Error).message.replace(PREFIX, "");
 }
 
 /**
@@ -144,12 +105,16 @@ export function integer(
   hi: number | bigint,
 ): Generator<number | bigint> {
   const call = `integer(${lo}, ${hi})`;
-  if (typeof lo !== typeof hi) refuse(call, "states bounds of two types");
+  if (typeof lo !== typeof hi) {
+    refuse(call, "states bounds of two types");
+  }
   const low = exact(call, lo);
   const high = exact(call, hi);
   const signed = low >= INT64_MIN && high <= INT64_MAX;
   const unsigned = low >= 0n && high <= UINT64_MAX;
-  if (low > high || !(signed || unsigned)) refuse(call, "states no value");
+  if (low > high || !(signed || unsigned)) {
+    refuse(call, "states no value");
+  }
   const choice = new Integer(new IntegerBounds(low, high));
   const numbers = typeof lo === "number";
   return new Mapped(
@@ -196,9 +161,13 @@ export function boolean(...options: BooleanOption[]): Generator<boolean> {
   const call = `boolean({ p: [${p[0]}, ${p[1]}] })`;
   const num = exact(call, p[0]);
   const den = exact(call, p[1]);
-  if (num < 0n || den < 1n || num > den) refuse(call, "states no probability");
+  if (num < 0n || den < 1n || num > den) {
+    refuse(call, "states no probability");
+  }
   let [a, b] = [num, den];
-  while (b !== 0n) [a, b] = [b, a % b];
+  while (b !== 0n) {
+    [a, b] = [b, a % b];
+  }
   const reduced: Rational = { num: num / a, den: den / a };
   return new Bool(reduced);
 }
@@ -222,7 +191,9 @@ export function just<T>(value: T): Generator<T> {
  * @throws RangeError for no value.
  */
 export function sampledFrom<T>(...values: readonly T[]): Generator<T> {
-  if (values.length === 0) refuse("sampledFrom()", "states no value");
+  if (values.length === 0) {
+    refuse("sampledFrom()", "states no value");
+  }
   return new SampledFrom(values);
 }
 
@@ -236,7 +207,9 @@ export function sampledFrom<T>(...values: readonly T[]): Generator<T> {
  * @throws RangeError for no generator.
  */
 export function oneOf<T>(...generators: readonly Generator<T>[]): Generator<T> {
-  if (generators.length === 0) refuse("oneOf()", "states no generator");
+  if (generators.length === 0) {
+    refuse("oneOf()", "states no generator");
+  }
   return new OneOf(generators);
 }
 
@@ -249,90 +222,6 @@ export function oneOf<T>(...generators: readonly Generator<T>[]): Generator<T> {
  */
 export function optional<T>(of: Generator<T>): Generator<T | undefined> {
   return new Optional(of);
-}
-
-/**
- * Returns the generator of lists of of's values: per element a continue
- * choice and the element's choices, then a stop. A unique list discards an
- * element equal to an earlier one, and ten discards in a row stop it.
- *
- * @param of - The generator of the elements.
- * @param options - The sizes, and whether the elements are unique.
- * @returns The generator.
- * @throws RangeError for sizes that admit no length.
- */
-export function list<T>(of: Generator<T>, ...options: ListOption[]): Generator<T[]> {
-  const stated = merged(options);
-  return new List(of, sizesOf("list", stated), stated.unique ?? false);
-}
-
-/**
- * Returns the generator of Maps from keys to values: per entry a continue
- * choice, the key's choices and the value's, then a stop. An entry whose key
- * equals an earlier key is discarded. A Map contains one of the keys +0 and -0,
- * which the definition counts as two keys.
- *
- * @param keys - The generator of the keys.
- * @param values - The generator of the values.
- * @param options - The sizes.
- * @returns The generator.
- * @throws RangeError for sizes that admit no length.
- */
-export function dict<K, V>(
-  keys: Generator<K>,
-  values: Generator<V>,
-  ...options: SizeOption[]
-): Generator<Map<K, V>> {
-  return new Mapped(
-    new Dict(keys, values, sizesOf("dict", merged(options))),
-    (pairs: Pairs) => new Map(pairs.items as readonly (readonly [K, V])[]),
-    (value) => (value instanceof Map ? new Pairs([...value]) : (value as Pairs)),
-  );
-}
-
-/**
- * Returns the generator of strings: one sequence of indices into the
- * alphabet. The default alphabet starts with the digits, the lowercase and
- * the uppercase letters, space and the ASCII punctuation, then every other
- * Unicode scalar value, so a string shrinks towards "0". A string never has
- * a lone surrogate.
- *
- * @param options - The sizes, and the alphabet.
- * @returns The generator.
- * @throws RangeError for sizes that admit no length, and for an alphabet
- *   that is empty, repeats a character or has a lone surrogate.
- */
-export function string(...options: StringOption[]): Generator<string> {
-  const stated = merged(options);
-  const sizes = sizesOf("string", stated);
-  if (stated.alphabet === undefined) {
-    return new Text(
-      undefined,
-      new SequenceBounds(alphabet.SIZE, sizes.minSize, sizes.maxSize),
-    );
-  }
-  const chars = [...stated.alphabet];
-  const call = `string({ alphabet: ${JSON.stringify(stated.alphabet)} })`;
-  if (chars.length === 0) refuse(call, "states no character");
-  if (new Set(chars).size !== chars.length) refuse(call, "repeats a character");
-  if (chars.some((c) => alphabet.indexOf(c) === undefined))
-    refuse(call, "has a lone surrogate");
-  return new Text(
-    chars,
-    new SequenceBounds(chars.length, sizes.minSize, sizes.maxSize),
-  );
-}
-
-/**
- * Returns the generator of byte strings: one sequence of 256 element values.
- *
- * @param options - The sizes.
- * @returns The generator.
- * @throws RangeError for sizes that admit no length.
- */
-export function bytes(...options: SizeOption[]): Generator<Uint8Array> {
-  const sizes = sizesOf("bytes", merged(options));
-  return new Bytes(new SequenceBounds(256, sizes.minSize, sizes.maxSize));
 }
 
 /**
@@ -356,46 +245,15 @@ export function duration(
   }
   const low = nanosecondsOf(lo);
   const high = nanosecondsOf(hi);
-  if (low > high || low < INT64_MIN || high > INT64_MAX)
+  if (low > high || low < INT64_MIN || high > INT64_MAX) {
     refuse(call, "states no duration");
+  }
   return new Mapped(
     new Integer(new IntegerBounds(low, high), "duration"),
     durationOf,
     (value) =>
       value instanceof Temporal.Duration ? nanosecondsOf(value) : (value as bigint),
   );
-}
-
-/**
- * Returns the generator of orderings of values: one swap choice per
- * position, whose targets leave the values in their stated order.
- *
- * @param values - The values.
- * @returns The generator.
- */
-export function permutation<T>(...values: readonly T[]): Generator<T[]> {
-  return new Permutation(values);
-}
-
-/**
- * Returns the generator of the strings that a pattern of the portable subset
- * matches in full. An alternation chooses a branch, a quantifier its
- * repetitions as a collection, and a class a character by an index in the
- * order of the default alphabet, so `[A0a]` shrinks to `0`.
- *
- * @param pattern - A pattern of the portable subset.
- * @returns The generator.
- * @throws RangeError for a pattern outside the portable subset.
- */
-export function stringMatching(pattern: string): Generator<string> {
-  try {
-    return new Matching(piece(pattern));
-  } catch (err) {
-    refuse(
-      `stringMatching(${JSON.stringify(pattern)})`,
-      `states no pattern of the portable subset: ${causeOf(err)}`,
-    );
-  }
 }
 
 /**

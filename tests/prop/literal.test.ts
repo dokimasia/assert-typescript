@@ -17,15 +17,8 @@ import {
 } from "../../src/prop/engine/generator.js";
 import { read } from "../../src/prop/engine/shape.js";
 import { Fields, Pairs, Variant } from "../../src/prop/engine/value.js";
-import {
-  boolean,
-  dict,
-  float,
-  integer,
-  list,
-  optional,
-  string,
-} from "../../src/prop/generators.js";
+import { dict, list, string } from "../../src/prop/generators/collections.js";
+import { boolean, float, integer, optional } from "../../src/prop/generators.js";
 import { drawnLiteral } from "../../src/prop/literal.js";
 import { test as it } from "../../src/vitest.js";
 

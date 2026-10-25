@@ -16,7 +16,7 @@
 
 import { DEFINITION } from "../record/call.js";
 import type { Failing } from "./case.js";
-import type { Drawn } from "./engine/case.js";
+import type { Drawn } from "./engine/case/record.js";
 import type { Execution } from "./engine/execution.js";
 import * as literal from "./engine/literal.js";
 import * as store from "./engine/store.js";
@@ -30,6 +30,15 @@ function drawsOf(draws: readonly Drawn[]): Record<string, unknown>[] {
     const value = drawnLiteral(drawn.generator, drawn.value);
     return value === undefined ? { label: drawn.label } : { label: drawn.label, value };
   });
+}
+
+/** Returns the canonical text of the value of a typed literal, or undefined for a literal that does not decode. */
+function literalKey(written: unknown): string | undefined {
+  try {
+    return canonical(literal.decode(written));
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -46,7 +55,7 @@ export function entryOf(
   execution: Execution,
   found: string,
 ): { readonly name: string; readonly entry: Record<string, unknown> } {
-  const choices = execution.case.choices;
+  const { choices } = execution.case;
   const failing = execution.failure?.record as Failing;
   const failure: store.Failure = {
     contract,
@@ -58,15 +67,6 @@ export function entryOf(
     name: store.name(contract, choices),
     entry: store.entry(failure, DEFINITION, found),
   };
-}
-
-/** Returns the canonical text of the value of a typed literal, or undefined for a literal that does not decode. */
-function literalKey(written: unknown): string | undefined {
-  try {
-    return canonical(literal.decode(written));
-  } catch {
-    return undefined;
-  }
 }
 
 /**
@@ -87,11 +87,17 @@ export function differs(
   replayed: Execution,
 ): boolean {
   const draws = drawsOf(replayed.case.draws);
-  if (recorded.length !== draws.length) return true;
+  if (recorded.length !== draws.length) {
+    return true;
+  }
   return recorded.some((entry, i) => {
     const draw = draws[i] as Record<string, unknown>;
-    if (entry["label"] !== draw["label"]) return true;
-    if (!("value" in entry)) return false;
+    if (entry["label"] !== draw["label"]) {
+      return true;
+    }
+    if (!("value" in entry)) {
+      return false;
+    }
     const value = literalKey(entry["value"]);
     return (
       value === undefined || !("value" in draw) || value !== literalKey(draw["value"])

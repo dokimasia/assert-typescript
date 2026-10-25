@@ -32,8 +32,9 @@
  * `testdata/prop`, and later runs replay it first.
  */
 
-import { FOR_ALL, registerSentences } from "./detail.js";
-import { FORM_IDS } from "./forms.js";
+import { registerSentences } from "./detail/sentence.js";
+import { FOR_ALL } from "./detail.js";
+import { FORM_IDS } from "./form.js";
 
 registerSentences([FOR_ALL, ...FORM_IDS]);
 
@@ -81,28 +82,30 @@ export {
 } from "./forms.js";
 export { fuzz } from "./fuzz.js";
 export {
+  bytes,
+  dict,
+  type ListOption,
+  list,
+  permutation,
+  type SizeOption,
+  type StringOption,
+  string,
+  stringMatching,
+} from "./generators/collections.js";
+export {
   type BooleanOption,
   boolean,
-  bytes,
   composite,
-  dict,
   duration,
   type FloatOption,
   float,
   integer,
   just,
-  type ListOption,
-  list,
   oneOf,
   optional,
-  permutation,
   type RecursiveOption,
   recursive,
-  type SizeOption,
-  type StringOption,
   sampledFrom,
-  string,
-  stringMatching,
 } from "./generators.js";
 export {
   around,
@@ -125,12 +128,6 @@ export {
   type Wrapper,
   workers,
 } from "./option.js";
-export {
-  of,
-  ofShape,
-  register,
-  registerValues,
-  registerVariants,
-  shapeOf,
-} from "./registry.js";
+export { register, registerValues, registerVariants } from "./registry/register.js";
+export { of, ofShape, shapeOf } from "./registry.js";
 export { values } from "./values.js";

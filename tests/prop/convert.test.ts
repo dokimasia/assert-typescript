@@ -5,14 +5,8 @@
 
 import { describe } from "vitest";
 import { check } from "../../src/index.js";
-import {
-  type Converter,
-  converterOf,
-  durationOf,
-  IDENTITY,
-  nanosecondsOf,
-  plainOf,
-} from "../../src/prop/convert.js";
+import type { Converter } from "../../src/prop/convert/converter.js";
+import { converterOf } from "../../src/prop/convert.js";
 import { Fields, Pairs, Variant } from "../../src/prop/engine/value.js";
 import { test as it } from "../../src/vitest.js";
 import { thrown } from "../helpers.js";
@@ -36,82 +30,6 @@ function groups(...values: number[]): Uint8Array {
 }
 
 describe("convert", () => {
-  describe("IDENTITY", () => {
-    it("returns a value in both directions", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        [IDENTITY.to(1n), IDENTITY.back(1n)],
-        [1n, 1n],
-        "the same value",
-      );
-    });
-  });
-
-  describe("nanosecondsOf", () => {
-    it("returns the nanoseconds of a duration with days of 24 hours", ({ seat }) => {
-      const duration = Temporal.Duration.from({ days: 1, hours: 1, nanoseconds: 5 });
-
-      check.isEqualTo(
-        seat,
-        nanosecondsOf(duration),
-        90_000_000_000_005n,
-        "a day, an hour and 5 ns",
-      );
-    });
-
-    it("throws a RangeError for a duration with a calendar unit", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        thrown(() => nanosecondsOf(Temporal.Duration.from({ months: 1 }))),
-        "prop: P1M states a calendar unit, which has no fixed length",
-        "a month has no fixed length",
-      );
-    });
-  });
-
-  describe("durationOf", () => {
-    it("returns a duration balanced from the hours down", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        durationOf(90_000_000_000_005n).toString(),
-        "PT25H0.000000005S",
-        "25 hours and 5 ns",
-      );
-    });
-
-    it("returns a negative duration of negative nanoseconds", ({ seat }) => {
-      check.isEqualTo(
-        seat,
-        durationOf(-1_500_000_000n).toString(),
-        "-PT1.5S",
-        "minus 1.5 seconds",
-      );
-    });
-  });
-
-  describe("plainOf", () => {
-    it("converts every engine container in a value to its TypeScript form", ({
-      seat,
-    }) => {
-      const value = [
-        new Fields([["a", 1n]]),
-        new Pairs([["k", new Variant("none")]]),
-        new Variant("some", [2n]),
-      ];
-
-      check.isEqualTo(
-        seat,
-        plainOf(value),
-        [
-          { a: 1n },
-          new Map([["k", { name: "none" }]]),
-          { name: "some", payload: [2n] },
-        ],
-        "the TypeScript values",
-      );
-    });
-  });
-
   describe("converterOf", () => {
     it("returns a number of an int of 32 bits", ({ seat }) => {
       const converter = of(INT32);

@@ -23,53 +23,39 @@
  * option's wrapper.
  */
 
-import { join } from "node:path";
 import type { Where } from "../failure.js";
-import { Fault, ofOperation } from "../matcher/fault.js";
-import { Mode, type Seat, signalOf } from "../matcher/seat.js";
-import { noteFault, type Running } from "../matcher/verdict.js";
-import { own, type Slot } from "../record/calls.js";
-import { Case, caseOf, execute as executeCase, type Location } from "./case.js";
-import { detailJson, detailOf, recordOf } from "./detail.js";
-import { claim, type Loaded, load, type Stored, save, storeOf } from "./directory.js";
+import { Fault, noteFault, ofOperation } from "../matcher/fault.js";
+import { Mode, type Seat } from "../matcher/seat.js";
+import type { Running } from "../matcher/verdict.js";
+import type { Case } from "./case.js";
+import { claim, type Loaded, load, storeOf } from "./directory.js";
 import { Bridging } from "./engine/bridge.js";
 import { campaign } from "./engine/campaign.js";
-import type { Step } from "./engine/case.js";
 import type { Choice } from "./engine/choice.js";
-import {
-  type Body,
-  type Execution,
-  execute,
-  type Observer,
-} from "./engine/execution.js";
-import * as literal from "./engine/literal.js";
-import {
-  concludeCase,
-  type Outcome,
-  run,
-  runStored,
-  type Settings,
-  Tally,
-} from "./engine/runner.js";
-import * as token from "./engine/token.js";
-import { type Entry, isStep, TraceError } from "./engine/trace.js";
-import { drive, pending, type Work } from "./engine/work.js";
-import { budgetOf, mutated, seedOf, tokenOf } from "./environment.js";
+import { execute } from "./engine/execution.js";
+import { concludeCase, run, runStored } from "./engine/runner.js";
+import type { Settings } from "./engine/settings.js";
+import { type Outcome, Tally } from "./engine/tally.js";
+import { type Entry, TraceError } from "./engine/trace.js";
+import { drive, type Work } from "./engine/work.js";
+import { budgetOf, seedOf } from "./environment.js";
 import type { Config, Wrapper } from "./option.js";
+import { adapt, observerOf } from "./property/body.js";
+import { entriesOf, refusalOf, replayOf } from "./property/replay.js";
+import { reportOutcome } from "./property/report.js";
+import { saveOutcome, storeFaults } from "./property/store.js";
 import { close } from "./registry.js";
-import { differs, entryOf } from "./stored.js";
-
-/** The option that states the entries of a case, at the front of the location of a fault in them. */
-const DRAWS = "draws";
-
-/** The option that states the wrapper of each run, the location of the wrapper's faults. */
-const AROUND = "around";
-
-/** A property's body: a function of its case, which may return a promise. */
-export type PropertyBody = (c: Case) => unknown;
 
 /** The settings of a property's runs, with the cap on choices that every run states. */
 type Stated = Settings & { readonly maxChoices: number };
+
+/** Notes a fault of the call of op on seat that does not end the call. */
+function note(seat: Seat, op: string, fault: Fault): void {
+  noteFault(seat, ofOperation(op, fault));
+}
+
+/** A property's body: a function of its case, which may return a promise. */
+export type PropertyBody = (c: Case) => unknown;
 
 /** The call of a property: its operation, which names its faults, its assertion, its contract and its call site. */
 export interface Call {
@@ -87,135 +73,6 @@ export interface Call {
    * caller's code locates its record.
    */
   readonly pinned?: boolean;
-}
-
-/** The signal that a run stops at, between two cases, because the signal of its seat aborted. */
-class Stopped extends Error {
-  /**
-   * Returns the signal of a run whose seat's signal aborted for reason.
-   *
-   * @param reason - The reason of the seat's signal.
-   */
-  constructor(reason: unknown) {
-    super("the run stopped between two cases, because the seat's signal aborted", {
-      cause: reason,
-    });
-    this.name = "Stopped";
-  }
-}
-
-/** Reports whether value is a JSON object. */
-function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** Returns the step entry that an entry of the draws option states. */
-function stepOf(entry: Readonly<Record<string, unknown>>, at: string): Step {
-  const client = entry["client"];
-  if (
-    client !== undefined &&
-    !(Number.isSafeInteger(client) && (client as number) >= 0)
-  ) {
-    throw new Fault(
-      `${at}.client`,
-      `the client ${JSON.stringify(client)} is no whole number of 0 or more`,
-    );
-  }
-  return {
-    action: entry["step"] as string,
-    ...(client === undefined ? {} : { client: client as number }),
-    ...(entry["drain"] === true ? { drain: true } : {}),
-  };
-}
-
-/**
- * Returns the entries of a case that the draws option states: a JSON array
- * of objects, each a step entry, which states the action of a step under
- * step, its client under client and the drain mark as drain: true, or a
- * draw entry, which states a label and a typed literal.
- *
- * @throws Fault at draws for text that is no array of objects, and at an
- *   entry that states no step and no label or no value, a client that is
- *   no whole number of 0 or more, and a value that is no typed literal.
- */
-function entriesOf(text: string): Entry[] {
-  let stated: unknown;
-  try {
-    stated = JSON.parse(text);
-  } catch (err) {
-    throw new Fault(DRAWS, "the entries are no JSON array of objects", err);
-  }
-  if (!(Array.isArray(stated) && stated.every(isObject))) {
-    throw new Fault(DRAWS, "the entries are no JSON array of objects");
-  }
-  return stated.map((entry, i): Entry => {
-    const at = `${DRAWS}[${i}]`;
-    if (typeof entry["step"] === "string") return stepOf(entry, at);
-    if (typeof entry["label"] !== "string" || !("value" in entry)) {
-      throw new Fault(at, "the entry states no step, and no label or no value");
-    }
-    try {
-      return { label: entry["label"], value: literal.decode(entry["value"]) };
-    } catch (err) {
-      throw new Fault(`${at}.value`, "the value is no typed literal", err);
-    }
-  });
-}
-
-/** Returns the choices of the token that the run replays, or undefined for a run that replays none. */
-function replayOf(config: Config): Choice[] | undefined {
-  const stated = tokenOf(config.replay, config.hermetic);
-  if (stated === undefined) return undefined;
-  try {
-    return token.decode(stated.token);
-  } catch (err) {
-    throw new Fault(stated.source, "no encoder writes the token", err);
-  }
-}
-
-/**
- * Returns the work of a case that wrapper runs. The first call of run runs
- * work to its end, and the case ends as work ended, after the wrapper
- * settles. A second call of run runs nothing, and neither does a call after
- * the wrapper settled.
- *
- * @throws Fault at around for a wrapper that throws, one that returns
- *   without a call of run, and one that calls run a second time.
- */
-function* wrapped(wrapper: Wrapper, work: Work<void>): Work<void> {
-  let calls = 0;
-  let settled = false;
-  let ended = Promise.resolve<{ readonly error: unknown } | undefined>(undefined);
-  const run = (): Promise<void> => {
-    calls += 1;
-    if (calls > 1 || settled) return Promise.resolve();
-    ended = drive(work).then(
-      () => undefined,
-      (error: unknown) => ({ error }),
-    );
-    return ended.then(() => undefined);
-  };
-  try {
-    const returned = pending(wrapper(run));
-    if (returned !== undefined) yield returned;
-  } catch (err) {
-    throw new Fault(AROUND, "the wrapper threw", err);
-  }
-  settled = true;
-  if (calls === 0) throw new Fault(AROUND, "the wrapper returned without calling run");
-  if (calls > 1) throw new Fault(AROUND, "the wrapper called run more than once");
-  const end = (yield ended) as { readonly error: unknown } | undefined;
-  if (end !== undefined) throw end.error;
-}
-
-/** Returns the observer that hands the calls of each case to slot, under the case's phase. */
-function observerOf(slot: Slot | undefined): Observer {
-  return (phase, execution) => slot?.take(own(caseOf(execution.case)), phase);
-}
-
-/** Notes a fault of the call of op on seat that does not end the call. */
-function note(seat: Seat, op: string, fault: Fault): void {
-  noteFault(seat, ofOperation(op, fault));
 }
 
 /** The settings of a property's calls, its store and how it reports. */
@@ -319,8 +176,10 @@ export class Property {
    * @returns A promise that settles when the call has reported.
    */
   async run(seat: Seat, running: Running, body: PropertyBody): Promise<void> {
-    if (!this.#claim(seat, running)) return;
-    const cases = this.#adapt(seat, running.slot, body);
+    if (!this.#claim(seat, running)) {
+      return;
+    }
+    const cases = adapt(seat, running.slot, body, this.call, this.#around);
     const observer = observerOf(running.slot);
     if (this.#replay !== undefined) {
       const replayed = run(
@@ -329,29 +188,38 @@ export class Property {
         observer,
       );
       const outcome = await this.#drive(running, replayed);
-      if (outcome !== undefined) this.#report(running, outcome);
+      if (outcome !== undefined) {
+        reportOutcome(running, this.call, outcome);
+      }
       return;
     }
     const loaded = this.#load(running);
-    if (loaded === undefined) return;
+    if (loaded === undefined) {
+      return;
+    }
     const settings = {
       ...this.#settings,
       stored: loaded.entries.map((entry) => entry.choices),
     };
     const saved: Fault[] = [];
     const concluded = (found: Outcome): void => {
-      saved.push(...this.#save(found));
+      saved.push(...saveOutcome(this.#dir, this.call.contract, found));
     };
     const work =
       this.#budget > 0
         ? campaign(cases, { ...settings, budget: this.#budget, concluded }, observer)
         : run(cases, settings, observer);
     const outcome = await this.#drive(running, work);
-    if (outcome === undefined) return;
-    if (outcome.kind === "counterexample" && this.#budget === 0) concluded(outcome);
-    for (const fault of [...this.#storeFaults(loaded, outcome), ...saved])
+    if (outcome === undefined) {
+      return;
+    }
+    if (outcome.kind === "counterexample" && this.#budget === 0) {
+      concluded(outcome);
+    }
+    for (const fault of [...storeFaults(this.#dir, loaded, outcome), ...saved]) {
       note(seat, this.call.op, fault);
-    this.#report(running, outcome);
+    }
+    reportOutcome(running, this.call, outcome);
   }
 
   /**
@@ -369,23 +237,30 @@ export class Property {
    * @returns A promise that settles when the call has reported.
    */
   async replayStored(seat: Seat, running: Running, body: PropertyBody): Promise<void> {
-    if (!this.#claim(seat, running)) return;
+    if (!this.#claim(seat, running)) {
+      return;
+    }
     const loaded = this.#load(running);
-    if (loaded === undefined) return;
+    if (loaded === undefined) {
+      return;
+    }
     const settings = {
       ...this.#settings,
       stored: loaded.entries.map((entry) => entry.choices),
     };
     const work = runStored(
-      this.#adapt(seat, running.slot, body),
+      adapt(seat, running.slot, body, this.call, this.#around),
       settings,
       observerOf(running.slot),
     );
     const outcome = await this.#drive(running, work);
-    if (outcome === undefined) return;
-    for (const fault of this.#storeFaults(loaded, outcome))
+    if (outcome === undefined) {
+      return;
+    }
+    for (const fault of storeFaults(this.#dir, loaded, outcome)) {
       note(seat, this.call.op, fault);
-    this.#report(running, outcome);
+    }
+    reportOutcome(running, this.call, outcome);
   }
 
   /**
@@ -407,7 +282,7 @@ export class Property {
     body: PropertyBody,
     data: Uint8Array,
   ): Promise<void> {
-    const cases = this.#adapt(seat, running.slot, body);
+    const cases = adapt(seat, running.slot, body, this.call, this.#around);
     const observer = observerOf(running.slot);
     const settings = this.#settings;
     function* bridged(): Work<Outcome> {
@@ -415,15 +290,21 @@ export class Property {
       observer("fuzz", execution);
       const tally = new Tally(settings.seed);
       const ended = tally.take(execution);
-      if (ended?.kind !== "counterexample") return ended ?? tally.outcome("passed");
+      if (ended?.kind !== "counterexample") {
+        return ended ?? tally.outcome("passed");
+      }
       return yield* concludeCase(cases, settings, execution, observer);
     }
     const outcome = await this.#drive(running, bridged());
-    if (outcome === undefined) return;
-    if (outcome.kind === "counterexample") {
-      for (const fault of this.#save(outcome)) note(seat, this.call.op, fault);
+    if (outcome === undefined) {
+      return;
     }
-    this.#report(running, outcome);
+    if (outcome.kind === "counterexample") {
+      for (const fault of saveOutcome(this.#dir, this.call.contract, outcome)) {
+        note(seat, this.call.op, fault);
+      }
+    }
+    reportOutcome(running, this.call, outcome);
   }
 
   /**
@@ -442,24 +323,11 @@ export class Property {
     Property.fault(running, this.call, err);
   }
 
-  /** Returns the engine's body that runs body on a case of seat inside the property's wrapper, and stops the run once the seat's signal aborts. */
-  #adapt(seat: Seat, slot: Slot | undefined, body: PropertyBody): Body {
-    const signal = signalOf(seat);
-    const location: Location = {
-      site: this.call.where,
-      pinned: this.call.pinned === true,
-    };
-    const around = this.#around;
-    return (engine) => {
-      if (signal.aborted) throw new Stopped(signal.reason);
-      const work = executeCase(new Case(engine, seat, slot, location), body);
-      return around === undefined ? work : wrapped(around, work);
-    };
-  }
-
   /** Claims the property's entries in its store, and ends the call with a fault when another property of the test has claimed them. */
   #claim(seat: Seat, running: Running): boolean {
-    if (claim(seat, this.#dir, this.call.contract)) return true;
+    if (claim(seat, this.#dir, this.call.contract)) {
+      return true;
+    }
     const contract = JSON.stringify(this.call.contract);
     this.#fault(
       running,
@@ -473,7 +341,9 @@ export class Property {
 
   /** Returns the entries of the store, or undefined after the call ended with a fault. */
   #load(running: Running): Loaded | undefined {
-    if (this.#dir === "") return { entries: [], skipped: [] };
+    if (this.#dir === "") {
+      return { entries: [], skipped: [] };
+    }
     try {
       return load(this.#dir, this.call.contract);
     } catch (err) {
@@ -492,102 +362,11 @@ export class Property {
     try {
       return await drive(work);
     } catch (err) {
-      this.#fault(running, err instanceof TraceError ? this.#refusal(err) : err);
+      this.#fault(
+        running,
+        err instanceof TraceError ? refusalOf(err, this.#entries) : err,
+      );
       return undefined;
     }
-  }
-
-  /** Returns the fault at the entry of the draws option that the body cannot follow. */
-  #refusal(err: TraceError): Fault {
-    const at = `${DRAWS}[${err.entry}].${err.reason}`;
-    const entry = this.#entries[err.entry] as Entry;
-    const label = JSON.stringify(err.what);
-    if (err.reason === "step")
-      return new Fault(at, `the machine cannot take the step ${label} there`);
-    if (err.reason === "value") {
-      return new Fault(
-        at,
-        `the generator of the draw labelled ${label} does not produce the entry's value`,
-      );
-    }
-    const taken = isStep(entry)
-      ? `the step entry of ${JSON.stringify(entry.action)}`
-      : `the entry labelled ${JSON.stringify(entry.label)}`;
-    return new Fault(at, `the draw labelled ${label} takes ${taken}`);
-  }
-
-  /**
-   * Writes an entry of the failing case of a counterexample, and one of each
-   * of its other failures, and returns the fault of each entry that the
-   * store cannot keep. A property without a store writes none, and neither
-   * does a property in a process of a mutation run, nor a counterexample of
-   * values, whose values are in the test's source.
-   */
-  #save(outcome: Outcome): Fault[] {
-    if (this.#dir === "" || mutated() || outcome.valued) return [];
-    const found = new Date().toISOString().slice(0, 10);
-    const faults: Fault[] = [];
-    for (const execution of [outcome.failing as Execution, ...outcome.others]) {
-      const { name, entry } = entryOf(this.call.contract, execution, found);
-      try {
-        save(this.#dir, name, entry);
-      } catch (err) {
-        const contract = JSON.stringify(this.call.contract);
-        faults.push(
-          new Fault(this.#dir, `the store keeps no case of ${contract}`, err),
-        );
-      }
-    }
-    return faults;
-  }
-
-  /** Returns the fault of each file of the store that the run skipped, and of each stored case that decodes to other values than its entry records. */
-  #storeFaults(loaded: Loaded, outcome: Outcome): Fault[] {
-    const skipped = loaded.skipped.map(
-      (name) =>
-        new Fault(
-          join(this.#dir, name),
-          "the entry is of a later format, so the run skips it",
-        ),
-    );
-    const differences = outcome.stored.flatMap((execution, i) => {
-      const entry = loaded.entries[i] as Stored;
-      if (!differs(entry.counterexample, execution)) return [];
-      const reason =
-        "the stored case decodes to other values than it records, and the run tested those";
-      return [new Fault(join(this.#dir, entry.name), reason)];
-    });
-    return [...skipped, ...differences];
-  }
-
-  /**
-   * Reports the outcome as the verdict of the call running. A skipped run
-   * skips the test of a seat that skips its test.
-   */
-  #report(running: Running, outcome: Outcome): void {
-    const { assertion, contract, where } = this.call;
-    if (outcome.kind === "passed") {
-      running.passRun(
-        Mode.Fatal,
-        assertion,
-        contract,
-        where,
-        detailJson(outcome, detailOf(outcome)),
-      );
-      return;
-    }
-    if (outcome.kind === "skipped") {
-      running.skipRun(
-        Mode.Fatal,
-        assertion,
-        contract,
-        where,
-        detailJson(outcome, detailOf(outcome)),
-        outcome.reason as string,
-      );
-      return;
-    }
-    const { failure, json } = recordOf(outcome, assertion, contract, where);
-    running.failRun(Mode.Fatal, failure, json);
   }
 }

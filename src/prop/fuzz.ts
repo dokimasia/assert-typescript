@@ -22,9 +22,6 @@ import { seeds, seedsOf } from "./directory.js";
 import { configure, type Option } from "./option.js";
 import { type Call, Property } from "./property.js";
 
-/** The target of a fuzzer: it runs the case of one byte input. */
-export type Target = (data: Uint8Array) => Promise<void>;
-
 /** Returns the target of a property whose call ended with err, which throws err's fault for every input. */
 function refused(call: Call, err: unknown): Target {
   return () => Promise.reject(ofOperation(call.op, err));
@@ -56,6 +53,9 @@ async function prepare(
     return property.input(target, Running.begin(target, call.where), body, data);
   };
 }
+
+/** The target of a fuzzer: it runs the case of one byte input. */
+export type Target = (data: Uint8Array) => Promise<void>;
 
 /**
  * Replays the property's stored cases and the test's seed files on seat,

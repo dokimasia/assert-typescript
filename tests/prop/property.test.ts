@@ -18,7 +18,8 @@ import {
   PROFILE_VARIABLE,
   REPLAY_VARIABLE,
 } from "../../src/prop/environment.js";
-import { bytes, integer } from "../../src/prop/generators.js";
+import { bytes } from "../../src/prop/generators/collections.js";
+import { integer } from "../../src/prop/generators.js";
 import {
   around,
   cases,
@@ -32,7 +33,7 @@ import {
   store,
 } from "../../src/prop/option.js";
 import { type Call, Property, type PropertyBody } from "../../src/prop/property.js";
-import { register } from "../../src/prop/registry.js";
+import { register } from "../../src/prop/registry/register.js";
 import { Recorder } from "../../src/seat.js";
 import { test as it } from "../../src/vitest.js";
 import { records, setVariable, temporary, thrown, UNENFORCED } from "../helpers.js";
@@ -631,7 +632,7 @@ describe("property", () => {
         () => {
           runs += 1;
         },
-        around(() => {}),
+        around(() => undefined),
       );
 
       check.isEqualTo(

@@ -19,35 +19,15 @@
  * it.
  */
 
-import { type Literal, encode as literalOf } from "../record/literal.js";
-import { type Converter, converterOf, IDENTITY } from "./convert.js";
+import type { Literal } from "../record/literal.js";
+import { type Converter, IDENTITY } from "./convert/converter.js";
+import { converterOf } from "./convert.js";
 import { type Generator, Mapped } from "./engine/generator.js";
-import { decode } from "./engine/literal.js";
-import { read, ShapeError } from "./engine/shape.js";
-import { canonical } from "./engine/value.js";
-
-/** What a registration states for a name: a generator, values, or variants. */
-type Registration =
-  | { readonly kind: "generator"; readonly generator: Generator<unknown> }
-  | {
-      readonly kind: "values";
-      readonly values: readonly unknown[];
-      readonly literals: readonly Literal[];
-      readonly converter: Converter;
-    }
-  | {
-      readonly kind: "variants";
-      readonly variants: readonly (readonly [string, string | undefined])[];
-    };
+import { ShapeError } from "./engine/shape/error.js";
+import { read } from "./engine/shape.js";
 
 /** A shape as its JSON states it. */
 type Node = Readonly<Record<string, unknown>>;
-
-/** The registrations of the test file, by name. */
-const REGISTRATIONS = new Map<string, Registration>();
-
-/** The names that a read looked up while the registry was open. */
-const CONSULTED = new Set<string>();
 
 /** The generators that of returned, by name. */
 const DERIVED = new Map<string, Generator<unknown>>();
@@ -61,132 +41,12 @@ interface Document {
   readonly generators: Set<string>;
 }
 
-/** Throws unless the registry admits a registration of name by call. */
-function admit(call: string, name: string): void {
-  if (typeof name !== "string" || name === "")
-    throw new RangeError(`prop: ${call} names no shape`);
-  if (closed)
-    throw new Error(
-      `prop: ${call} follows the first property, which closed the registry`,
-    );
-  if (REGISTRATIONS.has(name))
-    throw new Error(`prop: ${call} registers ${JSON.stringify(name)} a second time`);
-  if (CONSULTED.has(name)) {
-    throw new Error(
-      `prop: ${call} follows a read of ${JSON.stringify(name)}, whose generators would not see it`,
-    );
-  }
-}
-
 /** Returns what the registry states for name, and records the read while the registry is open. */
 function lookup(name: string): Registration | undefined {
-  if (!closed) CONSULTED.add(name);
+  if (!closed) {
+    CONSULTED.add(name);
+  }
   return REGISTRATIONS.get(name);
-}
-
-/**
- * Makes generator the generator of the shape definition name in the test
- * file: of returns it, and a ref to name generates with it. generator may
- * lack a shape, as one built with map, filter or composite does, so shapeOf
- * throws for name and for a name whose shape refers to it.
- *
- * @param name - The name of the shape definition.
- * @param generator - The generator.
- * @throws Error after the first property of the test file, for a name that
- *   has a registration, and for a name that a read has looked up.
- */
-export function register<T>(name: string, generator: Generator<T>): void {
-  admit(`register(${JSON.stringify(name)})`, name);
-  REGISTRATIONS.set(name, {
-    kind: "generator",
-    generator: generator as Generator<unknown>,
-  });
-}
-
-/**
- * Makes the shape of name a literal over values, in the order given, so a
- * generator of name generates one of them and the first is the simplest.
- * Each value is stated as its typed literal: a number as an int or a float,
- * a string as a string, and a plain object as a record. shapeOf writes the
- * literals, and a generator of name returns the registered values
- * themselves.
- *
- * @param name - The name of the shape definition.
- * @param values - The values, at least one.
- * @throws Error as register does.
- * @throws RangeError for no value, a value that no typed literal states,
- *   and two values of one typed literal.
- */
-export function registerValues<T>(name: string, ...values: readonly T[]): void {
-  const call = `registerValues(${JSON.stringify(name)})`;
-  admit(call, name);
-  if (values.length === 0) throw new RangeError(`prop: ${call} states no value`);
-  const literals = values.map((value, i) => {
-    const stated = literalOf(value);
-    if (stated === undefined)
-      throw new RangeError(`prop: ${call}: value ${i} states no typed literal`);
-    return stated;
-  });
-  const decoded = literals.map(decode);
-  const keys = new Map<string, number>();
-  for (const [i, value] of decoded.entries()) {
-    const key = canonical(value);
-    const earlier = keys.get(key);
-    if (earlier !== undefined) {
-      throw new RangeError(
-        `prop: ${call}: values ${earlier} and ${i} state one typed literal`,
-      );
-    }
-    keys.set(key, i);
-  }
-  for (const [i, value] of values.entries()) keys.set(canonical(value), i);
-  const converter: Converter = {
-    to: (value) => values[keys.get(canonical(value)) as number],
-    back: (value) => {
-      const index = keys.get(canonical(value));
-      if (index === undefined) {
-        throw new TypeError(
-          `prop: ${canonical(value)} is none of the values of ${JSON.stringify(name)}`,
-        );
-      }
-      return decoded[index];
-    },
-  };
-  REGISTRATIONS.set(name, { kind: "values", values, literals, converter });
-}
-
-/**
- * Makes the shape of name an enum whose variants are the names of variants,
- * in the order that Object.entries lists them, so a generator of name
- * generates one of them and the first is the simplest. Each variant maps to
- * the registered name of its payload's shape, or to undefined for a variant
- * without a payload. A value of the enum is `{ name }`, and `{ name, payload }`
- * for a variant with a payload.
- *
- * @param name - The name of the shape definition.
- * @param variants - The registered name of each variant's payload, by the variant's name.
- * @throws Error as register does.
- * @throws RangeError for no variant, a variant without a name, and a
- *   payload's name that is no string.
- */
-export function registerVariants(
-  name: string,
-  variants: Readonly<Record<string, string | undefined>>,
-): void {
-  const call = `registerVariants(${JSON.stringify(name)})`;
-  admit(call, name);
-  const entries = Object.entries(variants);
-  if (entries.length === 0) throw new RangeError(`prop: ${call} states no variant`);
-  for (const [variant, payload] of entries) {
-    if (variant === "")
-      throw new RangeError(`prop: ${call} states a variant without a name`);
-    if (payload !== undefined && (typeof payload !== "string" || payload === "")) {
-      throw new RangeError(
-        `prop: ${call}: the variant ${JSON.stringify(variant)} names no payload shape`,
-      );
-    }
-  }
-  REGISTRATIONS.set(name, { kind: "variants", variants: entries });
 }
 
 /**
@@ -197,38 +57,47 @@ function documentOf(call: string, name: string): Document {
   const document: Document = { shapes: new Map(), generators: new Set() };
   const pending = [name];
   for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
-    if (document.shapes.has(next) || document.generators.has(next)) continue;
-    const registration = lookup(next);
-    if (registration === undefined) {
-      throw new RangeError(
-        `prop: ${call}: ${JSON.stringify(next)} names no registration`,
-      );
-    }
-    if (registration.kind === "generator") {
-      document.generators.add(next);
-    } else if (registration.kind === "values") {
-      document.shapes.set(next, { shape: "literal", values: registration.literals });
-    } else {
-      const payloads = registration.variants.map(([variant, payload]) => {
-        if (payload !== undefined) pending.push(payload);
-        return [
-          variant,
-          payload === undefined ? null : { shape: "ref", name: payload },
-        ];
-      });
-      document.shapes.set(next, { shape: "enum", variants: payloads });
+    if (!(document.shapes.has(next) || document.generators.has(next))) {
+      add(call, next, document, pending);
     }
   }
   return document;
 }
 
+/** Adds the registration of name to document, and the names of its payloads to pending. */
+function add(call: string, name: string, document: Document, pending: string[]): void {
+  const registration = lookup(name);
+  if (registration === undefined) {
+    throw new RangeError(
+      `prop: ${call}: ${JSON.stringify(name)} names no registration`,
+    );
+  }
+  if (registration.kind === "generator") {
+    document.generators.add(name);
+  } else if (registration.kind === "values") {
+    document.shapes.set(name, { shape: "literal", values: registration.literals });
+  } else {
+    const payloads = registration.variants.map(([variant, payload]) => {
+      if (payload !== undefined) {
+        pending.push(payload);
+      }
+      return [variant, payload === undefined ? null : { shape: "ref", name: payload }];
+    });
+    document.shapes.set(name, { shape: "enum", variants: payloads });
+  }
+}
+
 /** Returns the converters of the registered names of a document: the identity for a generator, and the registered values for values. */
 function convertersOf(document: Document): Map<string, Converter> {
   const named = new Map<string, Converter>();
-  for (const name of document.generators) named.set(name, IDENTITY);
+  for (const name of document.generators) {
+    named.set(name, IDENTITY);
+  }
   for (const name of document.shapes.keys()) {
     const registration = REGISTRATIONS.get(name) as Registration;
-    if (registration.kind === "values") named.set(name, registration.converter);
+    if (registration.kind === "values") {
+      named.set(name, registration.converter);
+    }
   }
   return named;
 }
@@ -248,9 +117,12 @@ function converted(
 function derive(name: string): Generator<unknown> {
   const call = `of(${JSON.stringify(name)})`;
   const registration = lookup(name);
-  if (registration === undefined)
+  if (registration === undefined) {
     throw new RangeError(`prop: ${call} names no registration`);
-  if (registration.kind === "generator") return registration.generator;
+  }
+  if (registration.kind === "generator") {
+    return registration.generator;
+  }
   const document = documentOf(call, name);
   const externals = new Map(
     [...document.generators].map((external) => {
@@ -263,6 +135,71 @@ function derive(name: string): Generator<unknown> {
   );
   const root = { shape: "ref", name, definitions: Object.fromEntries(document.shapes) };
   return converted(root, externals, convertersOf(document));
+}
+
+/** Returns a JSON value with the keys of each object sorted. */
+function sortedKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortedKeys);
+  }
+  if (typeof value !== "object" || value === null) {
+    return value;
+  }
+  // The keys of an object are distinct, so no two compare equal.
+  const entries = Object.entries(value).sort(([a], [b]) => (a < b ? -1 : 1));
+  return Object.fromEntries(entries.map(([key, inner]) => [key, sortedKeys(inner)]));
+}
+
+/** Returns the names that the refs of node name, without following them. */
+function refsOf(node: unknown, names: Set<string>): Set<string> {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      refsOf(item, names);
+    }
+    return names;
+  }
+  if (typeof node !== "object" || node === null) {
+    return names;
+  }
+  const shape = node as Node;
+  if (shape["shape"] === "ref" && typeof shape["name"] === "string") {
+    names.add(shape["name"]);
+  }
+  for (const [key, inner] of Object.entries(shape)) {
+    if (key !== "values" && key !== "source") {
+      refsOf(inner, names);
+    }
+  }
+  return names;
+}
+
+/** What a registration states for a name: a generator, values, or variants. */
+export type Registration =
+  | { readonly kind: "generator"; readonly generator: Generator<unknown> }
+  | {
+      readonly kind: "values";
+      readonly values: readonly unknown[];
+      readonly literals: readonly Literal[];
+      readonly converter: Converter;
+    }
+  | {
+      readonly kind: "variants";
+      readonly variants: readonly (readonly [string, string | undefined])[];
+    };
+
+/** The registrations of the test file, by name. */
+export const REGISTRATIONS = new Map<string, Registration>();
+
+/** The names that a read looked up while the registry was open. */
+export const CONSULTED = new Set<string>();
+
+/**
+ * Reports whether the first property has closed the registry.
+ *
+ * @returns Whether the registry is closed.
+ */
+export function isClosed(): boolean {
+  return closed;
 }
 
 /**
@@ -283,31 +220,6 @@ export function of<T>(name: string): Generator<T> {
     DERIVED.set(name, generator);
   }
   return generator as Generator<T>;
-}
-
-/** Returns a JSON value with the keys of each object sorted. */
-function sortedKeys(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortedKeys);
-  if (typeof value !== "object" || value === null) return value;
-  // The keys of an object are distinct, so no two compare equal.
-  const entries = Object.entries(value).sort(([a], [b]) => (a < b ? -1 : 1));
-  return Object.fromEntries(entries.map(([key, inner]) => [key, sortedKeys(inner)]));
-}
-
-/** Returns the names that the refs of node name, without following them. */
-function refsOf(node: unknown, names: Set<string>): Set<string> {
-  if (Array.isArray(node)) {
-    for (const item of node) refsOf(item, names);
-    return names;
-  }
-  if (typeof node !== "object" || node === null) return names;
-  const shape = node as Node;
-  if (shape["shape"] === "ref" && typeof shape["name"] === "string")
-    names.add(shape["name"]);
-  for (const [key, inner] of Object.entries(shape)) {
-    if (key !== "values" && key !== "source") refsOf(inner, names);
-  }
-  return names;
 }
 
 /**
@@ -365,7 +277,9 @@ export function ofShape<T>(text: string): Generator<T> {
   try {
     document = JSON.parse(text);
   } catch (err) {
-    throw new ShapeError(`prop: the shape file is no JSON: ${(err as Error).message}`);
+    throw new ShapeError(`prop: the shape file is no JSON: ${(err as Error).message}`, {
+      cause: err,
+    });
   }
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
     throw new ShapeError(`prop: ${text.trim()} is not a shape`);
@@ -379,7 +293,9 @@ export function ofShape<T>(text: string): Generator<T> {
   );
   const externals = new Map<string, Generator<unknown>>();
   for (const name of refsOf(root, new Set())) {
-    if (!defined.has(name) && lookup(name) !== undefined) externals.set(name, of(name));
+    if (!defined.has(name) && lookup(name) !== undefined) {
+      externals.set(name, of(name));
+    }
   }
   const named = new Map([...externals.keys()].map((name) => [name, IDENTITY] as const));
   return converted(root, externals, named) as Generator<T>;

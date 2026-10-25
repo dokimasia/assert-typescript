@@ -8,59 +8,22 @@ import { Controlled } from "../../src/clock.js";
 import { Failure } from "../../src/failure.js";
 import type { History } from "../../src/history/history.js";
 import { check } from "../../src/index.js";
-import {
-  Case,
-  caseOf,
-  execute,
-  type Failing,
-  type Location,
-  onEngine,
-} from "../../src/prop/case.js";
-import {
-  Case as Engine,
-  Failed,
-  Rejected,
-  Replaying,
-  Skipped,
-} from "../../src/prop/engine/case.js";
-import { TraceError } from "../../src/prop/engine/trace.js";
-import { Diverged, Repeated } from "../../src/prop/engine/tree.js";
-import { drive } from "../../src/prop/engine/work.js";
+import { Case, caseOf, type Location, onEngine } from "../../src/prop/case.js";
+import { Replaying } from "../../src/prop/engine/case/providers.js";
+import { Failed, Rejected, Skipped } from "../../src/prop/engine/case/signals.js";
+import { Case as Engine } from "../../src/prop/engine/case.js";
 import { integer } from "../../src/prop/generators.js";
 import { Recorder } from "../../src/seat.js";
 import { test as it } from "../../src/vitest.js";
-
-/** The call site of the property of the cases. */
-const SITE = { file: "/work/tests/total.test.ts", line: 4 };
+import {
+  caseAt as caseOn,
+  ending,
+  failingOf as recordOf,
+  CASE_SITE as SITE,
+} from "../helpers.js";
 
 /** The location of the records of a case that locates them by the caller's frame. */
 const FREE: Location = { site: SITE, pinned: false };
-
-/** Returns a case on a recorder whose engine case replays integer choices. */
-function caseOn(
-  location: Location = FREE,
-  ...values: bigint[]
-): { c: Case; engine: Engine } {
-  const engine = new Engine(
-    new Replaying(values.map((value) => ({ kind: "integer", value }))),
-  );
-  return { c: new Case(engine, new Recorder(), undefined, location), engine };
-}
-
-/** Returns what the case throws when body runs on it, or undefined when it passes. */
-async function ending(c: Case, body: (c: Case) => unknown): Promise<unknown> {
-  try {
-    await drive(execute(c, body));
-  } catch (err) {
-    return err;
-  }
-  return undefined;
-}
-
-/** Returns the record of a failure that a case ended with. */
-function recordOf(thrown: unknown): Failing {
-  return (thrown as Failed).record as Failing;
-}
 
 describe("case", () => {
   describe("new Case", () => {
@@ -543,7 +506,7 @@ describe("case", () => {
       let aborted = false;
       await ending(c, (one) => {
         one.cleanup(() => {
-          aborted = one.signal.aborted;
+          ({ aborted } = one.signal);
         });
       });
 
@@ -615,122 +578,5 @@ describe("case", () => {
 
       check.doesNotThrow(seat, () => c.note("later"), "the case runs on");
     });
-  });
-
-  describe("execute", () => {
-    it("returns for an async body that passes", async ({ seat }) => {
-      const { c } = caseOn();
-
-      check.isNil(seat, await ending(c, async () => undefined), "the case passes");
-    });
-
-    it("ends the case with the record of a raised error at the frame that raised it", async ({
-      seat,
-    }) => {
-      const { c } = caseOn();
-      const { failure, identity } = recordOf(
-        await ending(c, () => {
-          throw new TypeError("bad input");
-        }),
-      );
-
-      check.isEqualTo(
-        seat,
-        [failure.assertion, failure.contract, failure.detail["error"], identity.error],
-        ["", "bad input", "TypeError", "TypeError"],
-        "the record of the error",
-      );
-      check.hasSuffix(
-        seat,
-        identity.where?.file,
-        "case.test.ts",
-        "the frame is this file's",
-      );
-    });
-
-    it("ends the case with the record of a rejected promise", async ({ seat }) => {
-      const { c } = caseOn();
-      const thrown = await ending(c, () => Promise.reject(new RangeError("late")));
-
-      check.isEqualTo(
-        seat,
-        recordOf(thrown).failure.contract,
-        "late",
-        "the rejection fails the case",
-      );
-    });
-
-    it("locates the record of a raised value that is no error at the property's call site", async ({
-      seat,
-    }) => {
-      const { c } = caseOn();
-      const { failure, identity } = recordOf(
-        await ending(c, () => {
-          throw "a string";
-        }),
-      );
-
-      check.isEqualTo(
-        seat,
-        [failure.contract, failure.detail, identity],
-        ["a string", { error: "string", stack: "" }, { error: "string", where: SITE }],
-        "the record of the value",
-      );
-    });
-
-    it("throws the failure of a case that a later assumption rejects", async ({
-      seat,
-    }) => {
-      const { c } = caseOn();
-      const thrown = await ending(c, (one) => {
-        one.record("first");
-        one.assume(false);
-      });
-
-      check.isEqualTo(
-        seat,
-        recordOf(thrown).failure.contract,
-        "first",
-        "the failure has priority",
-      );
-    });
-
-    it("throws the failure of a case that a later skip ends", async ({ seat }) => {
-      const { c } = caseOn();
-      const thrown = await ending(c, (one) => {
-        one.record("first");
-        one.skip("a skip after the failure");
-      });
-
-      check.isEqualTo(
-        seat,
-        recordOf(thrown).failure.contract,
-        "first",
-        "the failure has priority",
-      );
-    });
-
-    const tests = [
-      { name: "a repeat of a tested case", give: () => new Repeated() },
-      { name: "a divergence", give: () => new Diverged(0, undefined, undefined) },
-      {
-        name: "an entry that a trace cannot follow",
-        give: () => new TraceError(0, "x", "label"),
-      },
-    ];
-    for (const tt of tests) {
-      it(`throws the signal of ${tt.name} over an earlier failure`, async ({
-        seat,
-      }) => {
-        const { c } = caseOn();
-        const signal = tt.give();
-        const thrown = await ending(c, (one) => {
-          one.record("a failure first");
-          throw signal;
-        });
-
-        check.isTrue(seat, thrown === signal, "the signal");
-      });
-    }
   });
 });

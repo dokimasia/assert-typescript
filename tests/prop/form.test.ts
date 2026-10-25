@@ -8,7 +8,15 @@ import { byIdentity, check, equateEmpty, equateNans } from "../../src/index.js";
 import { Mode } from "../../src/matcher/seat.js";
 import * as value from "../../src/matcher/value.js";
 import { Mapped } from "../../src/prop/engine/generator.js";
-import { type Form, INPUT, PAIR, runForm, TRIPLE } from "../../src/prop/form.js";
+import {
+  FORM_IDS,
+  FORMS,
+  type Form,
+  INPUT,
+  PAIR,
+  runForm,
+  TRIPLE,
+} from "../../src/prop/form.js";
 import { integer } from "../../src/prop/generators.js";
 import {
   cases,
@@ -52,6 +60,71 @@ function belowFive(
 }
 
 describe("form", () => {
+  describe("FORMS", () => {
+    it("states the operation, the id and the labels of a form", ({ seat }) => {
+      check.isEqualTo(
+        seat,
+        FORMS.isCommutative,
+        {
+          op: "prop.isCommutative",
+          id: "prop-commutative",
+          relaxed: true,
+          labels: ["a", "b"],
+        },
+        "the form of isCommutative",
+      );
+    });
+  });
+
+  describe("FORM_IDS", () => {
+    it("lists the id of every form in the order of the table", ({ seat }) => {
+      check.isEqualTo(
+        seat,
+        FORM_IDS,
+        [
+          "equal",
+          "not-equal",
+          "true",
+          "false",
+          "nil",
+          "not-nil",
+          "length",
+          "empty",
+          "not-empty",
+          "contains",
+          "not-contains",
+          "contains-in-order",
+          "permutation",
+          "has-prefix",
+          "has-suffix",
+          "matches",
+          "close-to",
+          "in-range",
+          "pairwise",
+          "err-absent",
+          "err-present",
+          "err-is",
+          "err-is-not",
+          "err-as",
+          "throws",
+          "not-throws",
+          "pure",
+          "not-pure",
+          "nil-context-safe",
+          "honours-cancellation",
+          "honours-deadline",
+          "idempotent",
+          "accumulates",
+          "deterministic",
+          "commutative",
+          "associative",
+          "round-trip",
+        ].map((id) => `prop-${id}`),
+        "the 37 ids",
+      );
+    });
+  });
+
   describe("INPUT", () => {
     it("labels the one input of a form", ({ seat }) => {
       check.isEqualTo(
