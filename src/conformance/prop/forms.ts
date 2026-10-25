@@ -463,7 +463,7 @@ function aligned(ours: unknown, theirs: unknown): unknown {
  * with the record of an assertion, which states a detail.
  */
 function failureOf(ours: unknown, theirs: unknown): unknown {
-  if (!isObject(ours) || !isObject(theirs)) return ours;
+  if (!(isObject(ours) && isObject(theirs))) return ours;
   const stated = isObject(theirs["detail"]) ? Object.keys(theirs["detail"]) : [];
   const detail = ours["detail"] as Raw;
   return {

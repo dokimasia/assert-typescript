@@ -100,8 +100,8 @@ export async function checkVector(
   try {
     if (files !== undefined) await files(vector.raw, dir);
     else if (history !== undefined) history(vector.raw);
-    else if (stateful !== undefined) await stateful(vector.raw);
-    else await checkProp(vector.kind, vector.raw);
+    else if (stateful === undefined) await checkProp(vector.kind, vector.raw);
+    else await stateful(vector.raw);
   } catch (err) {
     return (err as Fault).within(vector.id).message;
   }

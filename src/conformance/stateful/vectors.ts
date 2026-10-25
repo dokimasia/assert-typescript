@@ -91,7 +91,7 @@ function detailOf(record: Raw): Raw {
 /** Throws a fault for a fault of the run other than the refusal of the trace's entry that the vector states. */
 function compareRefusal(message: string, error: Raw): void {
   const at = `prop.forAll: draws[${String(error["entry"])}].${String(error["reason"])}: `;
-  if (!message.startsWith(at) || !message.includes(JSON.stringify(error["name"]))) {
+  if (!(message.startsWith(at) && message.includes(JSON.stringify(error["name"])))) {
     throw new Fault(
       "error",
       `the run ends with ${JSON.stringify(message)}, want a refusal of entry ${String(error["entry"])} of ${JSON.stringify(error["name"])}`,
