@@ -154,8 +154,8 @@ describe("parse", () => {
           kind: "class",
           ranges: [
             [0, 0x61],
-            [0x7a, 0xd7ff],
-            [0xe000, 0x10ffff],
+            [0x7a, 0xd7_ff],
+            [0xe0_00, 0x10_ff_ff],
           ],
         },
         "the ranges outside b to y",
@@ -169,8 +169,8 @@ describe("parse", () => {
         {
           kind: "class",
           ranges: [
-            [0x62, 0xd7ff],
-            [0xe000, 0x10ffff],
+            [0x62, 0xd7_ff],
+            [0xe0_00, 0x10_ff_ff],
           ],
         },
         "the ranges above a",
@@ -182,13 +182,13 @@ describe("parse", () => {
     }) => {
       check.isEqualTo(
         seat,
-        parse(`[^a${String.fromCodePoint(0x10ffff)}]`).node,
+        parse(`[^a${String.fromCodePoint(0x10_ff_ff)}]`).node,
         {
           kind: "class",
           ranges: [
             [0, 0x60],
-            [0x62, 0xd7ff],
-            [0xe000, 0x10fffe],
+            [0x62, 0xd7_ff],
+            [0xe0_00, 0x10_ff_fe],
           ],
         },
         "the ranges without a and U+10FFFF",

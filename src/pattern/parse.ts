@@ -79,7 +79,13 @@ const RESERVED_PAIRS = new Set(["&&", "--", "||", "~~"]);
  * The characters that `.` leaves out, because some engine's `.` does not
  * match them: `\n`, `\r`, U+0085, U+2028 and U+2029.
  */
-export const LINE_TERMINATORS = String.fromCodePoint(0x0a, 0x0d, 0x85, 0x2028, 0x2029);
+export const LINE_TERMINATORS = String.fromCodePoint(
+  0x0a,
+  0x0d,
+  0x85,
+  0x20_28,
+  0x20_29,
+);
 
 /** What `\d`, `\w` and `\s` read as: the members that every engine's class has. */
 export const SHORTHANDS: Readonly<Record<string, string>> = {
@@ -98,10 +104,10 @@ const MAX_DEPTH = 100;
 const QUANTIFIERS = new Set("*+?{");
 
 /** The highest code point. */
-const LAST_CODE_POINT = 0x10ffff;
+const LAST_CODE_POINT = 0x10_ff_ff;
 
 /** The surrogates, which no scalar value is. */
-const SURROGATES: Range = [0xd800, 0xdfff];
+const SURROGATES: Range = [0xd8_00, 0xdf_ff];
 
 /** Returns ranges sorted and merged, with adjacent ranges joined. */
 function merge(ranges: readonly Range[]): Range[] {
@@ -237,7 +243,7 @@ class Parser {
    */
   #sequence(): Node {
     const items: Node[] = [];
-    while (!["", "|", ")"].includes(this.#peek()) && !this.#closingAnchor()) {
+    while (!(["", "|", ")"].includes(this.#peek()) || this.#closingAnchor())) {
       items.push(this.#quantified());
     }
     return items.length === 1 ? (items[0] as Node) : { kind: "sequence", items };

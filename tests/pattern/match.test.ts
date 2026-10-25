@@ -44,7 +44,7 @@ describe("match", () => {
       {
         name: "returns an expression whose \\d leaves out the digits beyond ASCII",
         givePattern: "\\d",
-        giveText: String.fromCodePoint(0x663),
+        giveText: String.fromCodePoint(0x6_63),
         want: false,
       },
       {
@@ -86,13 +86,13 @@ describe("match", () => {
       {
         name: "returns an expression whose dot leaves out U+2028",
         givePattern: "a.b",
-        giveText: `a${String.fromCodePoint(0x2028)}b`,
+        giveText: `a${String.fromCodePoint(0x20_28)}b`,
         want: false,
       },
       {
         name: "returns an expression whose dot leaves out U+2029",
         givePattern: "a.b",
-        giveText: `a${String.fromCodePoint(0x2029)}b`,
+        giveText: `a${String.fromCodePoint(0x20_29)}b`,
         want: false,
       },
       {
