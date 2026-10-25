@@ -56,7 +56,9 @@ const PENDING = new Pending();
 
 /** Returns the identity of the test that state runs, or undefined outside a test. */
 function testOf(state: Running): unknown {
-  if (state.currentTestName === undefined) return undefined;
+  if (state.currentTestName === undefined) {
+    return undefined;
+  }
   return (
     state.currentTestIdentity?.() ??
     JSON.stringify([
@@ -77,7 +79,9 @@ function end(): void {
   const abandoned = PENDING.end(testOf(expect.getState())).find(
     (call) => call.abandoned,
   );
-  if (abandoned !== undefined) throw abandoned.neverAwaited();
+  if (abandoned !== undefined) {
+    throw abandoned.neverAwaited();
+  }
 }
 
 /** The matchers of the assertions, each of which reports to a recorder of its own. */
@@ -85,7 +89,9 @@ const MATCHERS = matchers({ seat: () => new Recorder(), start });
 
 /** Keeps the failure of a matcher on a soft chain, and throws any other error. */
 function keep(err: unknown): void {
-  if (!(err instanceof Error && "matcherResult" in err)) throw err;
+  if (!(err instanceof Error && "matcherResult" in err)) {
+    throw err;
+  }
   expect.getState().suppressedErrors.push(err);
 }
 
@@ -97,7 +103,9 @@ function softly(chain: object): object {
       if (key === "not" || key === "resolves" || key === "rejects") {
         return softly(value as object);
       }
-      if (typeof value !== "function") return value;
+      if (typeof value !== "function") {
+        return value;
+      }
       return (...args: unknown[]) => {
         let result: unknown;
         try {
@@ -220,7 +228,9 @@ export function register(overlap: Overlap = { mode: "allow" }): void {
     writable: true,
   });
   afterEach(end);
-  if (overlap.mode === "shadow") shadow(overlap.log, originals as Originals);
+  if (overlap.mode === "shadow") {
+    shadow(overlap.log, originals as Originals);
+  }
   if (overlap.mode === "strict") {
     const refused = Object.keys(STRICT).filter((name) => name in chain);
     expect.extend(Object.fromEntries(refused.map((name) => [name, refusal(name)])));

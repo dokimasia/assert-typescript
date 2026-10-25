@@ -31,9 +31,9 @@ declare module "expect" {
      * @param actual - The value under test.
      * @returns The chain.
      */
-    soft<T = unknown>(
+    soft: <T = unknown>(
       actual: T,
-    ): Soft<Matchers<void, T>> & {
+    ) => Soft<Matchers<void, T>> & {
       resolves: Soft<Matchers<Promise<void>, T>>;
       rejects: Soft<Matchers<Promise<void>, T>>;
     };
@@ -54,9 +54,9 @@ declare global {
        * @returns The chain.
        */
       // biome-ignore lint/suspicious/noExplicitAny: the default that the global expect of @types/jest gives T
-      soft<T = any>(
+      soft: <T = any>(
         actual: T,
-      ): Soft<Matchers<void, T>> & {
+      ) => Soft<Matchers<void, T>> & {
         resolves: Soft<Matchers<Promise<void>, T>>;
         rejects: Soft<Matchers<Promise<void>, T>>;
       };

@@ -22,8 +22,8 @@ import * as entry from "../src/jest.js";
 import { Recorder } from "../src/seat.js";
 
 vi.mock("@jest/globals", async () => {
-  const { expect } = await import("expect");
-  return { expect, afterEach: () => undefined };
+  const { expect: jestExpect } = await import("expect");
+  return { expect: jestExpect, afterEach: () => undefined };
 });
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -96,7 +96,9 @@ function resultOf(project: string, file: string, title: string): Result {
     (one) => one.name === join(FIXTURES, project, file),
   );
   const found = suite?.assertionResults.find((one) => one.title === title);
-  if (found === undefined) throw new Error(`jest reported no test ${title} of ${file}`);
+  if (found === undefined) {
+    throw new Error(`jest reported no test ${title} of ${file}`);
+  }
   return found;
 }
 

@@ -25,8 +25,8 @@ import { temporary } from "../helpers.js";
 const HOOKS = vi.hoisted(() => [] as (() => void)[]);
 
 vi.mock("@jest/globals", async () => {
-  const { expect } = await import("expect");
-  return { expect, afterEach: (hook: () => void) => HOOKS.push(hook) };
+  const { expect: jestExpect } = await import("expect");
+  return { expect: jestExpect, afterEach: (hook: () => void) => HOOKS.push(hook) };
 });
 
 /** The symbol under which jest keeps its registry of matchers on the global object. */
@@ -52,7 +52,9 @@ function pristine(): void {
     HOOKS.splice(hooks);
     for (const [target, descriptors] of kept) {
       for (const key of Reflect.ownKeys(target)) {
-        if (!(key in descriptors)) delete (target as Record<PropertyKey, unknown>)[key];
+        if (!(key in descriptors)) {
+          delete (target as Record<PropertyKey, unknown>)[key];
+        }
       }
       Object.defineProperties(target, descriptors);
     }
@@ -211,7 +213,7 @@ describe("api", () => {
 
     it("throws in shadow mode for a registry without toStrictEqual", () => {
       pristine();
-      delete registry()["toStrictEqual"];
+      Reflect.deleteProperty(registry(), "toStrictEqual");
       const log = join(temporary(), "shadow.jsonl");
 
       expect(thrownBy(() => register({ mode: "shadow", log }))).toBe(
@@ -377,7 +379,7 @@ describe("api", () => {
         pristine();
         // jest 30 defines no toThrowError, which vitest adds to the registry
         // that it shares with jest's expect in this worker.
-        delete registry()["toThrowError"];
+        Reflect.deleteProperty(registry(), "toThrowError");
         register({ mode: "strict" });
 
         expect(["toThrow" in jest(1), "toThrowError" in jest(1)]).toEqual([
