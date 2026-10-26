@@ -111,5 +111,26 @@ describe("call", () => {
         "the error is the last field",
       );
     });
+
+    it("writes the reason of a call of the verdict skip last", ({ seat }) => {
+      const line = encodeCall(
+        {
+          assertion: "rejects",
+          contract: "the check rejects the defect",
+          verdict: "skip",
+          aborting: true,
+          where: { file: "check.ts", line: 12 },
+          reason: "the check needs a disk",
+        },
+        { seq: 1 },
+      );
+
+      check.hasSuffix(
+        seat,
+        line,
+        '"line":12},"reason":"the check needs a disk"}',
+        "the reason is the last field",
+      );
+    });
   });
 });

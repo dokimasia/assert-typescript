@@ -48,6 +48,13 @@ export interface Seat {
    */
   reportFault?: (fault: Error, ending: boolean) => void;
 
+  /**
+   * Skips the test of the seat with reason, and does not return. The seat
+   * of the vitest fixture calls skip of the test context, and the seat that
+   * doesReject hands its check ends the check.
+   */
+  skip?: (reason: string) => never;
+
   /** Aborts when the test that runs on this seat ends, where the seat states one. */
   readonly signal?: AbortSignal | undefined;
 }
@@ -118,24 +125,14 @@ export function takesRecords(seat: Seat): seat is Seat & Reporter {
   return typeof (seat as Partial<Reporter>).report === "function";
 }
 
-/** A seat that skips the test that runs on it. */
-export interface Skipper {
-  /**
-   * Skips the test, and does not return.
-   *
-   * @param reason - Why the test skips.
-   */
-  skip: (reason: string) => never;
-}
-
 /**
  * Reports whether a seat skips its test.
  *
  * @param seat - The seat of a call.
  * @returns True when the seat has a `skip` member.
  */
-export function takesSkips(seat: Seat): seat is Seat & Skipper {
-  return typeof (seat as Partial<Skipper>).skip === "function";
+export function takesSkips(seat: Seat): seat is Seat & Required<Pick<Seat, "skip">> {
+  return typeof seat.skip === "function";
 }
 
 /**

@@ -149,6 +149,22 @@ describe("vectors", () => {
       expect(await outputs("recording", raw)).toEqual({ verdict: "fail", calls: [] });
     });
 
+    it("computes the reason of a recording vector whose cases skip", async () => {
+      const raw = {
+        body: {
+          draw: DIGIT,
+          skips: [{ reason: "unsupported", when: { kind: "at-least", n: 0 } }],
+        },
+        settings: { seed: "7" },
+      };
+
+      expect(await outputs("recording", raw)).toEqual({
+        verdict: "skip",
+        reason: "unsupported",
+        calls: [],
+      });
+    });
+
     it("computes the inverse of a shape", async () => {
       expect(
         await outputs("inverse", {
@@ -264,6 +280,18 @@ describe("vectors", () => {
       };
 
       expect(await fault("decoding", raw)).toEqual(["", "the vector does not run"]);
+    });
+
+    it("rejects with a fault at the reason of a recording vector that differs", async () => {
+      const raw = {
+        ...vector("recording/records-the-cases-before-a-case-that-skips"),
+        reason: "the disk is full",
+      };
+
+      expect(await fault("recording", raw)).toEqual([
+        "reason",
+        'the engine computes "unsupported", want "the disk is full"',
+      ]);
     });
 
     it("rejects with a fault for a recording vector without settings", async () => {

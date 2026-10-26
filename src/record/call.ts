@@ -6,8 +6,9 @@
  *
  * A record states the call's number in its test, the assertion, the
  * contract, the verdict, the surface, the call site, and the detail of a
- * failure. Each record is one JSON object on one line, with its fields in
- * the order the definition lists them.
+ * failure. The record of a skip states the reason too. Each record is one
+ * JSON object on one line, with its fields in the order the definition
+ * lists them.
  */
 
 import { readFileSync } from "node:fs";
@@ -67,6 +68,8 @@ export interface Call {
   readonly detail?: Readonly<Record<string, unknown>>;
   /** The text of the fault that ended a call of the verdict `error`. */
   readonly error?: string;
+  /** The reason of the skip of a call of the verdict `skip`. */
+  readonly reason?: string;
 }
 
 /** Where a numbered call is among the calls of its test. */
@@ -105,5 +108,6 @@ export function encodeCall(call: Call, place: Place): string {
         : { file: basename(call.where.file), line: call.where.line },
     detail: call.detail,
     error: call.error,
+    reason: call.reason,
   });
 }

@@ -181,27 +181,31 @@ export class Running {
   }
 
   /**
-   * Reports that a property skipped, at where. The call's record states
-   * run, the detail of the property's run. A seat that skips its test then
-   * skips it with reason, and does not return. Any other seat receives
+   * Reports that the call ended as skipped with reason, at where. A
+   * property reports it when its run skips, and the call's record states
+   * run, the detail of the property's run. doesReject reports it without a
+   * run when its check skips before it fails. A seat that skips its test
+   * then skips it with reason, and does not return. Any other seat receives
    * nothing, and its test passes.
    *
    * @param mode - The surface of the call.
    * @param assertion - The canonical id.
    * @param contract - The caller's message.
-   * @param where - The call site of the property.
-   * @param run - The detail of the run, as JSON values.
-   * @param reason - Why the run skipped.
+   * @param where - The call site of the property, or undefined for the call
+   *   site of the call.
+   * @param run - The detail of the run as JSON values, or undefined for a
+   *   record without detail.
+   * @param reason - Why the call skipped.
    */
   skipRun(
     mode: Mode,
     assertion: string,
     contract: string,
     where: Site | undefined,
-    run: Readonly<Record<string, unknown>>,
+    run: Readonly<Record<string, unknown>> | undefined,
     reason: string,
   ): void {
-    if (!this.#writeRun("skip", mode, assertion, contract, where, run)) {
+    if (!this.#writeRun("skip", mode, assertion, contract, where, run, reason)) {
       return;
     }
     if (takesSkips(this.#seat)) {
@@ -210,8 +214,9 @@ export class Running {
   }
 
   /**
-   * Writes the call record of a property's run with verdict, and returns
-   * whether the process's switch of recording states a value.
+   * Writes the call record of a property's run with verdict, and of a skip
+   * with its reason. It returns whether the process's switch of recording
+   * states a value.
    */
   #writeRun(
     verdict: Verdict,
@@ -219,7 +224,8 @@ export class Running {
     assertion: string,
     contract: string,
     where: Site | undefined,
-    run: Readonly<Record<string, unknown>>,
+    run: Readonly<Record<string, unknown>> | undefined,
+    reason?: string,
   ): boolean {
     if (!this.#switched()) {
       return false;
@@ -231,6 +237,7 @@ export class Running {
         verdict,
         aborting: mode === Mode.Fatal,
         ...(where === undefined ? {} : { where }),
+        ...(reason === undefined ? {} : { reason }),
       },
       undefined,
       run,

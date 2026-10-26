@@ -97,6 +97,13 @@ A fault that ends the check of `doesReject` ends the call of
 `doesReject` with the same fault, because the check did not decide about
 the implementation.
 
+A check whose environment lacks a capability calls `skip` of its seat.
+When it skips before it fails, the call record of `doesReject` states the
+verdict skip and the reason. `doesReject` then calls `skip` of its own
+seat, and the seat of the vitest fixture skips the test. On a seat
+without `skip`, such as a `Recorder` or the seat of a jest test, the test
+runs on, and the promise resolves to no record.
+
 ## Two surfaces
 
 `check` stops at the first failure. `soft` records and carries on, so

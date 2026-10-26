@@ -165,8 +165,9 @@ async function shrinkingOf(raw: Raw): Promise<Record<string, unknown>> {
 }
 
 /**
- * Returns the verdict of a run of a body that asserts once at its end, and
- * the call of the body, the phase and the verdict of each assertion.
+ * Returns the verdict of a run of a body that asserts once at its end, the
+ * reason of a run that skips, and the call of the body, the phase and the
+ * verdict of each assertion.
  */
 async function recordingOf(raw: Raw): Promise<Record<string, unknown>> {
   const body = buildBody(raw["body"] as Raw);
@@ -193,7 +194,7 @@ async function recordingOf(raw: Raw): Promise<Record<string, unknown>> {
       made.length = 0;
     }),
   );
-  return { verdict: VERDICTS[outcome.kind] ?? "fail", calls };
+  return { verdict: VERDICTS[outcome.kind] ?? "fail", reason: outcome.reason, calls };
 }
 
 /** Returns the settings of a run that a vector states. */

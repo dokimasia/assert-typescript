@@ -158,6 +158,10 @@ const DECLARED: Record<string, { file: string; text: string }> = {
     file: "matcher/seat.d.ts",
     text: "readonly signal?: AbortSignal",
   },
+  "seat.skip": {
+    file: "matcher/seat.d.ts",
+    text: "skip?: (reason: string) => never",
+  },
   "case.cancellation": { file: "prop/case.d.ts", text: "readonly signal: AbortSignal" },
   scrubber: { file: "golden/scrub.d.ts", text: "export type Scrubber" },
   tree: { file: "files/tree.d.ts", text: "export type Tree" },

@@ -237,6 +237,137 @@ describe("rejects", () => {
       check.isFalse(seat, recorder.failed, "the failing check passes rejects");
     });
 
+    it("ends the call as skipped for a check that skips before it fails", async ({
+      seat,
+    }) => {
+      const recorder = new Recorder();
+      let reached = false;
+      const failures = await check.doesReject(
+        recorder,
+        "a check that skips",
+        (inner) => {
+          inner.skip?.("the check needs a disk");
+          reached = true;
+        },
+      );
+
+      check.isFalse(seat, reached, "the skip ended the check");
+      check.isEqualTo(seat, failures, [], "the skip has no record");
+      check.isFalse(seat, recorder.failed, "the skip fails nothing");
+      check.isEqualTo(
+        seat,
+        records(recorder).map((r) => [r["verdict"], r["reason"], "detail" in r]),
+        [["skip", "the check needs a disk", false]],
+        "the call of rejects ends as skipped",
+      );
+    });
+
+    it("skips the test of a seat that skips its test with the reason of the check", async ({
+      seat,
+    }) => {
+      class Skipping extends Recorder {
+        readonly reasons: string[] = [];
+
+        skip(reason: string): never {
+          this.reasons.push(reason);
+          throw new Error(`the test skips: ${reason}`);
+        }
+      }
+      const skipping = new Skipping();
+      const thrown = await check.rejectsWith(
+        seat,
+        () =>
+          check.doesReject(skipping, "a check that skips", (inner) => {
+            inner.skip?.("the check needs a disk");
+          }),
+        "rejects rejects with the skip of the seat",
+      );
+
+      check.isEqualTo(
+        seat,
+        [(thrown as Error).message, skipping.reasons],
+        ["the test skips: the check needs a disk", ["the check needs a disk"]],
+        "the seat skips with the reason",
+      );
+    });
+
+    it("keeps the reason of the first skip", async ({ seat }) => {
+      const recorder = new Recorder();
+      await check.doesReject(recorder, "a check with two skips", (inner) => {
+        try {
+          inner.skip?.("the first reason");
+        } catch {
+          // The check runs on past the end of its first skip.
+        }
+        inner.skip?.("the second reason");
+      });
+
+      check.isEqualTo(
+        seat,
+        records(recorder).map((r) => r["reason"]),
+        ["the first reason"],
+        "the call of rejects has the first reason",
+      );
+    });
+
+    it("passes a check that fails and then skips", async ({ seat }) => {
+      const recorder = new Recorder();
+      const failures = await check.doesReject(
+        recorder,
+        "a check that skips late",
+        (inner) => {
+          soft.isTrue(inner, false, "it fails first");
+          inner.skip?.("the check needs a disk");
+        },
+      );
+
+      check.isEqualTo(
+        seat,
+        failures.map((f) => f.contract),
+        ["it fails first"],
+        "the records of the check",
+      );
+      check.isEqualTo(
+        seat,
+        records(recorder)
+          .filter((r) => r["assertion"] === "rejects")
+          .map((r) => r["verdict"]),
+        ["pass"],
+        "rejects passes",
+      );
+    });
+
+    it("passes a fault that the check notes to its seat for a check that then skips", async ({
+      seat,
+    }) => {
+      const noted = new Error("a file of the store is of a later format");
+      const recorder = new Recorder();
+      const failures = await check.doesReject(
+        recorder,
+        "a check with a note",
+        (inner) => {
+          inner.reportFault?.(noted, false);
+          inner.skip?.("the check needs a disk");
+        },
+      );
+
+      check.isEqualTo(seat, failures, [], "the skip has no record");
+      check.hasLength(seat, recorder.faults, 1, "one noted fault");
+      check.isEqualTo(
+        seat,
+        recorder.faults[0],
+        noted,
+        "the seat receives the noted fault",
+        byIdentity(),
+      );
+      check.isEqualTo(
+        seat,
+        records(recorder).map((r) => r["verdict"]),
+        ["skip"],
+        "the call of rejects ends as skipped",
+      );
+    });
+
     it("rejects with what the check throws that is no failure", async ({ seat }) => {
       const boom = new RangeError("the check broke");
       const thrown = await check.rejectsWith(

@@ -18,14 +18,16 @@ import { own } from "./record/calls.js";
 
 /**
  * The seat of the check that rejects drives. It keeps each record of the
- * check in call order, whether the check failed at all, and the fault that
- * ended the check. A failure that stops ends the check, as it ends a test,
- * and so does a fault that ends its call.
+ * check in call order, whether the check failed at all, the fault that
+ * ended the check, and the reason of its first skip. A failure that stops
+ * ends the check, as it ends a test, and so do a fault that ends its call
+ * and a skip.
  */
 class Check extends Body implements Reporter {
   readonly #records: Failure[] = [];
   #failed = false;
   #fault: Error | undefined;
+  #reason: string | undefined;
 
   /** Marks the check failed, and ends it. */
   fail(): never {
@@ -63,13 +65,30 @@ class Check extends Body implements Reporter {
     throw new Ended();
   }
 
-  /** The check's records, whether it failed, and the fault that ended it. */
+  /**
+   * Keeps the reason of the first skip, and ends the check. A check that
+   * skips before it fails ends the call of rejects as skipped.
+   *
+   * @param reason - Why the check skips.
+   */
+  skip(reason: string): never {
+    this.#reason ??= reason;
+    throw new Ended();
+  }
+
+  /** The check's records, whether it failed, the fault that ended it, and the reason of its skip. */
   get outcome(): {
     readonly records: readonly Failure[];
     readonly failed: boolean;
     readonly fault: Error | undefined;
+    readonly reason: string | undefined;
   } {
-    return { records: [...this.#records], failed: this.#failed, fault: this.#fault };
+    return {
+      records: [...this.#records],
+      failed: this.#failed,
+      fault: this.#fault,
+      reason: this.#reason,
+    };
   }
 }
 
@@ -82,9 +101,13 @@ async function drive(
   const call = Running.begin(seat, callSite());
   const check = await runOn(new Check(seat, call.slot), body);
   call.slot?.take(own(check));
-  const { records, failed, fault } = check.outcome;
+  const { records, failed, fault, reason } = check.outcome;
   if (fault !== undefined) {
     call.fault(Mode.Fatal, "rejects", msg, fault);
+    return [];
+  }
+  if (!failed && reason !== undefined) {
+    call.skipRun(Mode.Fatal, "rejects", msg, undefined, undefined, reason);
     return [];
   }
   if (!failed) {
@@ -113,6 +136,12 @@ async function drive(
  * promise then resolves to no record on a seat with reportFault, and
  * rejects with the fault on any other seat. A fault that the check notes
  * goes to seat as a noted fault, and the check runs on.
+ *
+ * A check that calls `skip` of its seat before it fails ends the call as
+ * skipped. The call record of rejects states the verdict skip and the
+ * reason. rejects then calls `skip` of seat where the seat has the member,
+ * which skips the test. On a seat without the member, the promise resolves
+ * to no record. A check that fails and then skips passes rejects.
  *
  * @param seat - Where the failure is reported.
  * @param msg - The contract under test.

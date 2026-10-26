@@ -242,6 +242,38 @@ describe("verdict", () => {
       expect(seat.failed).toBe(false);
     });
 
+    it("writes the reason of the skip in its call record", () => {
+      const seat = new Recorder();
+      Running.of(seat).skipRun(
+        Mode.Fatal,
+        "prop-for-all",
+        "the run skips",
+        undefined,
+        run,
+        "the environment lacks a capability",
+      );
+
+      expect(records(seat).map((r) => r["reason"])).toEqual([
+        "the environment lacks a capability",
+      ]);
+    });
+
+    it("writes no detail for a call without a run", () => {
+      const seat = new Recorder();
+      Running.begin(seat, { file: "/a/check.ts", line: 12 }).skipRun(
+        Mode.Fatal,
+        "rejects",
+        "the check skips",
+        undefined,
+        undefined,
+        "the check needs a disk",
+      );
+
+      expect(
+        records(seat).map((r) => ["detail" in r, r["reason"], r["where"]]),
+      ).toEqual([[false, "the check needs a disk", { file: "check.ts", line: 12 }]]);
+    });
+
     it("skips the test of a seat that skips its test after the call record", () => {
       class Skipping extends Recorder {
         readonly reasons: string[] = [];
