@@ -6,7 +6,7 @@
 import { chmodSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, onTestFinished, vi } from "vitest";
-import { check } from "../../src/index.js";
+import { check, fault } from "../../src/index.js";
 import type { Seat } from "../../src/matcher/seat.js";
 import { Running } from "../../src/matcher/verdict.js";
 import type { Case } from "../../src/prop/case.js";
@@ -242,6 +242,50 @@ describe("property", () => {
         [recorder.failed, call?.["verdict"], detail?.["outcome"], detail?.["reason"]],
         [false, "skip", "skipped", "the environment lacks a capability"],
         "a skip",
+      );
+    });
+
+    it("ends the call with the fault that ends its first case, without a shrink", async ({
+      seat,
+    }) => {
+      const recorder = new Recorder();
+      const error = new Error("the environment lacks the resource");
+      let ran = 0;
+      await runOn(recorder, (c) => {
+        ran += 1;
+        c.draw(integer(0, 9), "x");
+        fault(c, error);
+      });
+      const [call] = records(recorder);
+
+      check.isEqualTo(
+        seat,
+        [recorder.faults, recorder.failures, ran, call?.["verdict"]],
+        [[error], [], 1, "error"],
+        "the call ends with the same fault after one case",
+      );
+    });
+
+    it("ends the call with the fault of a shrink candidate", async ({ seat }) => {
+      const recorder = new Recorder();
+      const error = new Error("the environment lacks the resource");
+      let failed = false;
+      await runOn(recorder, (c) => {
+        const value = c.draw(integer(0, 9), "x");
+        if (failed && value < 5) {
+          fault(c, error);
+        }
+        if (value >= 5) {
+          failed = true;
+          c.fail("the digit is 5 or more");
+        }
+      });
+
+      check.isEqualTo(
+        seat,
+        [recorder.faults, recorder.failures],
+        [[error], []],
+        "the shrink ends the call with the fault",
       );
     });
 

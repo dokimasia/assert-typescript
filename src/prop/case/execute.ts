@@ -7,16 +7,33 @@
  */
 
 import { Failure } from "../../failure.js";
+import { Fault } from "../../matcher/fault.js";
 import type { Case, Failing } from "../case.js";
 import { Failed } from "../engine/case/signals.js";
-import { TraceError } from "../engine/trace.js";
-import { Diverged, Repeated } from "../engine/tree.js";
 import { pending, type Work } from "../engine/work.js";
 import { keyOf, ofError } from "../identity.js";
-import { failedWith, isSignal, type State, stateOf } from "./state.js";
+import {
+  Faulted,
+  failedWith,
+  isFinal,
+  isSignal,
+  type State,
+  stateOf,
+} from "./state.js";
 
-/** Keeps what a body or a cleanup threw: a signal, or the first raised value. */
-function caught(state: State, err: unknown): void {
+/**
+ * Keeps what a body or a cleanup threw: a signal, or the first raised value.
+ * A Fault of the library ends the case as a reported fault does, and a
+ * fault replaces every earlier signal that does not end the run.
+ */
+function caught(state: State, thrown: unknown): void {
+  const err = thrown instanceof Fault ? new Faulted(thrown) : thrown;
+  if (err instanceof Faulted) {
+    if (!isFinal(state.stopped)) {
+      state.stopped = err;
+    }
+    return;
+  }
   if (isSignal(err)) {
     state.stopped ??= err;
   } else {
@@ -68,8 +85,8 @@ function failureOf(state: State): Failed | undefined {
 /**
  * Runs body on c as one case of a property, and ends the case: it aborts the
  * case's signal and runs its cleanups, then throws how the case ended. A case
- * that repeats a tested case, diverges, or follows a trace that it cannot
- * follow throws that signal. A case that failed, in the body or in a
+ * that repeats a tested case, diverges, follows a trace that it cannot follow,
+ * or that a fault of a call ended throws that signal. A case that failed, in the body or in a
  * cleanup, throws its failure, also when it was rejected, skipped or passed
  * its cap. A rejected case throws its rejection, a case that skipped throws
  * its skip, and a case that passed returns.
@@ -91,11 +108,7 @@ export function* execute(c: Case, body: (c: Case) => unknown): Work<void> {
   state.controller.abort(new DOMException("the case ended", "AbortError"));
   yield* cleanUp(state);
   const signal = state.stopped;
-  if (
-    signal instanceof Repeated ||
-    signal instanceof Diverged ||
-    signal instanceof TraceError
-  ) {
+  if (isFinal(signal)) {
     throw signal;
   }
   const failed = failureOf(state);

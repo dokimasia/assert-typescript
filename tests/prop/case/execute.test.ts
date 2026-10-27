@@ -5,6 +5,8 @@
 
 import { describe } from "vitest";
 import { check } from "../../../src/index.js";
+import { Fault } from "../../../src/matcher/fault.js";
+import { Faulted } from "../../../src/prop/case/state.js";
 import { TraceError } from "../../../src/prop/engine/trace.js";
 import { Diverged, Repeated } from "../../../src/prop/engine/tree.js";
 import { test as it } from "../../../src/vitest.js";
@@ -107,6 +109,50 @@ describe("execute", () => {
         "first",
         "the failure has priority",
       );
+    });
+
+    it("ends the case with a Fault that the body throws", async ({ seat }) => {
+      const { c } = caseOn();
+      const fault = new Fault("seed", "the seed is no number");
+      const thrown = await ending(c, () => {
+        throw fault;
+      });
+
+      check.isTrue(
+        seat,
+        thrown instanceof Faulted && thrown.fault === fault,
+        "the thrown fault ends the case",
+      );
+    });
+
+    it("keeps the fault of a cleanup over an earlier failure", async ({ seat }) => {
+      const { c } = caseOn();
+      const fault = new Error("the store is gone");
+      const thrown = await ending(c, (one) => {
+        one.cleanup(() => one.reportFault(fault, true));
+        one.fail("the totals differ");
+      });
+
+      check.isTrue(
+        seat,
+        thrown instanceof Faulted && thrown.fault === fault,
+        "the fault outweighs the failure",
+      );
+    });
+
+    it("keeps a signal that ends the run over a later fault of a cleanup", async ({
+      seat,
+    }) => {
+      const { c } = caseOn();
+      const signal = new Repeated();
+      const thrown = await ending(c, (one) => {
+        one.cleanup(() => {
+          throw new Fault("", "late");
+        });
+        throw signal;
+      });
+
+      check.isTrue(seat, thrown === signal, "the signal of the run");
     });
 
     const tests = [

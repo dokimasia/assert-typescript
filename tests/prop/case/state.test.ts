@@ -9,7 +9,9 @@ import { check } from "../../../src/index.js";
 import {
   CASES,
   check as checkState,
+  Faulted,
   failedWith,
+  isFinal,
   isSignal,
   locate,
   STATES,
@@ -19,6 +21,7 @@ import {
 import type { Failing } from "../../../src/prop/case.js";
 import { Failed, Rejected, Skipped } from "../../../src/prop/engine/case/signals.js";
 import { TraceError } from "../../../src/prop/engine/trace.js";
+import { Repeated } from "../../../src/prop/engine/tree.js";
 import { keyOf, ofRecord } from "../../../src/prop/identity.js";
 import { test as it } from "../../../src/vitest.js";
 import { caseAt as caseOn, CASE_SITE as SITE } from "../../helpers.js";
@@ -53,6 +56,20 @@ describe("state", () => {
     });
   });
 
+  describe("Faulted", () => {
+    it("keeps its fault and the text of the fault", ({ seat }) => {
+      const fault = new Error("the store is gone");
+      const signal = new Faulted(fault);
+
+      check.isEqualTo(
+        seat,
+        [signal.fault === fault, signal.message],
+        [true, "the store is gone"],
+        "the signal has the fault and its text",
+      );
+    });
+  });
+
   describe("isSignal", () => {
     it("reports the signals of the engine, which end a case", ({ seat }) => {
       check.isEqualTo(
@@ -62,10 +79,28 @@ describe("state", () => {
           isSignal(new Failed("x")),
           isSignal(new Skipped("why")),
           isSignal(new TraceError(0, "x", "label")),
+          isSignal(new Faulted(new Error("gone"))),
           isSignal(new Error("boom")),
         ],
-        [true, true, true, true, false],
-        "four signals and an error",
+        [true, true, true, true, true, false],
+        "five signals and an error",
+      );
+    });
+  });
+
+  describe("isFinal", () => {
+    it("reports the signals that end the run", ({ seat }) => {
+      check.isEqualTo(
+        seat,
+        [
+          isFinal(new Repeated()),
+          isFinal(new TraceError(0, "x", "label")),
+          isFinal(new Faulted(new Error("gone"))),
+          isFinal(new Skipped("why")),
+          isFinal(undefined),
+        ],
+        [true, true, true, false, false],
+        "three final signals, a skip and no signal",
       );
     });
   });

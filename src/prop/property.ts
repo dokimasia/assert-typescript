@@ -27,6 +27,7 @@ import type { Where } from "../failure.js";
 import { Fault, noteFault, ofOperation } from "../matcher/fault.js";
 import { Mode, type Seat } from "../matcher/seat.js";
 import type { Running } from "../matcher/verdict.js";
+import { Faulted } from "./case/state.js";
 import type { Case } from "./case.js";
 import { claim, type Loaded, load, storeOf } from "./directory.js";
 import { Bridging } from "./engine/bridge.js";
@@ -354,14 +355,19 @@ export class Property {
 
   /**
    * Drives work, and returns its outcome, or undefined after the call ended
-   * with a fault: at the entry of the draws option that the body cannot
-   * follow, and with any other error that ends the run, such as the stop of
-   * a run whose seat's signal aborted.
+   * with a fault: the same fault that ended a call of the body in any phase,
+   * a fault at the entry of the draws option that the body cannot follow,
+   * and any other error that ends the run, such as the stop of a run whose
+   * seat's signal aborted.
    */
   async #drive(running: Running, work: Work<Outcome>): Promise<Outcome | undefined> {
     try {
       return await drive(work);
     } catch (err) {
+      if (err instanceof Faulted) {
+        running.fault(Mode.Fatal, this.call.assertion, this.call.contract, err.fault);
+        return undefined;
+      }
       this.#fault(
         running,
         err instanceof TraceError ? refusalOf(err, this.#entries) : err,

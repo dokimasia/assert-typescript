@@ -22,13 +22,16 @@
 import type { Clock } from "../clock.js";
 import { Failure, type Where } from "../failure.js";
 import { History } from "../history/history.js";
+import { noteFault } from "../matcher/fault.js";
 import { clockOf, type Reporter, type Seat, signalOf } from "../matcher/seat.js";
 import { own, run, type Slot } from "../record/calls.js";
 import { Standard } from "../seat.js";
 import {
   CASES,
   check,
+  Faulted,
   failedWith,
+  isFinal,
   locate,
   STATES,
   stateOf,
@@ -216,6 +219,28 @@ export class Case implements Seat, Reporter {
     const state = stateOf(this);
     check(state);
     stop(state, new Skipped(reason));
+  }
+
+  /**
+   * Receives a fault of a call of the body. A fault that ends its call ends
+   * the case, also after a failure. The run of the property then ends in
+   * every phase, and the property ends its call with the same fault. A noted
+   * fault passes to the seat of the property, and the body runs on.
+   *
+   * @param fault - The fault.
+   * @param ending - Whether the fault ends its call.
+   */
+  reportFault(fault: Error, ending: boolean): void {
+    const state = stateOf(this);
+    if (!ending) {
+      noteFault(state.seat, fault);
+      return;
+    }
+    if (isFinal(state.stopped)) {
+      throw state.stopped;
+    }
+    state.stopped = new Faulted(fault);
+    throw state.stopped;
   }
 
   /**

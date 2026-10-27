@@ -8,6 +8,7 @@
  * same inputs, and the inputs cover more paths than one literal does.
  */
 
+import { Faulted } from "./case/state.js";
 import { Generating } from "./engine/case/providers.js";
 import { Rejected, Skipped } from "./engine/case/signals.js";
 import { Case, DECODE } from "./engine/case.js";
@@ -17,6 +18,31 @@ import { seedValue } from "./option.js";
 
 /** The most cases that values rejects for each value that it returns, the ratio at which a run gives up. */
 const REJECTIONS_PER_VALUE = 10;
+
+/**
+ * Returns the error that ends the call of values at err: a skip or a fault of
+ * the generator, whose signal is the cause of the error. It returns undefined
+ * for any other err.
+ */
+function endOf(call: string, err: unknown): Error | undefined {
+  if (err instanceof Skipped) {
+    return new Error(
+      `prop: ${call} stops at a case that the generator skips: ${err.reason}`,
+      {
+        cause: err,
+      },
+    );
+  }
+  if (err instanceof Faulted) {
+    return new Error(
+      `prop: ${call} stops at a fault of the generator: ${err.message}`,
+      {
+        cause: err,
+      },
+    );
+  }
+  return undefined;
+}
 
 /**
  * Returns n values of generator for seed: the values of the random cases of
@@ -37,8 +63,9 @@ const REJECTIONS_PER_VALUE = 10;
  * @throws RangeError for an n that is no whole number of 0 or more, and for
  *   a seed outside [0, 2^64).
  * @throws Error when the generator rejects more than ten cases for each of
- *   the n values, and at a case that the generator skips, because values
- *   runs no test that a skip could skip.
+ *   the n values, at a case that the generator skips, and at a case that the
+ *   generator ends with a fault, because values runs no test that a skip
+ *   could skip or a fault could end.
  * @example
  * const ids = prop.values(prop.integer(0, 1_000_000), 42, 100);
  * bench("get", () => {
@@ -62,11 +89,9 @@ export function values<T>(
     try {
       out.push(generator[DECODE](c));
     } catch (err) {
-      if (err instanceof Skipped) {
-        throw new Error(
-          `prop: ${call} stops at a case that the generator skips: ${err.reason}`,
-          { cause: err },
-        );
+      const ended = endOf(call, err);
+      if (ended !== undefined) {
+        throw ended;
       }
       if (!(err instanceof Rejected)) {
         throw err;

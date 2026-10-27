@@ -9,6 +9,7 @@
 
 import { callSite, type Failure, type Where } from "../../failure.js";
 import type { History } from "../../history/history.js";
+import { faultText } from "../../matcher/fault.js";
 import type { Seat } from "../../matcher/seat.js";
 import type { Case, Failing, Location } from "../case.js";
 import { Failed, Rejected, Skipped } from "../engine/case/signals.js";
@@ -41,15 +42,49 @@ export function stateOf(c: Case): State {
   return STATES.get(c) as State;
 }
 
+/**
+ * The signal of a case that a fault of a call of its body ended. The fault
+ * ends the run of the property in every phase, and the property ends its
+ * call with the same fault.
+ */
+export class Faulted extends Error {
+  /** The fault. */
+  readonly fault: unknown;
+
+  /**
+   * Returns the signal of a fault of a call of the body.
+   *
+   * @param fault - The fault.
+   */
+  constructor(fault: unknown) {
+    super(faultText(fault));
+    this.name = "Faulted";
+    this.fault = fault;
+  }
+}
+
 /** Reports whether err is a signal of the engine, which ends the case. */
 export function isSignal(err: unknown): boolean {
   return (
     err instanceof Rejected ||
     err instanceof Failed ||
     err instanceof Skipped ||
+    err instanceof Faulted ||
+    isFinal(err)
+  );
+}
+
+/**
+ * Reports whether err is a signal that ends the run as well as the case: a
+ * repeat of a tested case, a divergence, an entry that a trace cannot follow,
+ * and a fault of a call of the body.
+ */
+export function isFinal(err: unknown): boolean {
+  return (
     err instanceof Repeated ||
     err instanceof Diverged ||
-    err instanceof TraceError
+    err instanceof TraceError ||
+    err instanceof Faulted
   );
 }
 

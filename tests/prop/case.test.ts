@@ -8,6 +8,7 @@ import { Controlled } from "../../src/clock.js";
 import { Failure } from "../../src/failure.js";
 import type { History } from "../../src/history/history.js";
 import { check } from "../../src/index.js";
+import { Faulted } from "../../src/prop/case/state.js";
 import { Case, caseOf, type Location, onEngine } from "../../src/prop/case.js";
 import { Replaying } from "../../src/prop/engine/case/providers.js";
 import { Failed, Rejected, Skipped } from "../../src/prop/engine/case/signals.js";
@@ -327,6 +328,38 @@ describe("case", () => {
       });
 
       check.isTrue(seat, ended instanceof Rejected, "the rejection");
+    });
+  });
+
+  describe("Case.reportFault", () => {
+    it("ends the case with a fault that ends its call", async ({ seat }) => {
+      const { c } = caseOn();
+      const fault = new Error("the seed is no number");
+      let after = false;
+      const thrown = await ending(c, (one) => {
+        one.reportFault(fault, true);
+        after = true;
+      });
+
+      check.isEqualTo(
+        seat,
+        [thrown instanceof Faulted && thrown.fault === fault, after],
+        [true, false],
+        "the fault ends the case",
+      );
+    });
+
+    it("passes a noted fault to the seat of the property", async ({ seat }) => {
+      const recorder = new Recorder();
+      const c = new Case(new Engine(new Replaying([])), recorder, undefined, FREE);
+      const noted = new Error("the store skips a file");
+
+      check.isNil(
+        seat,
+        await ending(c, (one) => one.reportFault(noted, false)),
+        "the case passes",
+      );
+      check.isEqualTo(seat, recorder.faults, [noted], "the seat receives the fault");
     });
   });
 

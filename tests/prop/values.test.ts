@@ -4,7 +4,7 @@
 /** The spec of the values of a generator for a seed. */
 
 import { describe } from "vitest";
-import { check } from "../../src/index.js";
+import { check, fault } from "../../src/index.js";
 import { list } from "../../src/prop/generators/collections.js";
 import { composite, integer } from "../../src/prop/generators.js";
 import { values } from "../../src/prop/values.js";
@@ -100,6 +100,20 @@ describe("values", () => {
         seat,
         thrown(() => values(skipping, 7, 1)),
         "prop: values(generator, 7, 1) stops at a case that the generator skips: the generator skips",
+        "values stops",
+      );
+    });
+
+    it("throws at a case that the generator ends with a fault", ({ seat }) => {
+      const faulting = composite((c) => {
+        fault(c, new Error("the store is gone"));
+        return 0;
+      });
+
+      check.isEqualTo(
+        seat,
+        thrown(() => values(faulting, 7, 1)),
+        "prop: values(generator, 7, 1) stops at a fault of the generator: the store is gone",
         "values stops",
       );
     });
