@@ -349,6 +349,25 @@ describe("case", () => {
       );
     });
 
+    it("keeps the first fault of a case that catches it", async ({ seat }) => {
+      const { c } = caseOn();
+      const first = new Error("first");
+      const thrown = await ending(c, (one) => {
+        try {
+          one.reportFault(first, true);
+        } catch {
+          // The body catches the fault and calls on.
+        }
+        one.reportFault(new Error("second"), true);
+      });
+
+      check.isTrue(
+        seat,
+        thrown instanceof Faulted && thrown.fault === first,
+        "the first fault ends the case",
+      );
+    });
+
     it("passes a noted fault to the seat of the property", async ({ seat }) => {
       const recorder = new Recorder();
       const c = new Case(new Engine(new Replaying([])), recorder, undefined, FREE);
