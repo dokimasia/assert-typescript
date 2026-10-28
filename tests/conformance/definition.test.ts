@@ -29,8 +29,8 @@ describe("definition", () => {
   });
 
   describe("assertions", () => {
-    it("returns the 110 assertions of the vendored definition", ({ seat }) => {
-      check.hasLength(seat, assertions(), 110, "the definition states 110 assertions");
+    it("returns the 111 assertions of the vendored definition", ({ seat }) => {
+      check.hasLength(seat, assertions(), 111, "the definition states 111 assertions");
     });
   });
 

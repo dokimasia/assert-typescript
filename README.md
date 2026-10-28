@@ -889,7 +889,7 @@ definition and holds itself to it:
 
 ### Where TypeScript differs
 
-Six assertions are declared divergent rather than implemented.
+Seven assertions are declared divergent rather than implemented.
 `maxAllocs` and `maxAllocsWithSetup` on a call, their property forms
 `prop.maxAllocs` and `prop.maxAllocsWithSetup`, and
 `bench.Contract.maxAllocs` and `maxBytes` on a benchmark iteration state
@@ -900,6 +900,14 @@ collector ran: measuring one unchanged body six times gave 43, -3, 43,
 fail the next for no reason, so the overlay records the gap instead of
 pretending. `allocsChecked()` returns `{ checked: false, reason }` in
 every run for the same reason.
+
+`maxLiveBytes` bounds the memory that a call keeps reachable at each call
+of a probe. Node counts the backing store of a typed array in
+`arrayBuffers`, and it releases the store of a freed array on a background
+thread after the collection. A freed array of 256 KiB stayed counted after
+`gc()`, after a last-resort collection and after `setTimeout(0)`, and left
+about 10 ms later. A synchronous probe would read freed buffers as kept,
+so the overlay declines the assertion.
 
 A run of `prop.forAll` and `prop.fuzz` and a call of `prop.values` do not
 take `prop.using`, because the body or the caller states each generator

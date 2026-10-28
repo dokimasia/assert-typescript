@@ -351,8 +351,8 @@ describe("index", () => {
     );
   });
 
-  it("checks the 110 assertions of the definition", ({ seat }) => {
-    check.hasLength(seat, Object.keys(ASSERTIONS), 110, "the definition states 110");
+  it("checks the 111 assertions of the definition", ({ seat }) => {
+    check.hasLength(seat, Object.keys(ASSERTIONS), 111, "the definition states 111");
   });
 
   for (const id of Object.keys(ASSERTIONS)
