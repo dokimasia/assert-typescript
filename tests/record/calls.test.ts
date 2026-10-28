@@ -4,7 +4,14 @@
 /** The spec of the call records of a test, of a recorder and of a run of a body. */
 
 import { describe } from "vitest";
-import { byIdentity, check } from "../../src/index.js";
+import {
+  byIdentity,
+  check,
+  fault,
+  type Call as Observed,
+  prop,
+  Recorder,
+} from "../../src/index.js";
 import type { Call } from "../../src/record/call.js";
 import {
   add,
@@ -35,6 +42,22 @@ function keeping(): object {
   const seat = {};
   keep(own(seat));
   return seat;
+}
+
+/**
+ * Returns seat with a member observeCall, and with the calls that it observed
+ * in order.
+ */
+function watching<S extends object>(
+  seat: S,
+): S & { seen: Observed[]; observeCall: (observed: Observed) => void } {
+  const seen: Observed[] = [];
+  return Object.assign(seat, {
+    seen,
+    observeCall: (observed: Observed) => {
+      seen.push(observed);
+    },
+  });
 }
 
 describe("calls", () => {
@@ -81,6 +104,59 @@ describe("calls", () => {
       const subject = keeping();
 
       check.isTrue(seat, callsOf(subject) === own(subject), "the calls of the seat");
+    });
+
+    it("returns calls that pass each call to a seat with observeCall", ({ seat }) => {
+      const subject = watching({});
+      add(callsOf(subject) as Calls, {
+        assertion: "equal",
+        contract: "the totals match",
+        verdict: "fail",
+        aborting: true,
+      });
+
+      check.isEqualTo(
+        seat,
+        subject.seen,
+        [{ assertion: "equal", contract: "the totals match" }],
+        "the seat observes the call",
+      );
+    });
+
+    it("returns calls that pass the calls of a property to its seat", async ({
+      seat,
+    }) => {
+      const subject = watching(new Recorder());
+      await prop.forAll(
+        subject,
+        "every x is small",
+        (c) => {
+          check.isTrue(c, c.draw(prop.integer(0, 9), "x") < 10, "x is small");
+        },
+        prop.hermetic(),
+        prop.cases(3),
+      );
+      const contracts = subject.seen.map((c) => c.contract);
+
+      check.isEqualTo(
+        seat,
+        contracts.at(-1),
+        "every x is small",
+        "the property comes last",
+      );
+      check.doesContain(
+        seat,
+        contracts.slice(0, -1),
+        "x is small",
+        "a case comes first",
+      );
+    });
+
+    it("returns no calls of fault to a seat with observeCall", ({ seat }) => {
+      const subject = watching(new Recorder());
+      fault(subject, new Error("the check misses an option"));
+
+      check.isEqualTo(seat, subject.seen, [], "a fault is no assertion call");
     });
   });
 
@@ -146,6 +222,21 @@ describe("calls", () => {
         [body.entries.length, body.entries[0]?.seq],
         [1, 0],
         "the call waits for its slot",
+      );
+    });
+
+    it("passes a call once to a seat that keeps its records and observes it", ({
+      seat,
+    }) => {
+      const subject = watching({});
+      keep(own(subject));
+      add(callsOf(subject) as Calls, call("kept"));
+
+      check.isEqualTo(
+        seat,
+        [subject.seen.map((c) => c.assertion), parsed(own(subject)).length],
+        [["kept"], 1],
+        "the seat observes the call, and its calls keep the record",
       );
     });
   });
@@ -270,6 +361,44 @@ describe("calls", () => {
           [3, 2, 1, "true"],
         ],
         "the nested call keeps its own parent",
+      );
+    });
+
+    it("passes the calls of a body to the observer when the call takes them", ({
+      seat,
+    }) => {
+      const subject = watching({});
+      const slot = Slot.begin(subject) as Slot;
+      const body = new Calls();
+      run(body, slot);
+      add(body, call("in the body"));
+      const before = subject.seen.length;
+      slot.take(body, "random");
+      slot.write(call("prop-for-all"));
+
+      check.isEqualTo(
+        seat,
+        [before, subject.seen.map((c) => c.assertion)],
+        [0, ["in the body", "prop-for-all"]],
+        "the calls of the run, then the call that ran the body",
+      );
+    });
+
+    it("passes each call of a body once to a seat that keeps them", ({ seat }) => {
+      const subject = watching({});
+      keep(own(subject));
+      const slot = Slot.begin(subject) as Slot;
+      const body = new Calls();
+      run(body, slot);
+      add(body, call("in the body"));
+      slot.take(body);
+      slot.write(call("eventually"));
+
+      check.isEqualTo(
+        seat,
+        [subject.seen.map((c) => c.assertion), parsed(own(subject)).length],
+        [["in the body", "eventually"], 2],
+        "each call reaches the seat once, and the calls keep every record",
       );
     });
   });

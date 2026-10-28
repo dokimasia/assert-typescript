@@ -47,7 +47,7 @@ function reportDropped(seat: Seat): void {
 /** The functions that each collector runs when its test ends, in the order of their registration. */
 const CLEANUPS = new WeakMap<Collector, (() => void)[]>();
 
-export type { Cleanups, Seat } from "./matcher/seat.js";
+export type { Call, Cleanups, Seat } from "./matcher/seat.js";
 export { signalOf } from "./matcher/seat.js";
 
 /** Raised by every seat that stops a test. */

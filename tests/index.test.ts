@@ -142,7 +142,7 @@ const CLOCKS: Record<string, { prototype: object }> = {
  * is erased at run time.
  */
 const DECLARED: Record<string, { file: string; text: string }> = {
-  seat: { file: "seat.d.ts", text: "export type { Cleanups, Seat }" },
+  seat: { file: "seat.d.ts", text: "export type { Call, Cleanups, Seat }" },
   clock: { file: "clock.d.ts", text: "interface Clock" },
   failure: { file: "failure.d.ts", text: "class Failure" },
   where: { file: "failure.d.ts", text: "interface Where" },
@@ -161,6 +161,19 @@ const DECLARED: Record<string, { file: string; text: string }> = {
   "seat.skip": {
     file: "matcher/seat.d.ts",
     text: "skip?: (reason: string) => never",
+  },
+  "seat.observe-call": {
+    file: "matcher/seat.d.ts",
+    text: "observeCall?: (call: Call) => void",
+  },
+  "assertion-call": { file: "matcher/seat.d.ts", text: "export interface Call {" },
+  "assertion-call.assertion": {
+    file: "matcher/seat.d.ts",
+    text: "readonly assertion: string",
+  },
+  "assertion-call.contract": {
+    file: "matcher/seat.d.ts",
+    text: "readonly contract: string",
   },
   "case.cancellation": { file: "prop/case.d.ts", text: "readonly signal: AbortSignal" },
   scrubber: { file: "golden/scrub.d.ts", text: "export type Scrubber" },

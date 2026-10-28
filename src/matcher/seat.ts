@@ -55,8 +55,26 @@ export interface Seat {
    */
   skip?: (reason: string) => never;
 
+  /**
+   * Observes one assertion call, a passing one included. The seat receives
+   * each call that a recorded run records, whatever DOKIMI_ASSERT_RECORD
+   * states. It receives each call once, before the failure, the fault or the
+   * skip of that call. It receives the calls of a body when the call that
+   * ran the body takes them, so the calls of the cases of a property arrive
+   * in the order of a run on one worker.
+   */
+  observeCall?: (call: Call) => void;
+
   /** Aborts when the test that runs on this seat ends, where the seat states one. */
   readonly signal?: AbortSignal | undefined;
+}
+
+/** An assertion call, with the id of the assertion and the contract. */
+export interface Call {
+  /** The id of the assertion, as the definition names it. */
+  readonly assertion: string;
+  /** The message of the caller, unchanged. */
+  readonly contract: string;
 }
 
 /** A seat that runs functions when the test that runs on it ends. */

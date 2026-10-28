@@ -37,6 +37,7 @@ export * as prop from "./prop/index.js";
 export { doesReject } from "./rejects.js";
 export {
   AssertionFailed,
+  type Call,
   type Cleanups,
   Collector,
   Recorder,

@@ -16,12 +16,20 @@
  * A call that runs a body takes its number through {@link Slot.begin},
  * before the calls of its body, and writes its record through
  * {@link Slot.write} when it ends.
+ *
+ * A seat with a member observeCall receives each call, whatever the switch
+ * states. callsOf returns calls that pass each call to the seat once the
+ * call has ended, and that hand its record to the calls of the seat.
  */
 
+import type { Call as Observed } from "../matcher/seat.js";
 import { type Call, encodeCall, type Phase } from "./call.js";
 
 /** What a set of calls does with a record. */
-type State = "off" | "keeping" | "writing" | "running";
+type State = "off" | "keeping" | "writing" | "running" | "observing";
+
+/** The member observeCall of a seat, which receives each assertion call. */
+type Observer = (call: Observed) => void;
 
 /** One call among the calls of its test. */
 interface Entry {
@@ -39,6 +47,19 @@ interface Entry {
   seq: number;
   /** The calls that keep the entry now. */
   home: Calls | undefined;
+  /** Receives the call once it has ended, for a call on a seat with observeCall. */
+  observer?: Observer | undefined;
+  /** Whether the observer has received the call. */
+  observed?: boolean;
+}
+
+/** Passes the call of e to its observer once, after the call has ended. */
+function observe(e: Entry): void {
+  if (e.observer === undefined || e.call === undefined || e.observed === true) {
+    return;
+  }
+  e.observed = true;
+  e.observer({ assertion: e.call.assertion, contract: e.call.contract });
 }
 
 /** The calls of each seat of this library. */
@@ -61,9 +82,27 @@ export class Calls {
   entries: Entry[] = [];
   /** How many steps the walk of the run's case has made, for a run that a property cuts. */
   position: (() => number) | undefined;
+  /** The member observeCall of the seat of observing calls. */
+  observer: Observer | undefined;
+  /** The calls to which observing calls hand each record, or undefined when nothing keeps it. */
+  to: Calls | undefined;
 
-  /** Puts e among the calls: numbered and written when they keep or write, kept otherwise. */
+  /**
+   * Puts e among the calls: numbered and written when they keep or write,
+   * kept otherwise. Observing calls hand e to the calls after them, and
+   * pass a call that has ended to their observer.
+   */
   add(e: Entry): void {
+    if (this.observer !== undefined) {
+      e.observer ??= this.observer;
+      if (this.to === undefined) {
+        e.home = this;
+      } else {
+        this.to.add(e);
+      }
+      observe(e);
+      return;
+    }
     e.home = this;
     if (this.state === "running") {
       e.steps = this.position?.() ?? 0;
@@ -121,16 +160,27 @@ export function own(seat: object): Calls {
 }
 
 /**
- * Returns the calls that keep the record of a call on seat, and undefined
- * when the call is not recorded: for a seat that is no seat of this
- * library, and for one whose calls record nothing.
+ * Returns the calls that take the record of a call on seat, and undefined
+ * when the call is neither recorded nor observed. A call is not recorded on
+ * a seat that is no seat of this library, and on one whose calls record
+ * nothing. A seat with a member observeCall gets new calls that pass each
+ * call to observeCall, and hand its record to the calls of the seat.
  *
  * @param seat - The seat of the call.
  * @returns The calls, or undefined.
  */
 export function callsOf(seat: object): Calls | undefined {
   const calls = SEATS.get(seat);
-  return calls === undefined || calls.state === "off" ? undefined : calls;
+  const recorded = calls === undefined || calls.state === "off" ? undefined : calls;
+  const observer = (seat as { observeCall?: unknown }).observeCall;
+  if (typeof observer !== "function") {
+    return recorded;
+  }
+  const observing = new Calls();
+  observing.state = "observing";
+  observing.observer = (call) => observer.call(seat, call);
+  observing.to = recorded;
+  return observing;
 }
 
 /**
@@ -288,7 +338,9 @@ export class Slot {
         e.run = this.#runs;
         e.phase = phase;
       }
+      e.observer = this.#entry.observer;
       home.add(e);
+      observe(e);
     }
   }
 
@@ -304,5 +356,6 @@ export class Slot {
     if (this.#entry.seq !== 0) {
       home.emit(this.#entry);
     }
+    observe(this.#entry);
   }
 }
