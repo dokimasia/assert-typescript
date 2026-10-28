@@ -10,7 +10,7 @@
 
 import type { Anomaly, Instance, Observation } from "./anomaly.js";
 import { identityOf } from "./history.js";
-import { APPEND, type Transaction } from "./transaction.js";
+import { APPEND, READ, type Transaction, WRITE } from "./transaction.js";
 
 /** Returns the values of the read at position that txn appends to the key after it. */
 function future(
@@ -55,9 +55,7 @@ function internal(txn: Transaction): Instance | undefined {
   for (const [position, mop] of txn.mops.entries()) {
     const key = id(mop.key);
     const [whole, expected] = known.get(key) ?? [false, []];
-    if (mop.fn === APPEND) {
-      known.set(key, [whole, [...expected, mop.value]]);
-    } else {
+    if (mop.fn === READ) {
       const read = mop.value as readonly unknown[];
       const later = future(txn, position, read);
       if (later.length > 0 || (known.has(key) && !agrees(read, whole, expected))) {
@@ -76,13 +74,61 @@ function internal(txn: Transaction): Instance | undefined {
         );
       }
       known.set(key, [true, [...read]]);
+    } else {
+      known.set(key, [whole, [...expected, mop.value]]);
     }
+  }
+  return undefined;
+}
+
+/**
+ * Returns the first register read of an ok transaction that contradicts the
+ * transaction, or undefined. After a write or a read of a key, the
+ * transaction knows the key's value. A later read returns that value, and
+ * no read returns a value that the transaction writes to the key after the
+ * read.
+ */
+function internalRegister(txn: Transaction): Instance | undefined {
+  const known = new Map<string, readonly unknown[]>();
+  for (const [position, mop] of txn.mops.entries()) {
+    const key = id(mop.key);
+    const isRead = mop.fn === READ;
+    const read = isRead ? (mop.value as readonly unknown[]) : [mop.value];
+    const writesLater =
+      isRead &&
+      read.length > 0 &&
+      txn.mops
+        .slice(position + 1)
+        .some(
+          (later) =>
+            later.fn === WRITE && id(later.key) === key && same([later.value], read),
+        );
+    const expected = known.get(key);
+    if (writesLater || (isRead && expected !== undefined && !same(expected, read))) {
+      return single(
+        "internal-inconsistency",
+        [txn.call],
+        observation("internal-inconsistency", {
+          calls: [txn.call],
+          key: mop.key,
+          register: true,
+          read: read[0],
+          known: expected?.[0],
+          whole: expected !== undefined,
+          future: writesLater ? read[0] : undefined,
+          hasFuture: writesLater,
+        }),
+      );
+    }
+    known.set(key, read);
   }
   return undefined;
 }
 
 /** What the transactions of a history state, as the search of an anomaly of a read reads it. */
 export interface Facts {
+  /** Whether the history is a register history. */
+  readonly register: boolean;
   /** The transactions, in the order of their invocations. */
   readonly txns: readonly Transaction[];
   /** The committed reads, in the order of the transactions. */
@@ -100,6 +146,11 @@ export interface Read {
   readonly call: number;
   readonly key: unknown;
   readonly read: readonly unknown[];
+}
+
+/** Reports whether two register reads, each the list of its one value or the empty list, are one. */
+export function same(a: readonly unknown[], b: readonly unknown[]): boolean {
+  return JSON.stringify(a.map(id)) === JSON.stringify(b.map(id));
 }
 
 /** Returns the identity of a key or a value that the transactions stated, which has one. */
@@ -129,6 +180,9 @@ export function observation(
     whole: false,
     future: undefined,
     hasFuture: false,
+    register: false,
+    read: undefined,
+    known: undefined,
     ...fields,
   };
 }
@@ -150,7 +204,14 @@ export function garbageRead(facts: Facts): Instance | undefined {
         return single(
           "garbage-read",
           [call],
-          observation("garbage-read", { calls: [call], key, reads: [read], value }),
+          observation("garbage-read", {
+            calls: [call],
+            key,
+            reads: [read],
+            value,
+            register: facts.register,
+            read: facts.register ? value : undefined,
+          }),
         );
       }
     }
@@ -183,8 +244,9 @@ export function duplicateAppend(facts: Facts): Instance | undefined {
 
 /** Returns the first committed read that contradicts its own transaction. */
 export function internalInconsistency(facts: Facts): Instance | undefined {
+  const contradicted = facts.register ? internalRegister : internal;
   for (const txn of facts.txns) {
-    const found = txn.kind === "ok" ? internal(txn) : undefined;
+    const found = txn.kind === "ok" ? contradicted(txn) : undefined;
     if (found !== undefined) {
       return found;
     }
@@ -201,7 +263,13 @@ export function abortedRead(facts: Facts): Instance | undefined {
         return single(
           "aborted-read",
           [call, appender],
-          observation("aborted-read", { calls: [call], key, value, appender }),
+          observation("aborted-read", {
+            calls: [call],
+            key,
+            value,
+            appender,
+            register: facts.register,
+          }),
         );
       }
     }
@@ -229,6 +297,7 @@ export function intermediateRead(facts: Facts): Instance | undefined {
           value,
           appender,
           next: facts.later.get(name),
+          register: facts.register,
         }),
       );
     }

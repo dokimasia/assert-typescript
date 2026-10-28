@@ -787,7 +787,11 @@ form one partition, and the check searches each partition on its own.
 `history.concurrently` starts clients together, and
 `history.fromIntervals` builds a history from a log of timed calls.
 `history.isSerializable` and `history.hasSnapshotIsolation` check a
-history of list-append transactions.
+history of list-append transactions or of register transactions. A history
+that writes with `["write", key, value]` is a register history. Its reads
+return the value of the register, or null for the initial value. A
+register history shows fewer anomalies than a list-append history, because
+blind writes do not reveal an order between them.
 
 ## Machines
 
@@ -880,7 +884,7 @@ definition and holds itself to it:
 - 195 corpus cases state what each assertion must report, run against
   both surfaces and the matchers of `expect`, with the call record of
   each call. They are the same cases every other implementation runs.
-- 437 property vectors, 80 history vectors, 14 machine vectors and 57
+- 437 property vectors, 108 history vectors, 14 machine vectors and 57
   file vectors pin the property engine, the history checks, machines and
   the assertions of files.
 - A completeness gate checks that every assertion is present under the

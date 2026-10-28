@@ -15,6 +15,7 @@ import {
   internalInconsistency,
   nameOf,
   observation,
+  same,
   single,
 } from "../../src/history/reads.js";
 import type { Transaction } from "../../src/history/transaction.js";
@@ -24,6 +25,7 @@ import { test as it } from "../../src/vitest.js";
 /** Returns the facts of reads and appends, with no transaction and no aborted call. */
 function factsOf(fields: Partial<Facts>): Facts {
   return {
+    register: false,
     txns: [],
     reads: [],
     appender: new Map(),
@@ -83,6 +85,9 @@ describe("reads", () => {
           whole: false,
           future: undefined,
           hasFuture: false,
+          register: false,
+          read: undefined,
+          known: undefined,
         },
         "one field stated",
       );
@@ -208,6 +213,94 @@ describe("reads", () => {
 
       check.isNil(seat, internalInconsistency(factsOf({ txns: [txn] })), "consistent");
     });
+
+    it("returns a register read of another value than the transaction wrote", ({
+      seat,
+    }) => {
+      const txn = okTxn(
+        { fn: "write", key: "x", value: 1n },
+        { fn: "read", key: "x", value: [] },
+      );
+
+      check.isEqualTo(
+        seat,
+        internalInconsistency(factsOf({ register: true, txns: [txn] }))?.explanation,
+        [
+          observation("internal-inconsistency", {
+            calls: [0],
+            key: "x",
+            register: true,
+            known: 1n,
+            whole: true,
+          }),
+        ],
+        "the write of 1 and a read of the initial value",
+      );
+    });
+
+    it("returns a register read of a value that the transaction writes after it", ({
+      seat,
+    }) => {
+      const txn = okTxn(
+        { fn: "read", key: "x", value: [2n] },
+        { fn: "write", key: "x", value: 2n },
+      );
+
+      check.isEqualTo(
+        seat,
+        internalInconsistency(factsOf({ register: true, txns: [txn] }))?.explanation,
+        [
+          observation("internal-inconsistency", {
+            calls: [0],
+            key: "x",
+            register: true,
+            read: 2n,
+            future: 2n,
+            hasFuture: true,
+          }),
+        ],
+        "the future value 2",
+      );
+    });
+
+    it("returns undefined for a register transaction that reads its own writes", ({
+      seat,
+    }) => {
+      const txn = okTxn(
+        { fn: "write", key: "x", value: 1n },
+        { fn: "write", key: "x", value: 2n },
+        { fn: "read", key: "x", value: [2n] },
+        { fn: "read", key: "x", value: [2n] },
+      );
+
+      check.isNil(
+        seat,
+        internalInconsistency(factsOf({ register: true, txns: [txn] })),
+        "consistent",
+      );
+    });
+  });
+
+  describe("same", () => {
+    const tests: {
+      name: string;
+      give: readonly [readonly unknown[], readonly unknown[]];
+      want: boolean;
+    }[] = [
+      { name: "two reads of the initial value", give: [[], []], want: true },
+      { name: "two reads of one value", give: [[1n], [1n]], want: true },
+      {
+        name: "a read of a value and of the initial value",
+        give: [[1n], []],
+        want: false,
+      },
+      { name: "reads of two values", give: [[1n], [2n]], want: false },
+    ];
+    for (const tt of tests) {
+      it(`reports ${String(tt.want)} for ${tt.name}`, ({ seat }) => {
+        check.isEqualTo(seat, same(...tt.give), tt.want, "the comparison");
+      });
+    }
   });
 
   describe("abortedRead", () => {

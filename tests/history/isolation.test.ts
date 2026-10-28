@@ -33,6 +33,7 @@ import {
   records,
   runTxn,
   thrown,
+  write,
   writeSkew,
 } from "../helpers.js";
 
@@ -213,6 +214,35 @@ describe("isolation", () => {
           [0, "fail"],
         ],
         "the reader, then the appender",
+      );
+    });
+
+    it("reports G2 of a register write skew at serializability alone", ({ seat }) => {
+      const history = new History();
+      const first = invokeTxn(history, 0, readOf("x", null), write("y", 1));
+      const second = invokeTxn(history, 1, readOf("y", null), write("x", 2));
+      first.ok([readOf("x", null), write("y", 1)]);
+      second.ok([readOf("y", null), write("x", 2)]);
+
+      check.isEqualTo(
+        seat,
+        LEVELS.map((level) => outcome(history, level)),
+        [["G2", ["G2"]], undefined],
+        "snapshot isolation permits the write skew",
+      );
+    });
+
+    it("passes a serial register history at both levels", ({ seat }) => {
+      const history = new History();
+      runTxn(history, 0, write("x", 1));
+      runTxn(history, 1, readOf("x", 1), write("x", 2));
+      runTxn(history, 2, readOf("x", 2));
+
+      check.isEqualTo(
+        seat,
+        LEVELS.map((level) => outcome(history, level)),
+        [undefined, undefined],
+        "no anomaly",
       );
     });
 
@@ -407,6 +437,63 @@ describe("isolation", () => {
         "1 is followed by 2",
       );
     });
+
+    it("returns the explanation of a garbage read of a register", ({ seat }) => {
+      const history = new History();
+      runTxn(history, 0, write("x", 1));
+      runTxn(history, 1, readOf("x", 9));
+
+      check.isEqualTo(
+        seat,
+        json(history, SERIALIZABLE)["explanation"],
+        [{ call: 2, key: literalOf("x"), read: literalOf(9), value: literalOf(9) }],
+        "the value of the read",
+      );
+    });
+
+    it("returns the explanation of a register read of the initial value after a write", ({
+      seat,
+    }) => {
+      const history = new History();
+      runTxn(history, 0, write("x", 1), readOf("x", null));
+
+      check.isEqualTo(
+        seat,
+        json(history, SERIALIZABLE)["explanation"],
+        [
+          {
+            call: 0,
+            key: literalOf("x"),
+            read: null,
+            expected: literalOf(1),
+            whole: true,
+            future: null,
+          },
+        ],
+        "a read of null that expects 1",
+      );
+    });
+
+    it("returns the explanation of a register read of a later write", ({ seat }) => {
+      const history = new History();
+      runTxn(history, 0, readOf("x", 1), write("x", 1));
+
+      check.isEqualTo(
+        seat,
+        json(history, SERIALIZABLE)["explanation"],
+        [
+          {
+            call: 0,
+            key: literalOf("x"),
+            read: literalOf(1),
+            expected: null,
+            whole: false,
+            future: literalOf(1),
+          },
+        ],
+        "the later write of 1",
+      );
+    });
   });
 
   describe("evidenceJson", () => {
@@ -421,6 +508,7 @@ describe("isolation", () => {
           value: 1,
           empty: false,
           next: 2,
+          register: false,
         },
         want: {
           from: 0,
@@ -441,6 +529,7 @@ describe("isolation", () => {
           value: 2,
           empty: false,
           next: undefined,
+          register: false,
         },
         want: {
           from: 1,
@@ -460,6 +549,7 @@ describe("isolation", () => {
           value: undefined,
           empty: true,
           next: 1,
+          register: false,
         },
         want: {
           from: 0,

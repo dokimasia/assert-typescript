@@ -40,6 +40,9 @@ function spansText(label: string, spans: readonly Span[]): string {
 /** Returns the text of an edge of a cycle: its two calls and its relation, and the key and the values that prove it. */
 function edgeText(e: Edge): string {
   const head = `call ${e.from} -${e.relation}-> call ${e.to}: `;
+  if (e.register) {
+    return head + registerEdgeText(e);
+  }
   if (e.relation === "ww") {
     return `${head}call ${e.to} appended ${show(e.next)} to ${show(e.key)} after ${show(e.value)}`;
   }
@@ -52,8 +55,55 @@ function edgeText(e: Edge): string {
   return `${head}call ${e.from} read ${show(e.key)} ending in ${show(e.value)}, and call ${e.to} appended ${show(e.next)} after it`;
 }
 
+/** Returns the values and the calls that prove an edge of a register history. */
+function registerEdgeText(e: Edge): string {
+  const key = show(e.key);
+  if (e.relation === "ww") {
+    return `call ${e.to} wrote ${show(e.next)} to ${key} after ${show(e.value)}`;
+  }
+  if (e.relation === "wr") {
+    return `call ${e.to} read ${show(e.value)} from ${key}`;
+  }
+  if (e.empty) {
+    return `call ${e.from} read the initial value of ${key}, and call ${e.to} wrote ${show(e.next)} to it`;
+  }
+  return `call ${e.from} read ${show(e.value)} from ${key}, and call ${e.to} wrote ${show(e.next)} after it`;
+}
+
+/** Returns the text of a register's value, and "the initial value" for undefined. */
+function registerText(value: unknown): string {
+  return value === undefined ? "the initial value" : show(value);
+}
+
+/** Returns the text of the observation of an anomaly of a register history. */
+function registerObservationText(o: Observation): string {
+  const [call] = o.calls;
+  const key = show(o.key);
+  switch (o.anomaly) {
+    case "garbage-read":
+      return `call ${call} read ${show(o.value)} from ${key}, and no transaction wrote it`;
+    case "internal-inconsistency": {
+      let text = `call ${call} read ${registerText(o.read)} from ${key}`;
+      if (o.whole) {
+        text += `, and it knew the value was ${registerText(o.known)}`;
+      }
+      if (o.hasFuture) {
+        text += `, and ${show(o.future)} is a value that call ${call} writes later`;
+      }
+      return text;
+    }
+    case "aborted-read":
+      return `call ${call} read ${show(o.value)} from ${key}, which call ${o.appender} wrote and aborted`;
+    default:
+      return `call ${call} read ${show(o.value)} from ${key}, which call ${o.appender} followed with ${show(o.next)}`;
+  }
+}
+
 /** Returns the text of the observation of an anomaly that is no cycle: the reads and the appends that show it. */
 function observationText(o: Observation): string {
+  if (o.register) {
+    return registerObservationText(o);
+  }
   const [call, other] = o.calls;
   const [read, second] = o.reads;
   const key = show(o.key);

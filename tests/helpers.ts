@@ -217,6 +217,11 @@ export function append(key: unknown, value: unknown): unknown[] {
   return ["append", key, value];
 }
 
+/** Returns a micro-operation of a transaction that writes value to the register key. */
+export function write(key: unknown, value: unknown): unknown[] {
+  return ["write", key, value];
+}
+
 /** Returns a micro-operation of a transaction that read values from key. */
 export function readOf(key: unknown, values: unknown): unknown[] {
   return ["read", key, values];

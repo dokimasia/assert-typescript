@@ -20,6 +20,7 @@ function edge(from: number, to: number, relation: Relation): Edge {
     value: undefined,
     empty: false,
     next: undefined,
+    register: false,
   };
 }
 

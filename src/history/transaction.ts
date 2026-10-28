@@ -2,16 +2,24 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * The transactions of a history of list appends, which the isolation checks
- * read.
+ * The transactions of a history of list appends or of registers, which the
+ * isolation checks read.
  *
  * A transaction is one call whose operation is `txn`. Its arguments are its
- * micro-operations in the order it ran them: `["append", key, value]` and
- * `["read", key, null]`. An ok completion commits the transaction, and its
- * output repeats the micro-operations with each read's list filled in, or
- * null for an empty list. A fail completion aborts it. Every value is
- * appended to its key once, so a value names the append that produced it.
- * Keys and values compare by their typed literals.
+ * micro-operations in the order it ran them: `["append", key, value]`,
+ * `["write", key, value]` and `["read", key, null]`. A history whose
+ * micro-operations write is a register history, and every other history is
+ * a list-append history. An ok completion commits the transaction. Its
+ * output repeats the micro-operations with what each read returned: a list,
+ * or null for an empty list, in a list-append history, and a value, or null
+ * for the initial value, in a register history. A fail completion aborts
+ * it. Every value is appended or written to its key once, so a value
+ * identifies the micro-operation that produced it. Keys and values compare
+ * by their typed literals.
+ *
+ * A read of a register is a read of the list of its one value, or of the
+ * empty list for the initial value, so the checks read both workloads
+ * alike.
  */
 
 import { show } from "../matcher/inspect.js";
@@ -22,31 +30,75 @@ import { identityOf } from "./history.js";
 /** The elements of a micro-operation: its function, its key and its value. */
 const MOP_LENGTH = 3;
 
+/** The functions of a micro-operation. */
+const FUNCTIONS: ReadonlySet<unknown> = new Set(["append", "write", "read"]);
+
 /** Returns the micro-operation that one argument of an invocation states. */
 function invoked(call: number, position: number, raw: unknown): Mop {
-  if (
-    !Array.isArray(raw) ||
-    raw.length !== MOP_LENGTH ||
-    (raw[0] !== APPEND && raw[0] !== READ)
-  ) {
+  if (!Array.isArray(raw) || raw.length !== MOP_LENGTH || !FUNCTIONS.has(raw[0])) {
     throw new TransactionError(
-      `argument ${position} of call ${call} is ${show(raw)}, not [append, key, value] or [read, key, null]`,
+      `argument ${position} of call ${call} is ${show(raw)}, not [append, key, value], [write, key, value] or [read, key, null]`,
     );
   }
-  const [fn, key, value] = raw as [typeof APPEND | typeof READ, unknown, unknown];
-  if (fn === READ && value !== null && value !== undefined) {
+  const [fn, key, value] = raw as [Mop["fn"], unknown, unknown];
+  const absent = value === null || value === undefined;
+  if (fn === READ && !absent) {
     throw new TransactionError(
-      `the read at argument ${position} of call ${call} states a list before it ran`,
+      `the read at argument ${position} of call ${call} states a value before it ran`,
+    );
+  }
+  if (fn === WRITE && absent) {
+    throw new TransactionError(
+      `the write at argument ${position} of call ${call} writes null, the initial value of every key`,
     );
   }
   identity(call, key);
-  if (fn === APPEND) {
+  if (fn !== READ) {
     identity(call, value);
   }
   return { fn, key, value: fn === READ ? undefined : value };
 }
 
-/** Returns one micro-operation of an ok output, which repeats mop with a read's list. */
+/**
+ * Returns the list of the read at position of call, which returned value. A
+ * register read returned one value, or null for the initial value, and a
+ * list-append read returned a list, or null for the empty list.
+ */
+function listOf(
+  call: number,
+  position: number,
+  value: unknown,
+  ofRegisters: boolean,
+): readonly unknown[] {
+  if (value === null || value === undefined) {
+    return [];
+  }
+  if (!(ofRegisters || Array.isArray(value))) {
+    throw new TransactionError(
+      `the read at micro-operation ${position} of the output of call ${call} returned ${show(value)}, not a list`,
+    );
+  }
+  const list: readonly unknown[] = ofRegisters ? [value] : (value as unknown[]);
+  for (const element of list) {
+    identity(call, element);
+  }
+  return list;
+}
+
+/** Returns an ok transaction with the list of each read. */
+function readAs(txn: Transaction, ofRegisters: boolean): Transaction {
+  if (txn.kind !== "ok") {
+    return txn;
+  }
+  const mops = txn.mops.map((mop, position) =>
+    mop.fn === READ
+      ? { ...mop, value: listOf(txn.call, position, mop.value, ofRegisters) }
+      : mop,
+  );
+  return { ...txn, mops };
+}
+
+/** Returns one micro-operation of an ok output, which repeats mop with what a read returned. */
 function repeated(call: number, position: number, mop: Mop, raw: unknown): Mop {
   const repeats =
     Array.isArray(raw) &&
@@ -59,21 +111,10 @@ function repeated(call: number, position: number, mop: Mop, raw: unknown): Mop {
       `micro-operation ${position} of the output of call ${call} is ${show(raw)}, which does not repeat ${show([mop.fn, mop.key, mop.value ?? null])}`,
     );
   }
-  if (mop.fn === APPEND) {
+  if (mop.fn !== READ) {
     return mop;
   }
   const [, , value] = raw as unknown[];
-  if (value === null || value === undefined) {
-    return { fn: READ, key: mop.key, value: [] };
-  }
-  if (!Array.isArray(value)) {
-    throw new TransactionError(
-      `the read at micro-operation ${position} of the output of call ${call} returned ${show(value)}, not a list`,
-    );
-  }
-  for (const element of value) {
-    identity(call, element);
-  }
   return { fn: READ, key: mop.key, value };
 }
 
@@ -109,25 +150,25 @@ function transactionOf(invocation: Event, completion: Event | undefined): Transa
   };
 }
 
-/** Records each value that txn appends, under its key, and refuses a second append of one value. */
-function register(txn: Transaction, appended: Map<string, number>): void {
-  for (const mop of txn.mops.filter((one) => one.fn === APPEND)) {
+/** Records each value that txn appends or writes, under its key, and refuses a second one of one value. */
+function register(txn: Transaction, produced: Map<string, number>): void {
+  for (const mop of txn.mops.filter((one) => one.fn !== READ)) {
     const name = JSON.stringify([
       identity(txn.call, mop.key),
       identity(txn.call, mop.value),
     ]);
-    const first = appended.get(name);
+    const first = produced.get(name);
     if (first === txn.call) {
       throw new TransactionError(
-        `call ${txn.call} appends ${show(mop.value)} to the key ${show(mop.key)} twice`,
+        `call ${txn.call} ${mop.fn}s ${show(mop.value)} to the key ${show(mop.key)} twice`,
       );
     }
     if (first !== undefined) {
       throw new TransactionError(
-        `calls ${first} and ${txn.call} both append ${show(mop.value)} to the key ${show(mop.key)}`,
+        `calls ${first} and ${txn.call} both ${mop.fn} ${show(mop.value)} to the key ${show(mop.key)}`,
       );
     }
-    appended.set(name, txn.call);
+    produced.set(name, txn.call);
   }
 }
 
@@ -137,13 +178,17 @@ export const TXN = "txn";
 /** The function of a micro-operation that appends a value to a key. */
 export const APPEND = "append";
 
-/** The function of a micro-operation that reads a key's list. */
+/** The function of a micro-operation that reads a key's list or value. */
 export const READ = "read";
 
-/** A history that is no history of list-append transactions. */
+/** The function of a micro-operation that writes a value to a register. */
+export const WRITE = "write";
+
+/** A history that is no history of list-append or register transactions. */
 export class TransactionError extends Error {
   /**
-   * Returns the error of a history that is no history of list-append transactions.
+   * Returns the error of a history that is no history of list-append or
+   * register transactions.
    *
    * @param message - What is wrong, and where.
    */
@@ -155,15 +200,17 @@ export class TransactionError extends Error {
 
 /**
  * One micro-operation of a transaction. value is the appended value of an
- * append. For a read, it is the list that the read returned, or undefined
- * for a read whose transaction did not commit.
+ * append, and the written value of a write. For a read, it is the list that
+ * the read returned, or undefined for a read whose transaction did not
+ * commit. A register read returned the list of its one value, or the empty
+ * list for the initial value.
  */
 export interface Mop {
   /** The micro-operation's function. */
-  readonly fn: typeof APPEND | typeof READ;
+  readonly fn: typeof APPEND | typeof WRITE | typeof READ;
   /** The key. */
   readonly key: unknown;
-  /** The appended value, or the list that a read returned. */
+  /** The appended or written value, or the list that a read returned. */
   readonly value: unknown;
 }
 
@@ -208,13 +255,35 @@ export function identity(call: number, value: unknown): string {
 }
 
 /**
+ * Reports whether a history is a register history: whether one of its
+ * micro-operations writes.
+ *
+ * @param txns - The transactions of the history.
+ * @returns True for a register history.
+ * @throws TransactionError for a history that both appends and writes.
+ */
+export function registers(txns: readonly Transaction[]): boolean {
+  const first = (fn: Mop["fn"]): number | undefined =>
+    txns.find((txn) => txn.mops.some((mop) => mop.fn === fn))?.call;
+  const [appends, writes] = [first(APPEND), first(WRITE)];
+  if (appends !== undefined && writes !== undefined) {
+    throw new TransactionError(
+      `call ${appends} appends and call ${writes} writes, and a history is either list-append or registers`,
+    );
+  }
+  return writes !== undefined;
+}
+
+/**
  * Returns a history's transactions in the order of their invocations.
  *
  * @param events - The events of the history.
  * @returns The transactions.
- * @throws TransactionError when a call is no list-append transaction, an ok
- *   output does not repeat its invocation's micro-operations, a key or a
- *   value has no typed literal, or a value is appended to one key twice.
+ * @throws TransactionError when a call is no list-append or register
+ *   transaction, an ok output does not repeat its invocation's
+ *   micro-operations, a key or a value has no typed literal, a value is
+ *   appended or written to one key twice, the history both appends and
+ *   writes, or a list-append read returned no list.
  */
 export function transactions(events: readonly Event[]): Transaction[] {
   const completions = new Map<number, Event>();
@@ -223,14 +292,15 @@ export function transactions(events: readonly Event[]): Transaction[] {
       completions.set(event.call, event);
     }
   }
-  const appended = new Map<string, number>();
+  const produced = new Map<string, number>();
   const out: Transaction[] = [];
   for (const event of events.filter((one) => one.kind === "invoke")) {
     const txn = transactionOf(event, completions.get(event.index));
-    register(txn, appended);
+    register(txn, produced);
     out.push(txn);
   }
-  return out;
+  const ofRegisters = registers(out);
+  return out.map((txn) => readAs(txn, ofRegisters));
 }
 
 /**

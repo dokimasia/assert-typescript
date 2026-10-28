@@ -13,14 +13,16 @@ import {
   APPEND,
   identity,
   READ,
+  registers,
   TransactionError,
   TXN,
   transactionJson,
   transactions,
+  WRITE,
 } from "../../src/history/transaction.js";
 import { check } from "../../src/index.js";
 import { test as it } from "../../src/vitest.js";
-import { append, invokeTxn, readOf, runTxn, thrown } from "../helpers.js";
+import { append, invokeTxn, readOf, runTxn, thrown, write } from "../helpers.js";
 
 /** Returns the message of the TransactionError that transactions throws for history, or the empty string. */
 function refusal(history: History): string {
@@ -37,7 +39,36 @@ function refusal(history: History): string {
 
 describe("transaction", () => {
   it("names the operation and the functions of the workload", ({ seat }) => {
-    check.isEqualTo(seat, [TXN, APPEND, READ], ["txn", "append", "read"], "the names");
+    check.isEqualTo(
+      seat,
+      [TXN, APPEND, READ, WRITE],
+      ["txn", "append", "read", "write"],
+      "the names",
+    );
+  });
+
+  describe("registers", () => {
+    it("reports a history that writes", ({ seat }) => {
+      const history = new History();
+      runTxn(history, 0, write("x", 1));
+
+      check.isTrue(
+        seat,
+        registers(transactions(history.events())),
+        "a register history",
+      );
+    });
+
+    it("reports a history that only reads as a list-append history", ({ seat }) => {
+      const history = new History();
+      runTxn(history, 0, readOf("x", null));
+
+      check.isFalse(
+        seat,
+        registers(transactions(history.events())),
+        "a list-append history",
+      );
+    });
   });
 
   describe("new TransactionError", () => {
@@ -140,6 +171,22 @@ describe("transaction", () => {
       );
     });
 
+    it("reads a register read as the list of its value", ({ seat }) => {
+      const history = new History();
+      runTxn(history, 0, write("x", 1));
+      runTxn(history, 1, readOf("x", 1), readOf("y", null));
+
+      check.isEqualTo(
+        seat,
+        transactions(history.events())[1]?.mops,
+        [
+          { fn: "read", key: "x", value: [1] },
+          { fn: "read", key: "y", value: [] },
+        ],
+        "the list of each value",
+      );
+    });
+
     it("accepts one value appended to two keys", ({ seat }) => {
       const history = new History();
       runTxn(history, 0, append("x", 1), append("y", 1));
@@ -158,14 +205,50 @@ describe("transaction", () => {
         give: (history) => {
           history.invoke(0, TXN, [[APPEND, "x"]], "x");
         },
-        want: 'argument 0 of call 0 is ["append", "x"], not [append, key, value] or [read, key, null]',
+        want: 'argument 0 of call 0 is ["append", "x"], not [append, key, value], [write, key, value] or [read, key, null]',
       },
       {
-        name: "a read that states a list before it ran",
+        name: "a read that states a value before it ran",
         give: (history) => {
           history.invoke(0, TXN, [readOf("x", [1])], "x");
         },
-        want: "the read at argument 0 of call 0 states a list before it ran",
+        want: "the read at argument 0 of call 0 states a value before it ran",
+      },
+      {
+        name: "a write of null",
+        give: (history) => {
+          history.invoke(0, TXN, [write("x", null)], "x");
+        },
+        want: "the write at argument 0 of call 0 writes null, the initial value of every key",
+      },
+      {
+        name: "a value that two calls write to one key",
+        give: (history) => {
+          runTxn(history, 0, write("x", 1));
+          runTxn(history, 0, write("x", 1));
+        },
+        want: 'calls 0 and 2 both write 1 to the key "x"',
+      },
+      {
+        name: "a value that one call writes to one key twice",
+        give: (history) => runTxn(history, 0, write("x", 1), write("x", 1)),
+        want: 'call 0 writes 1 to the key "x" twice',
+      },
+      {
+        name: "a history that appends and writes",
+        give: (history) => {
+          runTxn(history, 0, append("x", 1));
+          runTxn(history, 0, write("y", 2));
+        },
+        want: "call 0 appends and call 2 writes, and a history is either list-append or registers",
+      },
+      {
+        name: "a register read of a value that no typed literal states",
+        give: (history) => {
+          runTxn(history, 0, write("x", 1));
+          invokeTxn(history, 0, readOf("x", null)).ok([readOf("x", Symbol.for("v"))]);
+        },
+        want: "call 2 states Symbol(v), which no typed literal states",
       },
       {
         name: "an output that repeats another value",

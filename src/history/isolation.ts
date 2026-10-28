@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * The checks that the list-append transactions of a history exhibit no
- * anomaly that an isolation level forbids.
+ * The checks that the list-append or register transactions of a history
+ * exhibit no anomaly that an isolation level forbids.
  *
  * A check first reads the micro-operations for the six anomalies that need
  * no dependency graph. It then derives the write-write, write-read and
@@ -29,7 +29,12 @@ import {
 } from "./anomaly.js";
 import { Analysis } from "./derivation.js";
 import { History } from "./history.js";
-import { type Transaction, transactionJson, transactions } from "./transaction.js";
+import {
+  registers,
+  type Transaction,
+  transactionJson,
+  transactions,
+} from "./transaction.js";
 
 /** The assertion of a check of serializability. */
 const SERIALIZABLE = "serializable";
@@ -58,7 +63,16 @@ function edgeJson(edge: Edge): Record<string, unknown> {
   };
 }
 
-/** Returns an observation as the explanation of a record states it: the fields that its anomaly states. */
+/** Returns the typed literal of a register's value, and null for the initial value. */
+function orNull(value: unknown): unknown {
+  return value === undefined ? null : literalOf(value);
+}
+
+/**
+ * Returns an observation as the explanation of a record states it: the
+ * fields that its anomaly states. A register read states its value in place
+ * of a list.
+ */
 function observationJson(o: Observation): Record<string, unknown> {
   const key = literalOf(o.key);
   switch (o.anomaly) {
@@ -66,8 +80,8 @@ function observationJson(o: Observation): Record<string, unknown> {
       return {
         call: o.calls[0],
         key,
-        read: literalOf(o.reads[0]),
-        expected: literalOf(o.expected),
+        read: o.register ? orNull(o.read) : literalOf(o.reads[0]),
+        expected: o.register ? orNull(o.known) : literalOf(o.expected),
         whole: o.whole,
         future: o.hasFuture ? literalOf(o.future) : null,
       };
@@ -87,7 +101,7 @@ function observationJson(o: Observation): Record<string, unknown> {
       return {
         call: o.calls[0],
         key,
-        read: literalOf(o.reads[0]),
+        read: o.register ? literalOf(o.read) : literalOf(o.reads[0]),
         value: literalOf(o.value),
       };
   }
@@ -152,14 +166,14 @@ export interface IsolationDetail {
  * @param level - The isolation level.
  * @returns The detail.
  * @throws TransactionError for a history that is no history of list-append
- *   transactions.
+ *   or register transactions.
  */
 export function checkIsolation(
   events: Parameters<typeof transactions>[0],
   level: Level,
 ): IsolationDetail | undefined {
   const txns = transactions(events);
-  const analysis = new Analysis(txns);
+  const analysis = new Analysis(txns, registers(txns));
   const found = FORBIDS[level]
     .map((kind) => [kind, analysis.instance(kind)] as const)
     .filter((pair): pair is readonly [Anomaly, Instance] => pair[1] !== undefined);
@@ -209,25 +223,32 @@ export function isolationJson(detail: IsolationDetail): Record<string, unknown> 
 }
 
 /**
- * Checks that the list-append transactions of history exhibit no anomaly
- * that serializability forbids, among the dependencies that their reads
- * reveal, and fails the seat with one record of the assertion serializable
- * when they do. Serializability forbids every kind of anomaly.
+ * Checks that the list-append or register transactions of history exhibit
+ * no anomaly that serializability forbids, among the dependencies that
+ * their reads reveal, and fails the seat with one record of the assertion
+ * serializable when they do. Serializability forbids every kind of anomaly.
  *
  * A transaction is a call of the operation "txn" whose arguments are its
  * micro-operations, each an array of three parts: "append", a key and a
- * value, or "read", a key and null. An ok completion commits the
+ * value, "write", a key and a value, or "read", a key and null. A history
+ * whose micro-operations write is a register history, and every other
+ * history is a list-append history. An ok completion commits the
  * transaction, and its output is an array that repeats the
- * micro-operations with each read's list, or null for the empty list. A
- * fail completion aborts it. A transaction whose outcome is unknown, or
- * that is pending, is committed when a committed read observed one of its
- * appends. Every value is appended to its key once. Keys and values compare
- * by their typed literals.
+ * micro-operations. Each read of a list-append history states its list, or
+ * null for the empty list. Each read of a register history states its
+ * value, or null for the initial value. A fail completion aborts the
+ * transaction. A transaction whose outcome is unknown, or that is pending,
+ * is committed when a committed read observed one of its appends or writes.
+ * Every value is appended or written to its key once. Keys and values
+ * compare by their typed literals. Blind writes do not reveal an order
+ * between them, so a register history shows fewer anomalies than a
+ * list-append history.
  *
  * The record's detail states the five fields of the definition: anomaly,
  * kinds, transactions, cycle and explanation. A history that is no
- * History, and a history whose calls are no list-append transactions, end
- * the call with a fault.
+ * History, a history whose calls are no list-append or register
+ * transactions, and a history that both appends and writes end the call
+ * with a fault.
  *
  * @param seat - Where the failure is reported.
  * @param history - The history.
@@ -238,9 +259,9 @@ export function isSerializable(seat: Seat, history: History, msg: string): void 
 }
 
 /**
- * Checks that the list-append transactions of history exhibit no anomaly
- * that snapshot isolation forbids, among the dependencies that their reads
- * reveal, and fails the seat with one record of the assertion
+ * Checks that the list-append or register transactions of history exhibit
+ * no anomaly that snapshot isolation forbids, among the dependencies that
+ * their reads reveal, and fails the seat with one record of the assertion
  * snapshot-isolation when they do. Snapshot isolation forbids every kind of
  * anomaly but G2: it permits a cycle in which two read-write dependencies
  * are adjacent, such as a write skew.

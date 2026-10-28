@@ -20,7 +20,15 @@ import { History } from "../../src/history/history.js";
 import { transactions } from "../../src/history/transaction.js";
 import { check } from "../../src/index.js";
 import { test as it } from "../../src/vitest.js";
-import { append, invokeTxn, readOf, readSkew, runTxn, writeSkew } from "../helpers.js";
+import {
+  append,
+  invokeTxn,
+  readOf,
+  readSkew,
+  runTxn,
+  write,
+  writeSkew,
+} from "../helpers.js";
 
 /** Returns the first instance of an anomaly in a history. */
 function instance(history: History, anomaly: Anomaly): Instance | undefined {
@@ -46,6 +54,9 @@ function observed(anomaly: Anomaly, fields: Partial<Observation>): Observation {
     whole: false,
     future: undefined,
     hasFuture: false,
+    register: false,
+    read: undefined,
+    known: undefined,
     ...fields,
   };
 }
@@ -326,6 +337,7 @@ describe("derivation", () => {
               value: 1,
               empty: false,
               next: 2,
+              register: false,
             },
             {
               from: 1,
@@ -335,10 +347,55 @@ describe("derivation", () => {
               value: 3,
               empty: false,
               next: 4,
+              register: false,
             },
           ],
         },
         "x orders 0 first, and y orders 1 first",
+      );
+    });
+
+    it("returns a G0 cycle of registers that each overwrite a value that the other read", ({
+      seat,
+    }) => {
+      const history = new History();
+      runTxn(history, 0, write("x", 1), readOf("y", 3), write("y", 4));
+      runTxn(history, 1, readOf("x", 1), write("x", 2), write("y", 3));
+
+      check.isEqualTo(
+        seat,
+        new Analysis(transactions(history.events()), true).instance("G0"),
+        {
+          anomaly: "G0",
+          calls: [0, 2],
+          cycle: [
+            { call: 0, relations: ["ww"] },
+            { call: 2, relations: ["ww"] },
+          ],
+          explanation: [
+            {
+              from: 0,
+              to: 2,
+              relation: "ww",
+              key: "x",
+              value: 1,
+              empty: false,
+              next: 2,
+              register: true,
+            },
+            {
+              from: 2,
+              to: 0,
+              relation: "ww",
+              key: "y",
+              value: 3,
+              empty: false,
+              next: 4,
+              register: true,
+            },
+          ],
+        },
+        "each edge is a write dependency of a register",
       );
     });
 
@@ -401,6 +458,7 @@ describe("derivation", () => {
               value: undefined,
               empty: true,
               next: 1,
+              register: false,
             },
             {
               from: 1,
@@ -410,6 +468,7 @@ describe("derivation", () => {
               value: 2,
               empty: false,
               next: undefined,
+              register: false,
             },
           ],
         },

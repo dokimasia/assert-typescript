@@ -5,7 +5,12 @@
 
 import { describe } from "vitest";
 import { Failure } from "../../src/failure.js";
-import type { Anomaly, Evidence, Observation } from "../../src/history/anomaly.js";
+import type {
+  Anomaly,
+  Edge,
+  Evidence,
+  Observation,
+} from "../../src/history/anomaly.js";
 import { History } from "../../src/history/history.js";
 import { check as checked, fieldsOf } from "../../src/history/linearizable.js";
 import { budget } from "../../src/history/option.js";
@@ -48,9 +53,56 @@ function observed(anomaly: Anomaly, fields: Partial<Observation>): Observation {
     whole: false,
     future: undefined,
     hasFuture: false,
+    register: false,
+    read: undefined,
+    known: undefined,
     ...fields,
   };
 }
+
+/** A cycle with one edge of each relation and a second rw edge, whose first rw edge is empty. */
+const CYCLE: readonly Edge[] = [
+  {
+    from: 0,
+    to: 1,
+    relation: "ww",
+    key: "x",
+    value: 1,
+    empty: false,
+    next: 2,
+    register: false,
+  },
+  {
+    from: 1,
+    to: 2,
+    relation: "wr",
+    key: "y",
+    value: 3,
+    empty: false,
+    next: undefined,
+    register: false,
+  },
+  {
+    from: 2,
+    to: 3,
+    relation: "rw",
+    key: "z",
+    value: undefined,
+    empty: true,
+    next: 4,
+    register: false,
+  },
+  {
+    from: 3,
+    to: 0,
+    relation: "rw",
+    key: "z",
+    value: 5,
+    empty: false,
+    next: 6,
+    register: false,
+  },
+];
 
 describe("sentence", () => {
   describe("sentence", () => {
@@ -114,28 +166,7 @@ describe("sentence", () => {
 
   describe("isolationSentence", () => {
     it("states the anomaly, the kinds and each edge of a cycle", ({ seat }) => {
-      const record = isolated("G0", [
-        { from: 0, to: 1, relation: "ww", key: "x", value: 1, empty: false, next: 2 },
-        {
-          from: 1,
-          to: 2,
-          relation: "wr",
-          key: "y",
-          value: 3,
-          empty: false,
-          next: undefined,
-        },
-        {
-          from: 2,
-          to: 3,
-          relation: "rw",
-          key: "z",
-          value: undefined,
-          empty: true,
-          next: 4,
-        },
-        { from: 3, to: 0, relation: "rw", key: "z", value: 5, empty: false, next: 6 },
-      ]);
+      const record = isolated("G0", CYCLE);
 
       check.isEqualTo(
         seat,
@@ -152,7 +183,83 @@ describe("sentence", () => {
       );
     });
 
+    it("states each edge of a register cycle", ({ seat }) => {
+      const record = isolated(
+        "G0",
+        CYCLE.map((edge) => ({ ...edge, register: true })),
+      );
+
+      check.isEqualTo(
+        seat,
+        isolationSentence(record),
+        [
+          "c: G0",
+          "    kinds: G0, G2",
+          '    call 0 -ww-> call 1: call 1 wrote 2 to "x" after 1',
+          '    call 1 -wr-> call 2: call 2 read 3 from "y"',
+          '    call 2 -rw-> call 3: call 2 read the initial value of "z", and call 3 wrote 4 to it',
+          '    call 3 -rw-> call 0: call 3 read 5 from "z", and call 0 wrote 6 after it',
+        ].join("\n"),
+        "the sentence",
+      );
+    });
+
     const tests: { name: string; give: Observation; want: string }[] = [
+      {
+        name: "a garbage read of a register",
+        give: observed("garbage-read", { value: 9, register: true, read: 9 }),
+        want: 'call 0 read 9 from "x", and no transaction wrote it',
+      },
+      {
+        name: "a register read that contradicts the known value",
+        give: observed("internal-inconsistency", {
+          register: true,
+          read: 1,
+          known: 2,
+          whole: true,
+        }),
+        want: 'call 0 read 1 from "x", and it knew the value was 2',
+      },
+      {
+        name: "a register read of the initial value after a write",
+        give: observed("internal-inconsistency", {
+          register: true,
+          known: 2,
+          whole: true,
+        }),
+        want: 'call 0 read the initial value from "x", and it knew the value was 2',
+      },
+      {
+        name: "a register read of a later write",
+        give: observed("internal-inconsistency", {
+          register: true,
+          read: 1,
+          future: 1,
+          hasFuture: true,
+        }),
+        want: 'call 0 read 1 from "x", and 1 is a value that call 0 writes later',
+      },
+      {
+        name: "an aborted read of a register",
+        give: observed("aborted-read", {
+          calls: [2],
+          value: 1,
+          appender: 0,
+          register: true,
+        }),
+        want: 'call 2 read 1 from "x", which call 0 wrote and aborted',
+      },
+      {
+        name: "an intermediate read of a register",
+        give: observed("intermediate-read", {
+          calls: [2],
+          value: 1,
+          appender: 0,
+          next: 2,
+          register: true,
+        }),
+        want: 'call 2 read 1 from "x", which call 0 followed with 2',
+      },
       {
         name: "a garbage read",
         give: observed("garbage-read", { reads: [[9]], value: 9 }),

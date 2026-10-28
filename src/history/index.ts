@@ -43,7 +43,8 @@
  * {@link specFrom} builds the spec from the subject itself, which checks that
  * the calls were atomic. {@link isSerializable} and
  * {@link hasSnapshotIsolation} read each call of the operation "txn" as a
- * transaction of list appends and list reads.
+ * transaction of list appends and list reads, or of register writes and
+ * register reads.
  */
 
 import { registerSentence } from "../failure.js";

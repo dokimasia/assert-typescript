@@ -44,7 +44,8 @@ export const ANOMALIES: readonly Anomaly[] = [
  * value of from in the key's version order for ww, the last value of the
  * list that to read for wr, and the last value of the list that from read
  * for rw. next is the value of to that follows value in the version order,
- * for ww and rw.
+ * for ww and rw. An edge of a register history has the values of the
+ * register, and its rw edge from a read of the initial value is empty.
  */
 export interface Edge {
   /** The call of the transaction that the dependency is on. */
@@ -61,6 +62,8 @@ export interface Edge {
   readonly empty: boolean;
   /** The value of to that follows value, for ww and rw. */
   readonly next: unknown;
+  /** Whether the edge is an edge of a register history. */
+  readonly register: boolean;
 }
 
 /**
@@ -74,6 +77,10 @@ export interface Edge {
  * - incompatible-order: calls and reads of the two reads, and key.
  * - aborted-read: calls of the one read, key, value and appender.
  * - intermediate-read: calls of the one read, key, value, appender and next.
+ *
+ * An observation of a register history has register set, and its appender
+ * is the writer of the value. Its internal inconsistency states read and
+ * known in place of reads and expected.
  */
 export interface Observation {
   /** The anomaly that the observation shows. */
@@ -98,6 +105,12 @@ export interface Observation {
   readonly future: unknown;
   /** Whether the read states such a value. */
   readonly hasFuture: boolean;
+  /** Whether the observation is an observation of a register history. */
+  readonly register: boolean;
+  /** The value that a register read returned, and undefined for the initial value. */
+  readonly read: unknown;
+  /** The value that the transaction knew before a register read, and undefined for the initial value. */
+  readonly known: unknown;
 }
 
 /** One entry of an anomaly's explanation. */

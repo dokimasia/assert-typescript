@@ -12,7 +12,8 @@
  * committed reads are not prefixes of one list has no version order. Every
  * committed read is a prefix of the key's final list, so a committed append
  * that no committed read observed follows the last value of the version
- * order.
+ * order. A register history has no version orders, and its writes are its
+ * appends.
  */
 
 import type { Anomaly, Edge, Instance } from "./anomaly.js";
@@ -30,7 +31,8 @@ import {
   type Read,
   single,
 } from "./reads.js";
-import { APPEND, READ, type Transaction } from "./transaction.js";
+import { registerEdges } from "./registers.js";
+import { READ, type Transaction } from "./transaction.js";
 
 /** A key's version order, the committed writer of each value, and the committed appends that no read observed. */
 interface Versions {
@@ -50,15 +52,15 @@ function add<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   }
 }
 
-/** Returns the evidence that following comes after value in key's version order. */
+/** Returns the evidence that next comes after value in key's version order. */
 function ww(
   from: number,
   to: number,
   key: unknown,
   value: unknown,
-  following: unknown,
+  next: unknown,
 ): Edge {
-  return { from, to, relation: "ww", key, value, empty: false, next: following };
+  return { from, to, relation: "ww", key, value, empty: false, next, register: false };
 }
 
 /**
@@ -101,9 +103,8 @@ export class Analysis {
   readonly #reads: readonly Read[];
   readonly #committed: ReadonlySet<number>;
   #incompatible: Instance | undefined;
-  readonly #orders: ReadonlyMap<string, readonly unknown[]>;
   /** The evidence of each dependency, by its source and its target, in the order derived. */
-  readonly #edges = new Map<string, Edge[]>();
+  readonly #edges: Map<string, Edge[]>;
   readonly #facts: Facts;
   readonly #dependencies: Dependencies;
 
@@ -112,8 +113,9 @@ export class Analysis {
    *
    * @param txns - The transactions, in the order of their invocations,
    *   whose keys and values each have a typed literal.
+   * @param register - True for a register history.
    */
-  constructor(txns: readonly Transaction[]) {
+  constructor(txns: readonly Transaction[], register = false) {
     for (const txn of txns) {
       this.#index(txn);
     }
@@ -148,9 +150,12 @@ export class Analysis {
       }
     }
     this.#committed = committed;
-    this.#orders = this.#versionOrders();
-    this.#derive();
+    this.#edges = register
+      ? registerEdges(txns, committed, this.#keys, this.#later, this.#appender)
+      : new Map();
+    this.#derive(register ? new Map() : this.#versionOrders());
     this.#facts = {
+      register,
       txns,
       reads: this.#reads,
       appender: this.#appender,
@@ -168,7 +173,7 @@ export class Analysis {
       if (!this.#keys.has(key)) {
         this.#keys.set(key, mop.key);
       }
-      if (mop.fn === APPEND) {
+      if (mop.fn !== READ) {
         const name = nameOf(mop.key, mop.value);
         this.#appender.set(name, txn.call);
         add(this.#appends, key, [txn.call, mop.value]);
@@ -246,17 +251,17 @@ export class Analysis {
   }
 
   /**
-   * Derives the dependencies between committed transactions, key by key.
-   * The transaction that appended the last value of a version order, and
-   * every read that returned the whole order, precede each committed append
-   * that no committed read observed.
+   * Derives the dependencies between committed transactions from orders,
+   * key by key. The transaction that appended the last value of a version
+   * order, and every read that returned the whole order, precede each
+   * committed append that no committed read observed.
    */
-  #derive(): void {
+  #derive(orders: ReadonlyMap<string, readonly unknown[]>): void {
     const reads = new Map<string, Read[]>();
     for (const one of this.#reads) {
       add(reads, id(one.key), one);
     }
-    for (const [key, order] of this.#orders) {
+    for (const [key, order] of orders) {
       const present = new Set(order.map(id));
       const versions: Versions = {
         key: this.#keys.get(key),
@@ -296,6 +301,7 @@ export class Analysis {
         value: last,
         empty: false,
         next: undefined,
+        register: false,
       }));
     }
     const following: readonly (readonly [number | undefined, unknown])[] =
@@ -311,6 +317,7 @@ export class Analysis {
         value: last,
         empty: seen === 0,
         next: value,
+        register: false,
       }));
     }
   }
