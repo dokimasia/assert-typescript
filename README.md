@@ -93,6 +93,24 @@ function loaded(seat: Seat, path: string): Catalog | undefined {
 }
 ```
 
+`cleanup(seat, fn)` registers `fn` to release what a helper starts. It
+calls the member `cleanup` of the seat. The fixture runs `fn` when the test
+ends, and awaits it when it returns a promise. The check of `doesReject`
+and each attempt of `eventually` run theirs when the body ends, before the
+assertion settles. A `Recorder` keeps them until `runCleanups`. A
+`Standard` has no member `cleanup`, so the helper ends the call with a
+fault there:
+
+```ts
+import { cleanup, type Seat } from "@dokimi/assert";
+
+async function served(seat: Seat): Promise<Server> {
+  const server = await listen(handler);
+  cleanup(seat, () => server.close());
+  return server;
+}
+```
+
 A fault that ends the check of `doesReject` ends the call of
 `doesReject` with the same fault, because the check did not decide about
 the implementation.
@@ -656,8 +674,9 @@ reason.
 
 ## Trees of files
 
-`files.workspace` writes a tree into a directory of the test's own. The
-fixture removes the directory when the test ends. The assertions of the
+`files.workspace` writes a tree into a directory of the test's own. A
+cleanup of the seat removes the directory, so the fixture removes it when
+the test ends, and a `Recorder` at `runCleanups`. The assertions of the
 `files` module compare the tree that the code under test leaves with a
 wanted tree, or check the entry at one path:
 

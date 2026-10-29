@@ -166,6 +166,10 @@ const DECLARED: Record<string, { file: string; text: string }> = {
     file: "matcher/seat.d.ts",
     text: "observeCall?: (call: Call) => void",
   },
+  "seat.cleanup": {
+    file: "matcher/seat.d.ts",
+    text: "cleanup?: (fn: () => void | Promise<void>) => void",
+  },
   "assertion-call": { file: "matcher/seat.d.ts", text: "export interface Call {" },
   "assertion-call.assertion": {
     file: "matcher/seat.d.ts",
@@ -335,6 +339,7 @@ describe("index", () => {
         "bench",
         "byIdentity",
         "check",
+        "cleanup",
         "doesReject",
         "equateEmpty",
         "equateNans",

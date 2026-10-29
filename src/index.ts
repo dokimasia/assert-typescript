@@ -26,6 +26,7 @@
 export { allocsChecked } from "./allocs.js";
 export * as bench from "./bench.js";
 export * as check from "./check.js";
+export { cleanup } from "./cleanup.js";
 export { type Clock, Controlled, System } from "./clock.js";
 export { Failure, type Where } from "./failure.js";
 export { fault } from "./fault.js";

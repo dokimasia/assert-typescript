@@ -52,15 +52,6 @@ const CALL: Call = {
   where: WHERE,
 };
 
-/** A recorder with cleanups, as the seat of a test with a store has them. */
-class Kept extends Recorder {
-  readonly cleanups: (() => void)[] = [];
-
-  cleanup(fn: () => void): void {
-    this.cleanups.push(fn);
-  }
-}
-
 /** A body that passes for every digit. */
 const PASSES: PropertyBody = (c: Case) => {
   c.draw(integer(0, 9), "x");
@@ -93,6 +84,16 @@ async function runOn(
   ...options: Option[]
 ): Promise<void> {
   await propertyOf(seat, ...options).run(seat, Running.begin(seat, WHERE), body);
+}
+
+/**
+ * Writes the entry of a failure of BELOW_FIVE into the store dir. The run
+ * releases its claim on the entries, so a later property can claim them.
+ */
+async function storeAFailure(dir: string): Promise<void> {
+  const first = new Recorder();
+  await runOn(first, BELOW_FIVE, store(dir));
+  await first.runCleanups();
 }
 
 /** Returns the detail of the first failure that recorder received. */
@@ -340,7 +341,8 @@ describe("property", () => {
     it("ends the call with a fault for a second property of one contract in one store", async ({
       seat,
     }) => {
-      const kept = new Kept();
+      const kept = new Recorder();
+      onTestFinished(() => kept.runCleanups());
       const dir = temporary();
       await runOn(kept, PASSES, store(dir));
       await runOn(kept, PASSES, store(dir));
@@ -403,7 +405,7 @@ describe("property", () => {
     }) => {
       setVariable(MUTANT, undefined);
       const dir = temporary();
-      await runOn(new Recorder(), BELOW_FIVE, store(dir));
+      await storeAFailure(dir);
       const [written] = readdirSync(dir);
       const entry = JSON.parse(
         readFileSync(join(dir, written as string), "utf8"),
@@ -448,7 +450,7 @@ describe("property", () => {
     }) => {
       setVariable(MUTANT, undefined);
       const dir = temporary();
-      await runOn(new Recorder(), BELOW_FIVE, store(dir));
+      await storeAFailure(dir);
       writeFileSync(join(dir, "later.json"), JSON.stringify({ store: 2 }));
       const [written] = readdirSync(dir).filter((file) => file !== "later.json");
       const recorder = new Recorder();
@@ -761,7 +763,7 @@ describe("property", () => {
     it("counts the stored cases that pass", async ({ seat }) => {
       setVariable(MUTANT, undefined);
       const dir = temporary();
-      await runOn(new Recorder(), BELOW_FIVE, store(dir));
+      await storeAFailure(dir);
       const recorder = new Recorder();
       await propertyOf(recorder, store(dir)).replayStored(
         recorder,
@@ -787,7 +789,7 @@ describe("property", () => {
     }) => {
       setVariable(MUTANT, undefined);
       const dir = temporary();
-      await runOn(new Recorder(), BELOW_FIVE, store(dir));
+      await storeAFailure(dir);
       const recorder = new Recorder();
       await propertyOf(recorder, store(dir)).replayStored(
         recorder,
@@ -817,7 +819,7 @@ describe("property", () => {
     it("records a skip for a stored case that skips", async ({ seat }) => {
       setVariable(MUTANT, undefined);
       const dir = temporary();
-      await runOn(new Recorder(), BELOW_FIVE, store(dir));
+      await storeAFailure(dir);
       const recorder = new Recorder();
       await propertyOf(recorder, store(dir)).replayStored(
         recorder,
@@ -835,7 +837,8 @@ describe("property", () => {
     });
 
     it("ends the call with a fault for a second claim", async ({ seat }) => {
-      const kept = new Kept();
+      const kept = new Recorder();
+      onTestFinished(() => kept.runCleanups());
       const dir = temporary();
       await runOn(kept, PASSES, store(dir));
       await propertyOf(kept, store(dir)).replayStored(
@@ -875,7 +878,7 @@ describe("property", () => {
     it("runs each stored case inside the wrapper", async ({ seat }) => {
       setVariable(MUTANT, undefined);
       const dir = temporary();
-      await runOn(new Recorder(), BELOW_FIVE, store(dir));
+      await storeAFailure(dir);
       const count = { calls: 0 };
       const recorder = new Recorder();
       await propertyOf(recorder, store(dir), counting(count)).replayStored(
@@ -892,7 +895,7 @@ describe("property", () => {
     }) => {
       setVariable(MUTANT, undefined);
       const dir = temporary();
-      await runOn(new Recorder(), BELOW_FIVE, store(dir));
+      await storeAFailure(dir);
       const recorder = new Recorder().withSignal(AbortSignal.abort());
       await propertyOf(recorder, store(dir)).replayStored(
         recorder,

@@ -47,6 +47,49 @@ describe("waiting", () => {
       ]);
     });
 
+    it("runs the cleanups of an attempt before the next attempt", async () => {
+      const order: string[] = [];
+      let attempts = 0;
+      await waiting.eventually(
+        controlled(),
+        Mode.Fatal,
+        1000,
+        5,
+        (trial: Seat) => {
+          attempts += 1;
+          order.push(`attempt ${attempts}`);
+          trial.cleanup?.(() => {
+            order.push(`cleanup ${attempts}`);
+          });
+          check.isTrue(trial, attempts >= 2, "it settled");
+        },
+        "it converges",
+      );
+
+      expect(order).toEqual(["attempt 1", "cleanup 1", "attempt 2", "cleanup 2"]);
+    });
+
+    it("tries again after a failure in a cleanup of an attempt", async () => {
+      let attempts = 0;
+      const seat = controlled();
+      await waiting.eventually(
+        seat,
+        Mode.Fatal,
+        1000,
+        5,
+        (trial: Seat) => {
+          attempts += 1;
+          const attempt = attempts;
+          trial.cleanup?.(() => {
+            check.isTrue(trial, attempt >= 2, "the server stops");
+          });
+        },
+        "it converges",
+      );
+
+      expect([attempts, seat.failed]).toEqual([2, false]);
+    });
+
     it("passes a body that passes on its third attempt", async () => {
       let attempts = 0;
       const seat = controlled();

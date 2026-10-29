@@ -17,7 +17,7 @@ import {
   storeOf,
 } from "../../src/prop/directory.js";
 import { entry, name } from "../../src/prop/engine/store.js";
-import { Collector, cleanUp, Recorder } from "../../src/seat.js";
+import { Collector, cleanUp, Recorder, Standard } from "../../src/seat.js";
 import { test as it } from "../../src/vitest.js";
 import { temporary, thrown } from "../helpers.js";
 
@@ -141,24 +141,24 @@ describe("directory", () => {
     });
 
     it("claims nothing on a seat without cleanups", ({ seat }) => {
-      const recorder = new Recorder();
+      const standard = new Standard();
 
       check.isTrue(
         seat,
-        claim(recorder, "dir", "c") && claim(recorder, "dir", "c"),
+        claim(standard, "dir", "c") && claim(standard, "dir", "c"),
         "both claims succeed",
       );
     });
 
-    it("refuses a second claim of one contract in one store until the test ends", ({
+    it("refuses a second claim of one contract in one store until the test ends", async ({
       seat,
     }) => {
       const collector = new Collector();
       const first = claim(collector, "dir", "c");
       const second = claim(collector, "dir", "c");
-      cleanUp(collector);
+      await cleanUp(collector);
       const third = claim(collector, "dir", "c");
-      cleanUp(collector);
+      await cleanUp(collector);
 
       check.isEqualTo(
         seat,
@@ -168,10 +168,10 @@ describe("directory", () => {
       );
     });
 
-    it("grants claims of two contracts in one store", ({ seat }) => {
+    it("grants claims of two contracts in one store", async ({ seat }) => {
       const collector = new Collector();
       const claims = [claim(collector, "dir", "a"), claim(collector, "dir", "b")];
-      cleanUp(collector);
+      await cleanUp(collector);
 
       check.isEqualTo(seat, claims, [true, true], "the store grants both claims");
     });

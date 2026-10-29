@@ -11,27 +11,9 @@ import { describe, onTestFinished } from "vitest";
 import { directory, Entry, text } from "../../src/files/entry.js";
 import { workspace } from "../../src/files/workspace.js";
 import { check } from "../../src/index.js";
-import type { Cleanups } from "../../src/matcher/seat.js";
 import { Recorder } from "../../src/seat.js";
 import { test as it } from "../../src/vitest.js";
 import { temporary, WINDOWS } from "../helpers.js";
-
-/** A recorder that keeps the cleanups that it receives, which a test runs itself. */
-class Cleaning extends Recorder implements Cleanups {
-  /** The cleanups, in the order of their registration. */
-  readonly cleanups: (() => void)[] = [];
-
-  cleanup(fn: () => void): void {
-    this.cleanups.push(fn);
-  }
-
-  /** Runs the cleanups, the last registered first. */
-  end(): void {
-    for (const fn of [...this.cleanups].reverse()) {
-      fn();
-    }
-  }
-}
 
 describe("workspace", () => {
   describe("workspace", () => {
@@ -47,23 +29,23 @@ describe("workspace", () => {
       );
     });
 
-    it("registers the removal of its directory with the seat", ({ seat }) => {
-      const cleaning = new Cleaning();
+    it("registers the removal of its directory with the seat", async ({ seat }) => {
+      const cleaning = new Recorder();
       const dir = workspace(cleaning, { "a.txt": text("a") });
-      cleaning.end();
+      await cleaning.runCleanups();
 
       check.isFalse(seat, existsSync(dir), "the directory is removed");
     });
 
     it.skipIf(WINDOWS)(
       "removes a directory whose mode forbids the owner to write it",
-      ({ seat }) => {
-        const cleaning = new Cleaning();
+      async ({ seat }) => {
+        const cleaning = new Recorder();
         const dir = workspace(cleaning, {
           sealed: directory().withMode(0o500),
           "sealed/a.txt": text("a"),
         });
-        cleaning.end();
+        await cleaning.runCleanups();
 
         check.isFalse(seat, existsSync(dir), "the directory is removed");
       },
@@ -72,9 +54,9 @@ describe("workspace", () => {
     it("ends the call with a fault for a tree that breaks a rule, before it writes anything", ({
       seat,
     }) => {
-      const cleaning = new Cleaning();
+      const cleaning = new Recorder();
       const dir = workspace(cleaning, { "a.txt": text("a"), b: new Entry() });
-      onTestFinished(() => cleaning.end());
+      onTestFinished(() => cleaning.runCleanups());
 
       check.isEqualTo(
         seat,
@@ -96,7 +78,7 @@ describe("workspace", () => {
             process.env["TMPDIR"] = before;
           }
         });
-        const cleaning = new Cleaning();
+        const cleaning = new Recorder();
         const dir = workspace(cleaning, {});
 
         check.isEqualTo(seat, dir, "", "no directory");

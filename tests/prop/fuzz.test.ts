@@ -73,8 +73,9 @@ describe("fuzz", () => {
     it("fails the call at a stored case that fails", async ({ seat }) => {
       setVariable(MUTANT, undefined);
       const dir = temporary();
+      const first = new Recorder();
       await forAll(
-        new Recorder(),
+        first,
         "no leading seven",
         (c) => {
           const data = c.draw(bytes({ maxSize: 4 }), "data");
@@ -84,6 +85,7 @@ describe("fuzz", () => {
         seed(1n),
         store(dir),
       );
+      await first.runCleanups();
       const recorder = new Recorder();
       await fuzz(
         recorder,

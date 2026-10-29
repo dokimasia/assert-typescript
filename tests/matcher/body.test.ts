@@ -77,11 +77,93 @@ describe("body", () => {
   });
 
   describe("Body.end", () => {
-    it("aborts the signal with an AbortError", () => {
+    it("aborts the signal with an AbortError", async () => {
       const probe = new Probe(new Recorder(), undefined);
-      probe.end();
+      await probe.end();
 
       expect((probe.signal.reason as Error).name).toBe("AbortError");
+    });
+
+    it("runs the cleanups after the signal aborts, the last registered first", async () => {
+      const probe = new Probe(new Recorder(), undefined);
+      const order: string[] = [];
+      probe.cleanup(() => {
+        order.push(`first ${probe.signal.aborted}`);
+      });
+      probe.cleanup(() => {
+        order.push(`second ${probe.signal.aborted}`);
+      });
+      await probe.end();
+
+      expect(order).toEqual(["second true", "first true"]);
+    });
+
+    it("returns what the first cleanup throws, after the later cleanups run", async () => {
+      const probe = new Probe(new Recorder(), undefined);
+      const busy = new Error("the port is busy");
+      let ran = false;
+      probe.cleanup(() => {
+        ran = true;
+      });
+      probe.cleanup(() => {
+        throw busy;
+      });
+
+      expect([await probe.end(), ran]).toEqual([{ value: busy }, true]);
+    });
+
+    it("keeps a failure in a cleanup as a failure of the body", async () => {
+      const probe = new Probe(new Recorder(), undefined);
+      probe.cleanup(() => {
+        probe.fail("the cleanup failed");
+      });
+
+      expect([await probe.end(), probe.messages]).toEqual([
+        undefined,
+        ["the cleanup failed"],
+      ]);
+    });
+  });
+
+  describe("Body.cleanup", () => {
+    it("awaits a cleanup that returns a promise before the next one runs", async () => {
+      const probe = new Probe(new Recorder(), undefined);
+      const order: string[] = [];
+      probe.cleanup(() => {
+        order.push("first");
+      });
+      probe.cleanup(async () => {
+        await Promise.resolve();
+        order.push("awaited");
+      });
+      await probe.end();
+
+      expect(order).toEqual(["awaited", "first"]);
+    });
+
+    it("runs a cleanup that a cleanup registers in the same pass", async () => {
+      const probe = new Probe(new Recorder(), undefined);
+      const order: string[] = [];
+      probe.cleanup(() => {
+        order.push("registering");
+        probe.cleanup(() => {
+          order.push("registered");
+        });
+      });
+      await probe.end();
+
+      expect(order).toEqual(["registering", "registered"]);
+    });
+
+    it("runs a cleanup that arrives after the body ended at once", async () => {
+      const probe = new Probe(new Recorder(), undefined);
+      await probe.end();
+      const order: string[] = [];
+      probe.cleanup(() => {
+        order.push("late");
+      });
+
+      expect(order).toEqual(["late"]);
     });
   });
 
@@ -159,6 +241,42 @@ describe("body", () => {
       }).catch(() => undefined);
 
       expect(probe.signal.aborted).toBe(true);
+    });
+
+    it("runs the cleanups before it returns the seat", async () => {
+      const order: string[] = [];
+      await runOn(new Probe(new Recorder(), undefined), (seat) => {
+        seat.cleanup?.(() => {
+          order.push("cleaned");
+        });
+      });
+
+      expect(order).toEqual(["cleaned"]);
+    });
+
+    it("rejects with what a cleanup throws when the body returns", async () => {
+      const busy = new RangeError("the port is busy");
+
+      await expect(
+        runOn(new Probe(new Recorder(), undefined), (seat) => {
+          seat.cleanup?.(() => {
+            throw busy;
+          });
+        }),
+      ).rejects.toBe(busy);
+    });
+
+    it("rejects with what the body throws over what a cleanup throws", async () => {
+      const broke = new RangeError("the body broke");
+
+      await expect(
+        runOn(new Probe(new Recorder(), undefined), (seat) => {
+          seat.cleanup?.(() => {
+            throw new RangeError("the port is busy");
+          });
+          throw broke;
+        }),
+      ).rejects.toBe(broke);
     });
   });
 });

@@ -266,7 +266,7 @@ export const test = base.extend<SeatFixture>({
       });
     }
     await use(collector);
-    cleanUp(collector);
+    await cleanUp(collector);
     collector.flush();
   },
 });

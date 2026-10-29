@@ -15,6 +15,7 @@
 
 import { type Clock, System } from "./clock.js";
 import { type Failure, render } from "./failure.js";
+import { CleanupList } from "./matcher/cleanup.js";
 import { faultText } from "./matcher/fault.js";
 import { clear, dropped } from "./matcher/pending.js";
 import type { Cleanups, Seat } from "./matcher/seat.js";
@@ -44,8 +45,26 @@ function reportDropped(seat: Seat): void {
   );
 }
 
-/** The functions that each collector runs when its test ends, in the order of their registration. */
-const CLEANUPS = new WeakMap<Collector, (() => void)[]>();
+/** The functions that each collector runs when its test ends. */
+const CLEANUPS = new WeakMap<Collector, CleanupList>();
+
+/**
+ * Returns a pass of a cleanup list that awaits each function. An error that
+ * a function throws or rejects with is a failure of seat: `a cleanup
+ * failed: ` and the text of the error.
+ *
+ * @param seat - The seat that receives the failure.
+ * @returns The pass.
+ */
+function releasing(seat: Seat): (fn: () => unknown) => Promise<void> {
+  return async (fn) => {
+    try {
+      await fn();
+    } catch (err) {
+      seat.record(`a cleanup failed: ${faultText(err)}`);
+    }
+  };
+}
 
 export type { Call, Cleanups, Seat } from "./matcher/seat.js";
 export { signalOf } from "./matcher/seat.js";
@@ -114,11 +133,14 @@ export class Standard implements Seat {
  * A test of an assertion reads what the assertion reported on it, rather
  * than being stopped by it. Nothing driven with a recorder can fail a test.
  * It keeps the call record of every call it receives, whatever
- * `DOKIMI_ASSERT_RECORD` states.
+ * `DOKIMI_ASSERT_RECORD` states. It keeps the functions that cleanup
+ * registers until runCleanups runs them.
  */
 export class Recorder implements Seat {
   /** Every record that arrived, in call order. */
   readonly #records: Failure[] = [];
+  /** The functions that cleanup registered, which runCleanups runs. */
+  readonly #cleanups = new CleanupList();
   /** Every fault that arrived through reportFault, in call order. */
   readonly #faults: Error[] = [];
   /** What assertions read time from, or undefined for the platform. */
@@ -273,6 +295,32 @@ export class Recorder implements Seat {
   get helperCalls(): number {
     return this.#helpers;
   }
+
+  /**
+   * Registers fn to run at runCleanups. A helper that a test checks on a
+   * recorder registers the release of what it starts, and the recorder keeps
+   * the release until the test runs it.
+   *
+   * @param fn - The function, which may return a promise.
+   */
+  cleanup(fn: () => void | Promise<void>): void {
+    this.#cleanups.add(fn);
+  }
+
+  /**
+   * Runs the functions that cleanup registered, the last registered first,
+   * and forgets them. It awaits a function that returns a promise before
+   * the next one runs. A function that a function registers runs before the
+   * promise settles, and a function that arrives later waits for the next
+   * call. A function that throws or rejects fails the recorder with `a
+   * cleanup failed: ` and the text of the error, and the later functions
+   * still run.
+   *
+   * @returns A promise that settles once every function has run.
+   */
+  runCleanups(): Promise<void> {
+    return this.#cleanups.run(releasing(this));
+  }
 }
 
 /**
@@ -336,15 +384,16 @@ export class Collector implements Seat, Cleanups {
   /**
    * Registers fn to run when the test ends, also when the test fails. The
    * fixture of `@dokimi/assert/vitest` runs the functions after the test
-   * body, in the reverse order of their registration, and reports each
-   * function that throws as a failure of the test.
+   * body, in the reverse order of their registration, and awaits a function
+   * that returns a promise. It reports each function that throws or rejects
+   * as a failure of the test.
    *
    * @param fn - The function, such as the removal of a directory that the
    *   test created.
    */
-  cleanup(fn: () => void): void {
-    const registered = CLEANUPS.get(this) ?? [];
-    registered.push(fn);
+  cleanup(fn: () => void | Promise<void>): void {
+    const registered = CLEANUPS.get(this) ?? new CleanupList();
+    registered.add(fn);
     CLEANUPS.set(this, registered);
   }
 
@@ -378,20 +427,15 @@ export class Collector implements Seat, Cleanups {
 
 /**
  * Runs the functions that collector registered through `cleanup`, the
- * last registered first, and forgets them. A function that throws does
- * not stop the ones after it: the collector records its error as a
- * failure, which the next flush reports.
+ * last registered first, and forgets them. It awaits a function that
+ * returns a promise before the next one runs, and a function that a
+ * function registers runs in the same pass. A function that throws or
+ * rejects does not stop the ones after it: the collector records its error
+ * as a failure, which the next flush reports.
  *
  * @param collector - The seat of the test that ended.
+ * @returns A promise that settles once every function has run.
  */
-export function cleanUp(collector: Collector): void {
-  const registered = CLEANUPS.get(collector) ?? [];
-  CLEANUPS.delete(collector);
-  for (const fn of registered.reverse()) {
-    try {
-      fn();
-    } catch (err) {
-      collector.record(`a cleanup failed: ${faultText(err)}`);
-    }
-  }
+export async function cleanUp(collector: Collector): Promise<void> {
+  await CLEANUPS.get(collector)?.run(releasing(collector));
 }

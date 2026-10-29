@@ -434,6 +434,41 @@ describe("rejects", () => {
       );
     });
 
+    it("runs the cleanups of the check before it settles", async ({ seat }) => {
+      const order: string[] = [];
+      await check.doesReject(new Recorder(), "the check cleans up", (inner) => {
+        inner.cleanup?.(() => {
+          order.push("cleaned");
+        });
+        check.isTrue(inner, false, "it fails");
+      });
+      order.push("settled");
+
+      check.isEqualTo(seat, order, ["cleaned", "settled"], "the cleanup runs first");
+    });
+
+    it("returns the record of a failure in a cleanup of the check", async ({
+      seat,
+    }) => {
+      const recorder = new Recorder();
+      const failures = await check.doesReject(
+        recorder,
+        "the cleanup fails",
+        (inner) => {
+          inner.cleanup?.(() => {
+            check.isTrue(inner, false, "the server stops");
+          });
+        },
+      );
+
+      check.isEqualTo(
+        seat,
+        [failures.map((f) => f.contract), recorder.failed],
+        [["the server stops"], false],
+        "rejects passes with the record of the cleanup",
+      );
+    });
+
     it("returns a promise that the forgotten-await guard tracks", ({ seat }) => {
       const standard = new Standard();
       void check.doesReject(standard, "nobody awaits this", (inner) => {

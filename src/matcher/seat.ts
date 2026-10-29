@@ -65,6 +65,16 @@ export interface Seat {
    */
   observeCall?: (call: Call) => void;
 
+  /**
+   * Registers fn to run when the test, the case or the body of the seat
+   * ends. The seat runs the last registered first, and awaits a function
+   * that returns a promise before the next one runs. The fixture of
+   * `@dokimi/assert/vitest` runs them when the test ends, a Recorder at
+   * runCleanups, and the seat that doesReject or eventually hands a body
+   * when the body ends.
+   */
+  cleanup?: (fn: () => void | Promise<void>) => void;
+
   /** Aborts when the test that runs on this seat ends, where the seat states one. */
   readonly signal?: AbortSignal | undefined;
 }
@@ -83,7 +93,7 @@ export interface Cleanups {
    * Registers fn to run when the test ends, also when the test fails. The
    * functions run in the reverse order of their registration.
    */
-  cleanup: (fn: () => void) => void;
+  cleanup: (fn: () => void | Promise<void>) => void;
 }
 
 /**

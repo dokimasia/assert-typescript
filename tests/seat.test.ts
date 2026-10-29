@@ -323,6 +323,96 @@ describe("seat", () => {
     });
   });
 
+  describe("Recorder.cleanup", () => {
+    it("keeps the function until runCleanups", async () => {
+      const seat = new Recorder();
+      const order: string[] = [];
+      seat.cleanup(() => {
+        order.push("released");
+      });
+      expect(order).toEqual([]);
+
+      await seat.runCleanups();
+      expect(order).toEqual(["released"]);
+    });
+  });
+
+  describe("Recorder.runCleanups", () => {
+    it("runs the last registered function first", async () => {
+      const seat = new Recorder();
+      const order: number[] = [];
+      seat.cleanup(() => {
+        order.push(1);
+      });
+      seat.cleanup(() => {
+        order.push(2);
+      });
+      await seat.runCleanups();
+
+      expect(order).toEqual([2, 1]);
+    });
+
+    it("awaits a function that returns a promise before the next one runs", async () => {
+      const seat = new Recorder();
+      const order: string[] = [];
+      seat.cleanup(() => {
+        order.push("first");
+      });
+      seat.cleanup(async () => {
+        await settled();
+        order.push("awaited");
+      });
+      await seat.runCleanups();
+
+      expect(order).toEqual(["awaited", "first"]);
+    });
+
+    it("runs a function that a function registers before it settles", async () => {
+      const seat = new Recorder();
+      const order: string[] = [];
+      seat.cleanup(() => {
+        order.push("registering");
+        seat.cleanup(() => {
+          order.push("registered");
+        });
+      });
+      await seat.runCleanups();
+
+      expect(order).toEqual(["registering", "registered"]);
+    });
+
+    it("leaves a function that arrives after it to the next call", async () => {
+      const seat = new Recorder();
+      const order: string[] = [];
+      seat.cleanup(() => {
+        order.push("first run");
+      });
+      await seat.runCleanups();
+      seat.cleanup(() => {
+        order.push("second run");
+      });
+      expect(order).toEqual(["first run"]);
+
+      await seat.runCleanups();
+      expect(order).toEqual(["first run", "second run"]);
+    });
+
+    it("keeps the error of a function as a failure, and runs the ones after it", async () => {
+      const seat = new Recorder();
+      let ran = false;
+      seat.cleanup(() => {
+        ran = true;
+      });
+      seat.cleanup(() => Promise.reject(new Error("the port is busy")));
+      await seat.runCleanups();
+
+      expect([ran, seat.messages]).toEqual([
+        true,
+        ["a cleanup failed: the port is busy"],
+      ]);
+    });
+  });
+
   describe("Collector.helper", () => {
     it("collects nothing", () => {
       const seat = new Collector();
@@ -456,42 +546,46 @@ describe("seat", () => {
   });
 
   describe("Collector.cleanup", () => {
-    it("registers a function that cleanUp runs", () => {
+    it("registers a function that cleanUp runs", async () => {
       const seat = new Collector();
       let ran = false;
       seat.cleanup(() => {
         ran = true;
       });
-      cleanUp(seat);
+      await cleanUp(seat);
 
       expect(ran).toBe(true);
     });
   });
 
   describe("cleanUp", () => {
-    it("runs the functions of the collector, the last registered first", () => {
+    it("runs the functions of the collector, the last registered first", async () => {
       const seat = new Collector();
       const order: number[] = [];
-      seat.cleanup(() => order.push(1));
-      seat.cleanup(() => order.push(2));
-      cleanUp(seat);
+      seat.cleanup(() => {
+        order.push(1);
+      });
+      seat.cleanup(() => {
+        order.push(2);
+      });
+      await cleanUp(seat);
 
       expect(order).toEqual([2, 1]);
     });
 
-    it("runs each function once", () => {
+    it("runs each function once", async () => {
       const seat = new Collector();
       let runs = 0;
       seat.cleanup(() => {
         runs += 1;
       });
-      cleanUp(seat);
-      cleanUp(seat);
+      await cleanUp(seat);
+      await cleanUp(seat);
 
       expect(runs).toBe(1);
     });
 
-    it("records the error of a function that throws, and runs the ones after it", () => {
+    it("records the error of a function that throws, and runs the ones after it", async () => {
       const seat = new Collector();
       let ran = false;
       seat.cleanup(() => {
@@ -500,7 +594,7 @@ describe("seat", () => {
       seat.cleanup(() => {
         throw new Error("the directory is busy");
       });
-      cleanUp(seat);
+      await cleanUp(seat);
 
       expect([ran, seat.collected]).toEqual([
         true,
@@ -508,9 +602,46 @@ describe("seat", () => {
       ]);
     });
 
-    it("runs nothing for a collector that registered nothing", () => {
+    it("awaits a function that returns a promise before the next one runs", async () => {
       const seat = new Collector();
-      cleanUp(seat);
+      const order: string[] = [];
+      seat.cleanup(() => {
+        order.push("first");
+      });
+      seat.cleanup(async () => {
+        await settled();
+        order.push("awaited");
+      });
+      await cleanUp(seat);
+
+      expect(order).toEqual(["awaited", "first"]);
+    });
+
+    it("records the rejection of a function", async () => {
+      const seat = new Collector();
+      seat.cleanup(() => Promise.reject(new Error("the socket is busy")));
+      await cleanUp(seat);
+
+      expect(seat.collected).toEqual(["a cleanup failed: the socket is busy"]);
+    });
+
+    it("runs a function that a function registers in the same pass", async () => {
+      const seat = new Collector();
+      const order: string[] = [];
+      seat.cleanup(() => {
+        order.push("registering");
+        seat.cleanup(() => {
+          order.push("registered");
+        });
+      });
+      await cleanUp(seat);
+
+      expect(order).toEqual(["registering", "registered"]);
+    });
+
+    it("runs nothing for a collector that registered nothing", async () => {
+      const seat = new Collector();
+      await cleanUp(seat);
 
       expect(seat.collected).toEqual([]);
     });

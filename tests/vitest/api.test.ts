@@ -460,8 +460,12 @@ describe("api", () => {
       const ran: string[] = [];
 
       it("registers cleanups on the seat", ({ seat }) => {
-        seat.cleanup(() => ran.push("first"));
-        seat.cleanup(() => ran.push("second"));
+        seat.cleanup(() => {
+          ran.push("first");
+        });
+        seat.cleanup(() => {
+          ran.push("second");
+        });
 
         expect(ran).toEqual([]);
       });
@@ -471,7 +475,9 @@ describe("api", () => {
       });
 
       it.fails("registers a cleanup in a test that fails", ({ seat }) => {
-        seat.cleanup(() => ran.push("after a failure"));
+        seat.cleanup(() => {
+          ran.push("after a failure");
+        });
         check.isTrue(seat, false, "the test fails");
       });
 
@@ -483,6 +489,10 @@ describe("api", () => {
         seat.cleanup(() => {
           throw new Error("the directory is busy");
         });
+      });
+
+      it.fails("fails a test whose cleanup rejects", ({ seat }) => {
+        seat.cleanup(() => Promise.reject(new Error("the socket is busy")));
       });
     });
 

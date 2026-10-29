@@ -10,19 +10,45 @@
  * the assertion's seat and aborts when the body ends, so work that the
  * body starts with it stops before the assertion returns. A failure that
  * stops ends the body, as it ends a test, and so does a fault that ends its
- * call.
+ * call. When the body ends, the seat aborts its signal and then runs the
+ * cleanups of the body, the last registered first.
  */
 
 import { own, run, type Slot } from "../record/calls.js";
+import { CleanupList } from "./cleanup.js";
 import { noteFault } from "./fault.js";
 import { type Seat, signalOf } from "./seat.js";
+
+/**
+ * Runs fn, and awaits a promise that it returns.
+ *
+ * @param fn - A body or a cleanup.
+ * @returns What fn threw or rejected with, or undefined when it returned or
+ *   when it ended the body.
+ */
+async function attempt(fn: () => unknown): Promise<Thrown | undefined> {
+  try {
+    await fn();
+    return undefined;
+  } catch (thrown) {
+    return thrown instanceof Ended ? undefined : { value: thrown };
+  }
+}
 
 /** Thrown by the seat of a body to end the body at a failure that stops. */
 export class Ended {}
 
+/** What a body or a cleanup threw, other than the end of the body. */
+export interface Thrown {
+  /** The thrown value. */
+  readonly value: unknown;
+}
+
 /** The seat of one run of a body. */
 export abstract class Body implements Seat {
   readonly #controller = new AbortController();
+  /** The functions that cleanup registered, which end runs. */
+  readonly #cleanups = new CleanupList();
   /** The seat of the assertion that runs the body. */
   readonly #parent: Seat;
   /** Aborts when the assertion's seat's signal does, and when the body ends. */
@@ -67,33 +93,57 @@ export abstract class Body implements Seat {
     this.fail(fault.message);
   }
 
-  /** Ends the body: the signal aborts. */
-  end(): void {
+  /**
+   * Registers fn to run when the body ends. A function that arrives after
+   * the cleanups of the body ran runs at once.
+   *
+   * @param fn - The function, which may return a promise.
+   */
+  cleanup(fn: () => void | Promise<void>): void {
+    if (!this.#cleanups.add(fn)) {
+      fn();
+    }
+  }
+
+  /**
+   * Ends the body. The signal aborts first. Then the cleanups run, the last
+   * registered first, and the seat awaits each one. A failure in a cleanup
+   * is a failure of the body, and the later cleanups still run.
+   *
+   * @returns What the first cleanup threw other than the end of the body,
+   *   or undefined.
+   */
+  async end(): Promise<Thrown | undefined> {
     this.#controller.abort(new DOMException("the body ended", "AbortError"));
+    let first: Thrown | undefined;
+    await this.#cleanups.close(async (fn) => {
+      const thrown = await attempt(fn);
+      first ??= thrown;
+    });
+    return first;
   }
 }
 
 /**
  * Runs body on seat, and ends the run when body returns, when its
- * promise settles, and at its first failure that stops. Any other throw
- * is no failure of the body, and rejects the call.
+ * promise settles, and at its first failure that stops. The seat then runs
+ * its cleanups. Any other throw is no failure of the body, and rejects the
+ * call once the cleanups have run. So does the first throw of a cleanup,
+ * when the body did not throw.
  *
  * @param seat - The seat of the run.
  * @param body - The body.
- * @returns seat, once the run has ended.
+ * @returns seat, once the run and its cleanups have ended.
  */
 export async function runOn<S extends Body>(
   seat: S,
   body: (seat: Seat) => unknown,
 ): Promise<S> {
-  try {
-    await body(seat);
-  } catch (thrown) {
-    if (!(thrown instanceof Ended)) {
-      throw thrown;
-    }
-  } finally {
-    seat.end();
+  const raised = await attempt(() => body(seat));
+  const cleanedUp = await seat.end();
+  const thrown = raised ?? cleanedUp;
+  if (thrown !== undefined) {
+    throw thrown.value;
   }
   return seat;
 }
