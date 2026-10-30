@@ -7,9 +7,9 @@
  */
 
 const TIMESTAMP =
-  /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g;
-const HASH = /\b[0-9a-f]{32,128}\b/g;
-const RUN_ID = /\brun_[0-9a-zA-Z]{16}\b/g;
+  /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/gu;
+const HASH = /\b[0-9a-f]{32,128}\b/gu;
+const RUN_ID = /\brun_[0-9a-zA-Z]{16}\b/gu;
 
 /** A replacement applied to both sides before they are compared. */
 export type Scrubber = (text: string) => string;
@@ -55,8 +55,8 @@ export function scrubJsonFields(...fields: string[]): Scrubber {
     return (text) => text;
   }
 
-  const names = fields.map((f) => f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const pattern = new RegExp(`("(?:${names.join("|")})"\\s*:\\s*)"[^"]*"`, "g");
+  const names = fields.map((f) => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"));
+  const pattern = new RegExp(`("(?:${names.join("|")})"\\s*:\\s*)"[^"]*"`, "gu");
   return (text) => text.replace(pattern, '$1"SCRUBBED"');
 }
 

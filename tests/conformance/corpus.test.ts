@@ -81,20 +81,24 @@ function checkWhere(one: Case, recorder: Recorder): void {
   }
 }
 
+/** Drives one case through the subject that it names, on seat. */
+async function driveSubject(
+  surface: string,
+  one: Case,
+  seat: Recorder,
+  options: ReturnType<typeof optionsOf>,
+): Promise<void> {
+  const subject = one.subject as string;
+  const ran = await runSubject(surface, one.assertion, subject, seat, one.id, options);
+  expect(ran, `no subject named "${subject}" on ${surface}`).toBe(true);
+}
+
 /** Drives one case on one surface, and returns the recorder that it reported to. */
 async function drive(surface: string, one: Case): Promise<Recorder> {
   const options = optionsOf(one);
   const seat = new Recorder().withClock(new Controlled(0));
   if (one.subject !== undefined) {
-    const ran = await runSubject(
-      surface,
-      one.assertion,
-      one.subject,
-      seat,
-      one.id,
-      options,
-    );
-    expect(ran, `no subject named "${one.subject}" on ${surface}`).toBe(true);
+    await driveSubject(surface, one, seat, options);
     return seat;
   }
   const member = memberFor(one);

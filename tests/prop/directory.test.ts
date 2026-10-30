@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { describe } from "vitest";
 import { check } from "../../src/index.js";
 import { nameTest } from "../../src/matcher/seat.js";
+import { compareText } from "../../src/order.js";
 import {
   claim,
   load,
@@ -214,7 +215,7 @@ describe("directory", () => {
       check.isEqualTo(
         seat,
         load(dir, "c").entries.map((one) => one.name),
-        [a.name, b.name].sort(),
+        [a.name, b.name].sort(compareText),
         "the names in order",
       );
     });

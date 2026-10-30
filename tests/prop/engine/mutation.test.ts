@@ -5,6 +5,7 @@
 
 import { describe } from "vitest";
 import { check } from "../../../src/index.js";
+import { compareText } from "../../../src/order.js";
 import type { Request } from "../../../src/prop/engine/case/providers.js";
 import type { Span } from "../../../src/prop/engine/case/record.js";
 import { IntegerBounds } from "../../../src/prop/engine/choice.js";
@@ -73,7 +74,7 @@ describe("mutation", () => {
 
       check.isEqualTo(
         seat,
-        [...kinds].sort(),
+        [...kinds].sort(compareText),
         ["redraw 3", "span"],
         "a change of a span, or one choice drawn again",
       );

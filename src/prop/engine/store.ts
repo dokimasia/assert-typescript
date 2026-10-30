@@ -79,11 +79,11 @@ const IDENTITIES = [
 const DRAWS = new Set(["label", "label,value"]);
 
 /** The start of a token, which states its version. */
-const TOKEN = /^prop([1-9][0-9]*):/;
+const TOKEN = /^prop(?<version>[1-9][0-9]*):/u;
 
 /** A definition version and a date. */
-const VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
-const DATE = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/;
+const VERSION = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u;
+const DATE = /^(?<year>[0-9]{4})-(?<month>[0-9]{2})-(?<day>[0-9]{2})$/u;
 
 /** The signal that an entry is of a later format or token version. */
 class Later extends Error {}
@@ -126,11 +126,17 @@ function identityValue(key: string, value: unknown): boolean {
  * February 30, is no date.
  */
 function isDate(found: unknown): boolean {
-  const match = typeof found === "string" ? DATE.exec(found) : null;
-  if (match === null) {
+  const fields = (typeof found === "string" ? DATE.exec(found)?.groups : undefined) as
+    | { readonly year: string; readonly month: string; readonly day: string }
+    | undefined;
+  if (fields === undefined) {
     return false;
   }
-  const [year, month, day] = [Number(match[1]), Number(match[2]) - 1, Number(match[3])];
+  const [year, month, day] = [
+    Number(fields.year),
+    Number(fields.month) - 1,
+    Number(fields.day),
+  ];
   const date = new Date(0);
   date.setUTCFullYear(year, month, day);
   return (
@@ -177,11 +183,11 @@ function parseEntry(text: string): readonly [string, Choice[]] {
     throw new JsonError("prop: the entry's fields are not those of its format");
   }
   const token = entryOf["choices"] as string;
-  const stated = TOKEN.exec(token);
-  if (stated === null) {
+  const stated = TOKEN.exec(token)?.groups as { readonly version: string } | undefined;
+  if (stated === undefined) {
     throw new JsonError("prop: the token states no version");
   }
-  if (BigInt(stated[1] as string) > TOKEN_VERSION) {
+  if (BigInt(stated.version) > TOKEN_VERSION) {
     throw new Later();
   }
   return [entryOf["property"] as string, decode(token)];

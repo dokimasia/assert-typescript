@@ -47,7 +47,7 @@ const MAX_DEPTH = 100;
 const QUANTIFIERS = new Set("*+?{");
 
 /** The text of one decimal digit. */
-const DIGIT = /^[0-9]$/;
+const DIGIT = /^[0-9]$/u;
 
 /** Returns the largest product of quantifier counts along a path through node. */
 function weight(node: Node): number {

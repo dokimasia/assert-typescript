@@ -8,6 +8,7 @@
  * reports whether it made a candidate the best case.
  */
 
+import { min } from "../choice.js";
 import type { Shrinker } from "../shrink.js";
 import type { Work } from "../work.js";
 import {
@@ -117,7 +118,7 @@ function* lowerPair(shrinker: Shrinker, index: number): Work<boolean> {
   }
   const step = value > target ? -1n : 1n;
   const distance = (v: bigint) => (v > target ? v - target : target - v);
-  const room = distance(value) < distance(other) ? distance(value) : distance(other);
+  const room = min(distance(value), distance(other));
 
   const moved = function* (amount: bigint): Work<boolean> {
     if (amount > room) {

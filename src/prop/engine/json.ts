@@ -23,11 +23,12 @@ const ESCAPES: ReadonlyMap<string, string> = new Map([
 ]);
 
 /** A number of the JSON grammar. */
-const NUMBER = /-?(?:0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/y;
+const NUMBER =
+  /-?(?:0|[1-9][0-9]*)(?<fraction>\.[0-9]+)?(?<exponent>[eE][+-]?[0-9]+)?/uy;
 
 /** The hexadecimal digits of a \u escape, and their form. */
 const ESCAPE_DIGITS = 4;
-const HEX_ESCAPE = /^[0-9a-fA-F]{4}$/;
+const HEX_ESCAPE = /^[0-9a-fA-F]{4}$/u;
 
 /** The reader of one text. */
 class Reader {
@@ -200,7 +201,11 @@ class Reader {
       this.#fail("no value starts here");
     }
     this.#at += match[0].length;
-    if (match[1] === undefined && match[2] === undefined) {
+    const { fraction, exponent } = match.groups as {
+      readonly fraction: string | undefined;
+      readonly exponent: string | undefined;
+    };
+    if (fraction === undefined && exponent === undefined) {
       return BigInt(match[0]);
     }
     return Number(match[0]);

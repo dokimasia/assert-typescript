@@ -9,6 +9,7 @@ import { describe, onTestFinished, vi } from "vitest";
 import { check, fault } from "../../src/index.js";
 import type { Seat } from "../../src/matcher/seat.js";
 import { Running } from "../../src/matcher/verdict.js";
+import { compareText } from "../../src/order.js";
 import type { Case } from "../../src/prop/case.js";
 import { FOR_ALL } from "../../src/prop/detail.js";
 import { encode } from "../../src/prop/engine/token.js";
@@ -625,9 +626,9 @@ describe("property", () => {
           ...new Set(
             records(recorder)
               .slice(1)
-              .map((one) => one["phase"]),
+              .map((one) => one["phase"] as string),
           ),
-        ].sort(),
+        ].sort(compareText),
         ["explain", "random", "replay", "shrink", "simplest"],
         "the wrapper runs the cases of every phase",
       );

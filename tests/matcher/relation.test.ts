@@ -152,7 +152,7 @@ describe("relation", () => {
         ),
       );
 
-      expect(seat.failures[0]?.where?.file).toMatch(/relation\.test\.ts$/);
+      expect(seat.failures[0]?.where?.file).toMatch(/relation\.test\.ts$/u);
     });
   });
 

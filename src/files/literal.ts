@@ -28,7 +28,7 @@ import {
 import { check, compareBytes, pathsOf } from "./tree.js";
 
 /** The text of bytes: lowercase hexadecimal, two digits per byte. */
-const HEX_TEXT = /^(?:[0-9a-f]{2})*$/;
+const HEX_TEXT = /^(?:[0-9a-f]{2})*$/u;
 
 /** The members that state the kind of an entry, of which an entry states exactly one. */
 const KIND_MEMBERS = ["text", "bytes", "directory", "link", "digest"] as const;

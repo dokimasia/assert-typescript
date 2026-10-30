@@ -10,6 +10,7 @@ import { describe } from "vitest";
 import { SPECS } from "../../../src/conformance/history/specs.js";
 import { CallOperation, type Operation, type Spec } from "../../../src/history/spec.js";
 import { check } from "../../../src/index.js";
+import { compareText } from "../../../src/order.js";
 import { test as it } from "../../../src/vitest.js";
 import { thrown } from "../../helpers.js";
 
@@ -295,7 +296,7 @@ describe("specs", () => {
     it("states the six named specs of the definition", ({ seat }) => {
       check.isEqualTo(
         seat,
-        [...SPECS.keys()].sort(),
+        [...SPECS.keys()].sort(compareText),
         ["cas-register", "key-value", "lossy-register", "queue", "register", "set"],
         "the names",
       );

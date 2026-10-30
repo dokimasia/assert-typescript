@@ -62,7 +62,11 @@ describe("inspect", () => {
         give: new Date(0),
         want: "1970-01-01T00:00:00.000Z",
       },
-      { name: "returns a regular expression as its literal", give: /x/g, want: "/x/g" },
+      {
+        name: "returns a regular expression as its literal",
+        give: /x/gu,
+        want: "/x/gu",
+      },
       {
         name: "returns an error as its name with its message",
         give: new TypeError("boom"),

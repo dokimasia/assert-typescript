@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { checkProp, KINDS, settingsOf } from "../../../src/conformance/prop/vectors.js";
 import { vectors } from "../../../src/conformance/vector.js";
 import { Fault } from "../../../src/matcher/fault.js";
+import { compareText } from "../../../src/order.js";
 
 /** The property vectors of the definition, by id. */
 const VECTORS = new Map(vectors().map((v) => [v.id, v.raw]));
@@ -52,7 +53,7 @@ const DIGIT = { gen: "integer", min: 0, max: 9 };
 describe("vectors", () => {
   describe("KINDS", () => {
     it("states a runner of each kind of property vector", () => {
-      expect([...KINDS.keys()].sort()).toEqual([
+      expect([...KINDS.keys()].sort(compareText)).toEqual([
         "behaviour",
         "bridge",
         "coverage",

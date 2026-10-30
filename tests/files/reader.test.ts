@@ -18,6 +18,7 @@ import { bytes, directory, executable, link, text } from "../../src/files/entry.
 import { kindOfStats, readPath, readTree } from "../../src/files/reader.js";
 import { treeOf } from "../../src/files/tree.js";
 import { check } from "../../src/index.js";
+import { compareText } from "../../src/order.js";
 import { test as it } from "../../src/vitest.js";
 import {
   LONG_NAMES_ABSENT,
@@ -133,7 +134,7 @@ describe("reader", () => {
 
       check.isEqualTo(
         seat,
-        [...readTree(root, false).keys()].sort(),
+        [...readTree(root, false).keys()].sort(compareText),
         ["a.txt", "current", "keys", "keys/id", "run.sh"],
         "the paths",
       );

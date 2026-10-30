@@ -133,8 +133,8 @@
     {
       "path": "biome.json",
       "producer": "js",
-      "local": "2ab58407c972e7ca782f051dfb07d744657582e7205bd9359c6b91ba6d32994d",
-      "sha256": "11fedd256af36dbff3d4ffc64135c589ae62ce680c8e5ec7ba4e08c6b833e801"
+      "local": "82146e7cd0ab2a9d0c88168e5a24823be3f8f78eb22350c27aa640a6e860a7cb",
+      "sha256": "178b1a81d1bcab0db04150f859fa2a683a3f43f10aa6531ecf126ac8afb2693f"
     }
   ],
   "settings": {

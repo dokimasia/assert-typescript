@@ -87,6 +87,53 @@ function leafOf(node: Node): Converter {
   }
 }
 
+/** Returns the converter of a list whose elements of converts. */
+function listOf(of: Converter): Converter {
+  return {
+    to: (value) => (value as unknown[]).map(of.to),
+    back: (value) =>
+      Array.isArray(value) ? value.map(of.back) : refuse(value, "list"),
+  };
+}
+
+/** Returns the converter of a set whose elements of converts. */
+function setOf(of: Converter): Converter {
+  return {
+    to: (value) => new Set((value as unknown[]).map(of.to)),
+    back: (value) => {
+      if (value instanceof Set || Array.isArray(value)) {
+        return [...value].map(of.back);
+      }
+      return refuse(value, "set");
+    },
+  };
+}
+
+/** Returns the converter of a map whose keys key converts and whose values of converts. */
+function mapOf(key: Converter, of: Converter): Converter {
+  return {
+    to: (value) =>
+      new Map((value as Pairs).items.map(([k, v]) => [key.to(k), of.to(v)])),
+    back: (value) => {
+      if (!(value instanceof Pairs || value instanceof Map)) {
+        refuse(value, "map");
+      }
+      const items: readonly (readonly [unknown, unknown])[] =
+        value instanceof Pairs ? value.items : [...value];
+      return new Pairs(items.map(([k, v]) => [key.back(k), of.back(v)] as const));
+    },
+  };
+}
+
+/** Returns the converter of an optional value whose value of converts. */
+function optionalOf(of: Converter): Converter {
+  return {
+    to: (value) => (value === undefined ? undefined : of.to(value)),
+    back: (value) =>
+      value === undefined || value === null ? undefined : of.back(value),
+  };
+}
+
 /** The shapes of a shape file and the converters read so far. */
 class Walker {
   readonly #definitions: Readonly<Record<string, unknown>>;
@@ -126,16 +173,16 @@ class Walker {
     switch (node["shape"]) {
       case "list":
       case "fixed-list":
-        return this.#list(this.convert(node["of"] as Node));
+        return listOf(this.convert(node["of"] as Node));
       case "set":
-        return this.#set(this.convert(node["of"] as Node));
+        return setOf(this.convert(node["of"] as Node));
       case "map":
-        return this.#map(
+        return mapOf(
           this.convert(node["key"] as Node),
           this.convert(node["of"] as Node),
         );
       case "optional":
-        return this.#optional(this.convert(node["of"] as Node));
+        return optionalOf(this.convert(node["of"] as Node));
       case "record":
         return this.#record(node["fields"] as readonly (readonly [string, Node])[]);
       case "enum":
@@ -147,49 +194,6 @@ class Walker {
       default:
         return leafOf(node);
     }
-  }
-
-  #list(of: Converter): Converter {
-    return {
-      to: (value) => (value as unknown[]).map(of.to),
-      back: (value) =>
-        Array.isArray(value) ? value.map(of.back) : refuse(value, "list"),
-    };
-  }
-
-  #set(of: Converter): Converter {
-    return {
-      to: (value) => new Set((value as unknown[]).map(of.to)),
-      back: (value) => {
-        if (value instanceof Set || Array.isArray(value)) {
-          return [...value].map(of.back);
-        }
-        return refuse(value, "set");
-      },
-    };
-  }
-
-  #map(key: Converter, of: Converter): Converter {
-    return {
-      to: (value) =>
-        new Map((value as Pairs).items.map(([k, v]) => [key.to(k), of.to(v)])),
-      back: (value) => {
-        if (!(value instanceof Pairs || value instanceof Map)) {
-          refuse(value, "map");
-        }
-        const items: readonly (readonly [unknown, unknown])[] =
-          value instanceof Pairs ? value.items : [...value];
-        return new Pairs(items.map(([k, v]) => [key.back(k), of.back(v)] as const));
-      },
-    };
-  }
-
-  #optional(of: Converter): Converter {
-    return {
-      to: (value) => (value === undefined ? undefined : of.to(value)),
-      back: (value) =>
-        value === undefined || value === null ? undefined : of.back(value),
-    };
   }
 
   #record(fields: readonly (readonly [string, Node])[]): Converter {

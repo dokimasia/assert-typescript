@@ -164,10 +164,8 @@ describe("literal", () => {
         );
       });
     }
-  });
 
-  describe("decode", () => {
-    const tests: { name: string; give: Literal; want: string }[] = [
+    const refusals: { name: string; give: Literal; want: string }[] = [
       {
         name: "throws for a float name that the encoding does not define",
         give: { type: "float", value: "huge" },
@@ -265,7 +263,7 @@ describe("literal", () => {
       },
     ];
 
-    for (const tt of tests) {
+    for (const tt of refusals) {
       it(tt.name, ({ seat }) => {
         check.doesContain(
           seat,

@@ -10,6 +10,7 @@
 
 import { describe } from "vitest";
 import { check } from "../../../src/index.js";
+import { compareText } from "../../../src/order.js";
 import { type CampaignSettings, campaign } from "../../../src/prop/engine/campaign.js";
 import { Generating } from "../../../src/prop/engine/case/providers.js";
 import { Case, DECODE, type Decoder } from "../../../src/prop/engine/case.js";
@@ -279,12 +280,15 @@ describe("campaign", () => {
         [one.failing, ...one.others].map((execution) => execution?.failure?.identity),
       );
       const reported = [outcome.failing, ...outcome.others].map(
-        (execution) => execution?.failure?.identity,
+        (execution) => execution?.failure?.identity as string,
       );
 
       check.isEqualTo(
         seat,
-        [new Set(identities).size === identities.length, [...reported].sort()],
+        [
+          new Set(identities).size === identities.length,
+          [...reported].sort(compareText),
+        ],
         [true, ["high m", "high n", "zero n"]],
         "each identity once",
       );

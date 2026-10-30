@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
-import { describe, expect, it, onTestFinished } from "vitest";
+import { describe, expect, onTestFinished } from "vitest";
 import { isEmpty, isEqualTo, isTrue } from "../src/check/values.js";
 import type * as check from "../src/check.js";
 import { Controlled } from "../src/clock.js";
@@ -37,7 +37,7 @@ import { VARIABLE } from "../src/record/switch.js";
 import { Recorder, type Seat } from "../src/seat.js";
 import { clients } from "../src/stateful/option.js";
 import { uniform } from "../src/stateful/strategy.js";
-import { test } from "../src/vitest.js";
+import { test as it } from "../src/vitest.js";
 
 /** The key of `globalThis` under which the process keeps its reading of the switch. */
 const READING = Symbol.for("dokimi.assert.record.switch");
@@ -810,14 +810,14 @@ export function counter(): { raise: () => void; read: () => number } {
 export function formCases(rows: readonly FormRow[], contract: string): void {
   for (const row of rows) {
     describe(row.name, () => {
-      test("passes a property that is true for every input", async ({ seat }) => {
+      it("passes a property that is true for every input", async ({ seat }) => {
         const recorder = new Recorder();
         await row.passing(recorder);
 
         isEmpty(seat, recorder.failures, "no failure");
       });
 
-      test(`fails with a record of prop-${row.assertion} whose case failed ${row.assertion}`, async ({
+      it(`fails with a record of prop-${row.assertion} whose case failed ${row.assertion}`, async ({
         seat,
       }) => {
         const recorder = new Recorder();
@@ -834,7 +834,7 @@ export function formCases(rows: readonly FormRow[], contract: string): void {
 
       const { relaxed } = row;
       if (relaxed !== undefined) {
-        test("passes the relaxations to the assertion", async ({ seat }) => {
+        it("passes the relaxations to the assertion", async ({ seat }) => {
           const recorder = new Recorder();
           await relaxed(recorder);
 

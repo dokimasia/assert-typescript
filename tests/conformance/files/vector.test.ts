@@ -52,7 +52,7 @@ describe("vector", () => {
 
     it("refuses a literal that states no tree at the member", () => {
       expect(faultOf(() => treeAt({ type: "list" }, "workspace"))?.[0]).toMatch(
-        /^workspace/,
+        /^workspace/u,
       );
     });
   });
@@ -76,7 +76,7 @@ describe("vector", () => {
     });
 
     it("refuses an argument that is no typed literal at its position", () => {
-      expect(faultOf(() => valuesOf({ args: [5] }, 1))?.[0]).toMatch(/^args\[0\]/);
+      expect(faultOf(() => valuesOf({ args: [5] }, 1))?.[0]).toMatch(/^args\[0\]/u);
     });
   });
 

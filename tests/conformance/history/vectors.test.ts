@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { RUNNERS } from "../../../src/conformance/history/vectors.js";
 import { vectors } from "../../../src/conformance/vector.js";
 import { Fault } from "../../../src/matcher/fault.js";
+import { compareText } from "../../../src/order.js";
 
 /** The history vectors of the definition, by id. */
 const VECTORS = new Map(
@@ -65,7 +66,7 @@ const FAILING = "linearizable/a-read-after-a-completed-write-misses-it";
 describe("vectors", () => {
   describe("RUNNERS", () => {
     it("states a runner of each kind of history vector", () => {
-      expect([...RUNNERS.keys()].sort()).toEqual([
+      expect([...RUNNERS.keys()].sort(compareText)).toEqual([
         "linearizable",
         "seam",
         "serializable",

@@ -39,8 +39,8 @@ const NON_FINITE: ReadonlyMap<string, number> = new Map([
 const SCALARS = new Set(["bool", "int", "float", "string"]);
 
 /** The form of a decimal integer, and the form of lowercase hexadecimal bytes. */
-const DECIMAL = /^-?[0-9]+$/;
-const HEX_BYTES = /^(?:[0-9a-f]{2})*$/;
+const DECIMAL = /^-?[0-9]+$/u;
+const HEX_BYTES = /^(?:[0-9a-f]{2})*$/u;
 
 /** Returns the JSON text of a value, for an error's message. */
 function shown(value: unknown): string {

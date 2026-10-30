@@ -27,6 +27,7 @@
  * its states and the candidates that the spec rejected there.
  */
 
+import { compareText } from "../order.js";
 import { type Ending, type Limit, SpecError, type Verdict } from "./ending.js";
 import type { Config } from "./option.js";
 import type { Checked } from "./partition.js";
@@ -262,7 +263,7 @@ export class Search<S> {
   /** Stores a configuration, and reports whether the memo lacked it. */
   #remember(done: bigint, states: S[]): boolean {
     this.#calling = "key";
-    const keys = [...new Set(states.map(this.#key))].sort();
+    const keys = [...new Set(states.map(this.#key))].sort(compareText);
     const name = `${done.toString(HEX_RADIX)}|${JSON.stringify(keys)}`;
     const bucket = this.#memo.get(name) ?? [];
     this.#calling = "equal";

@@ -56,7 +56,7 @@ const SENTENCES = new Map<string, (failure: Failure) => string>();
  * file, then its line and its column. A frame without a line, such as that
  * of a built-in function, has none.
  */
-const FRAME = /(?:\(|^at (?:async )?)(?<file>[^()]+?):(?<line>\d+):\d+\)?$/;
+const FRAME = /(?:\(|^at (?:async )?)(?<file>[^()]+?):(?<line>\d+):\d+\)?$/u;
 
 /**
  * Returns the path of a frame's file with the separators of the platform.

@@ -28,14 +28,14 @@ interface Platform {
 const POSIX: Platform = {
   recordedBits: 0o777,
   // A target is stored as written, so the pattern matches nothing.
-  namespace: /(?!)/,
+  namespace: /(?!)/u,
   modeFault: undefined,
 };
 
 /** Windows, whose paths separate names with a backslash. */
 const WINDOWS: Platform = {
   recordedBits: 0,
-  namespace: /^\\\\\?\\/,
+  namespace: /^\\\\\?\\/u,
   modeFault: "the file system records no permission bits",
 };
 

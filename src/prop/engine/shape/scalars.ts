@@ -67,7 +67,7 @@ const FLOAT_MAX: Readonly<Record<Width, number>> = {
 };
 
 /** The text form of a decimal bound. */
-const DECIMAL = /^-?\d+(\.\d+)?$/;
+const DECIMAL = /^-?\d+(?:\.\d+)?$/u;
 
 /** Returns the generator of exactly count bytes. */
 function fixedBytes(count: number): Bytes {

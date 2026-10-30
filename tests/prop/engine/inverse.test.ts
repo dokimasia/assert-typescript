@@ -9,6 +9,7 @@
 
 import { describe } from "vitest";
 import { check } from "../../../src/index.js";
+import { compareText } from "../../../src/order.js";
 import { Generating, Replaying } from "../../../src/prop/engine/case/providers.js";
 import { Rejected } from "../../../src/prop/engine/case/signals.js";
 import { Case, DECODE } from "../../../src/prop/engine/case.js";
@@ -93,7 +94,7 @@ function replayed(generator: Generator<unknown>, choices: readonly Choice[]): un
 /** Returns the canonical text of a value, a set's elements in no order. */
 function textOf(value: unknown, unordered: boolean): string {
   return unordered
-    ? [...(value as unknown[]).map(canonical)].sort().join(";")
+    ? [...(value as unknown[]).map(canonical)].sort(compareText).join(";")
     : canonical(value);
 }
 
@@ -773,7 +774,7 @@ describe("inverse", () => {
       seat,
     }) => {
       const parsed = new Mapped(DIGIT, String, (text: string) => {
-        if (!/^[0-9]$/.test(text)) {
+        if (!/^[0-9]$/u.test(text)) {
           throw new SyntaxError(`${text} is no digit`);
         }
         return BigInt(text);

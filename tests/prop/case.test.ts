@@ -519,12 +519,13 @@ describe("case", () => {
     }) => {
       const { c } = caseOn();
       const order: string[] = [];
+      const inner = (): void => {
+        order.push("inner");
+      };
       await ending(c, (one) => {
         one.cleanup(() => {
           order.push("outer");
-          one.cleanup(() => {
-            order.push("inner");
-          });
+          one.cleanup(inner);
         });
       });
 

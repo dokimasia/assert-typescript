@@ -12,6 +12,7 @@
  * bits.
  */
 
+import { compareText } from "../../order.js";
 import { bitsOf, NAN_BITS } from "./float.js";
 
 /** The ids that canonical gives the values it cannot compare by value. */
@@ -31,7 +32,7 @@ function identityOf(value: WeakKey): string {
 
 /** Returns the canonical text of each element of values, sorted. */
 function sorted(values: Iterable<string>): string {
-  return [...values].sort().join(",");
+  return [...values].sort(compareText).join(",");
 }
 
 /** Returns the canonical text of an object. */

@@ -38,25 +38,51 @@ const MAX_DURATION_NS = INT64_MAX;
 const MAX_OFFSET = 64_800n;
 
 /** The text forms of a date, a time of day, and a date and time. */
-const DATE = /^(\d{4})-(\d\d)-(\d\d)$/;
-const TIME = /^(\d\d):(\d\d):(\d\d)(?:\.(\d{1,9}))?$/;
-const DATE_TIME = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,9}))?(Z?)$/;
+const DATE = /^(?<year>\d{4})-(?<month>\d\d)-(?<day>\d\d)$/u;
+const TIME =
+  /^(?<hour>\d\d):(?<minute>\d\d):(?<second>\d\d)(?:\.(?<digits>\d{1,9}))?$/u;
+const DATE_TIME =
+  /^(?<year>\d{4})-(?<month>\d\d)-(?<day>\d\d)T(?<hour>\d\d):(?<minute>\d\d):(?<second>\d\d)(?:\.(?<digits>\d{1,9}))?(?<zone>Z?)$/u;
+
+/** The fields of a date that DATE matches. */
+interface DateFields {
+  readonly year: string;
+  readonly month: string;
+  readonly day: string;
+}
+
+/** The fields of a time of day that TIME matches, with the digits of its fraction. */
+interface TimeFields {
+  readonly hour: string;
+  readonly minute: string;
+  readonly second: string;
+  readonly digits: string | undefined;
+}
+
+/** The fields of a date and time that DATE_TIME matches, with its zone: Z or the empty text. */
+interface DateTimeFields extends DateFields, TimeFields {
+  readonly zone: string;
+}
+
+/** Returns the fields that pattern matches in text, and undefined for text that it does not match. */
+function fieldsOf<F>(pattern: RegExp, text: unknown): F | undefined {
+  return (typeof text === "string" ? pattern.exec(text)?.groups : undefined) as
+    | F
+    | undefined;
+}
 
 /** Returns the generator of an instant at the stated unit. */
 export function instantShape(_reader: Reader, node: Node, where: string): InstantShape {
   const per = unitOf(node, where);
   const parse = (text: unknown): Pair => {
-    const match = typeof text === "string" ? DATE_TIME.exec(text) : null;
-    if (match === null || match[8] !== "Z") {
+    const fields = fieldsOf<DateTimeFields>(DATE_TIME, text);
+    if (fields === undefined || fields.zone !== "Z") {
       throw new ShapeError(`prop: ${where} bound ${shown(text)} is no instant in UTC`);
     }
-    const [, year, month, day, hour, minute, second, digits] =
-      match as unknown as string[];
-    const days = dayOf(year as string, month as string, day as string, where);
+    const days = dayOf(fields.year, fields.month, fields.day, where);
     const seconds =
-      days * SECONDS_PER_DAY +
-      timeOf(hour as string, minute as string, second as string, where);
-    return [seconds, fractionUnits(digits, per, where)];
+      days * SECONDS_PER_DAY + timeOf(fields.hour, fields.minute, fields.second, where);
+    return [seconds, fractionUnits(fields.digits, per, where)];
   };
   const [lo, hi] = pairBounds(
     node,
@@ -77,11 +103,11 @@ export function dateShape(
   where: string,
 ): Generator<unknown> {
   const parse = (text: unknown): bigint => {
-    const match = typeof text === "string" ? DATE.exec(text) : null;
-    if (match === null) {
+    const fields = fieldsOf<DateFields>(DATE, text);
+    if (fields === undefined) {
       throw new ShapeError(`prop: ${where} bound ${shown(text)} is no date`);
     }
-    return dayOf(match[1] as string, match[2] as string, match[3] as string, where);
+    return dayOf(fields.year, fields.month, fields.day, where);
   };
   return new Integer(bounded(node, where, [FIRST_DAY, LAST_DAY], parse));
 }
@@ -94,17 +120,12 @@ export function timeOfDayShape(
 ): Generator<unknown> {
   const per = unitOf(node, where);
   const parse = (text: unknown): bigint => {
-    const match = typeof text === "string" ? TIME.exec(text) : null;
-    if (match === null) {
+    const fields = fieldsOf<TimeFields>(TIME, text);
+    if (fields === undefined) {
       throw new ShapeError(`prop: ${where} bound ${shown(text)} is no time of day`);
     }
-    const seconds = timeOf(
-      match[1] as string,
-      match[2] as string,
-      match[3] as string,
-      where,
-    );
-    return seconds * per + fractionUnits(match[4], per, where);
+    const seconds = timeOf(fields.hour, fields.minute, fields.second, where);
+    return seconds * per + fractionUnits(fields.digits, per, where);
   };
   return new Integer(bounded(node, where, [0n, SECONDS_PER_DAY * per - 1n], parse));
 }
@@ -117,17 +138,15 @@ export function localShape(
 ): LocalDateTimeShape {
   const per = unitOf(node, where);
   const parse = (text: unknown): Pair => {
-    const match = typeof text === "string" ? DATE_TIME.exec(text) : null;
-    if (match === null || match[8] !== "") {
+    const fields = fieldsOf<DateTimeFields>(DATE_TIME, text);
+    if (fields === undefined || fields.zone !== "") {
       throw new ShapeError(
         `prop: ${where} bound ${shown(text)} is no local date and time`,
       );
     }
-    const [, year, month, day, hour, minute, second, digits] =
-      match as unknown as string[];
-    const days = dayOf(year as string, month as string, day as string, where);
-    const seconds = timeOf(hour as string, minute as string, second as string, where);
-    return [days, seconds * per + fractionUnits(digits, per, where)];
+    const days = dayOf(fields.year, fields.month, fields.day, where);
+    const seconds = timeOf(fields.hour, fields.minute, fields.second, where);
+    return [days, seconds * per + fractionUnits(fields.digits, per, where)];
   };
   const fallback: readonly [Pair, Pair] = [
     [FIRST_DAY, 0n],

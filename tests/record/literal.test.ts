@@ -221,7 +221,7 @@ describe("literal", () => {
       { name: "returns undefined for an error", give: new Error("e"), want: undefined },
       {
         name: "returns undefined for a regular expression",
-        give: /x/,
+        give: /x/u,
         want: undefined,
       },
       {

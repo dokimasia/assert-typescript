@@ -26,17 +26,17 @@ const START = "<!-- api-reference:start -->";
 const END = "<!-- api-reference:end -->";
 
 /** A declared function of a declaration file, and the void return of a signature. */
-const DECLARED_FUNCTION = /^(export )?declare function (\w+)(.*);$/;
-const VOID_RETURN = /: void$/;
+const FUNCTION_LINE = /^(?:export )?declare function (?<name>\w+)(?<signature>.*);$/u;
+const VOID_RETURN = /: void$/u;
 
 /** The export of a local function under another name. */
-const EXPORT_ALIAS = /^export \{ (\w+) as (\w+) \};$/;
+const EXPORT_ALIAS = /^export \{ (?<local>\w+) as (?<exported>\w+) \};$/u;
 
 /** A name that starts with a capital, as the name of a class does. */
-const CAPITALISED = /^[A-Z]/;
+const CAPITALISED = /^[A-Z]/u;
 
 /** A public method of a class in a declaration file. */
-const METHOD = /^ {4}(\w+)(<[^(]*>)?(\(.*\)): (.+);$/;
+const METHOD = /^ {4}(?<name>\w+)(?<generic><[^(]*>)?(?<params>\(.*\)): (?<type>.+);$/u;
 
 /** A family of functions: its title, what it states, and the names of its functions. */
 type Family = readonly [title: string, blurb: string, names: readonly string[]];
@@ -84,19 +84,19 @@ function declaredIn(file: string): Map<string, string[]> {
   const found = new Map<string, string[]>();
   const local = new Map<string, string[]>();
   for (const line of readFileSync(join(ROOT, "dist", file), "utf8").split("\n")) {
-    const match = DECLARED_FUNCTION.exec(line.trim());
-    if (match?.[2] !== undefined && match[3] !== undefined) {
+    const declared = FUNCTION_LINE.exec(line.trim())?.groups;
+    if (declared !== undefined) {
       // Almost every function returns void, so a reference that states it
       // on every line hides the few that return a value worth reading.
-      const signature = match[3].replace(VOID_RETURN, "");
-      const into = match[1] === undefined ? local : found;
-      into.set(match[2], [...(into.get(match[2]) ?? []), signature]);
+      const { name = "", signature = "" } = declared;
+      const into = line.trim().startsWith("export ") ? found : local;
+      into.set(name, [...(into.get(name) ?? []), signature.replace(VOID_RETURN, "")]);
     }
     // A function whose name a module format reserves, such as require,
     // has a local name and an export under its own name.
-    const alias = EXPORT_ALIAS.exec(line.trim());
-    if (alias?.[1] !== undefined && alias[2] !== undefined) {
-      found.set(alias[2], local.get(alias[1]) ?? []);
+    const alias = EXPORT_ALIAS.exec(line.trim())?.groups;
+    if (alias !== undefined) {
+      found.set(alias["exported"] as string, local.get(alias["local"] as string) ?? []);
     }
   }
   return found;
@@ -161,7 +161,7 @@ async function signatures(
 function methods(file: string, className: string, names?: readonly string[]): string[] {
   const lines = readFileSync(join(ROOT, "dist", file), "utf8").split("\n");
 
-  const declared = new RegExp(`declare (abstract )?class ${className}\\b`);
+  const declared = new RegExp(`declare (?:abstract )?class ${className}\\b`, "u");
   const at = lines.findIndex((l) => declared.test(l));
   if (at < 0) {
     return [];
@@ -172,11 +172,11 @@ function methods(file: string, className: string, names?: readonly string[]): st
     if (line.startsWith("}")) {
       break;
     }
-    const match = METHOD.exec(line);
-    const name = match?.[1];
+    const method = METHOD.exec(line)?.groups;
+    const name = method?.["name"];
     if (name !== undefined && (names === undefined || names.includes(name))) {
       rendered.push(
-        `${className}.${name}${match?.[2] ?? ""}${match?.[3]}: ${match?.[4]}`,
+        `${className}.${name}${method?.["generic"] ?? ""}${method?.["params"]}: ${method?.["type"]}`,
       );
     }
   }

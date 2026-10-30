@@ -9,7 +9,7 @@ import { Fault } from "../matcher/fault.js";
 import { directory, type Entry, kindOf } from "./entry.js";
 
 /** A backslash or NUL, which no name of a path contains. */
-const FORBIDDEN_IN_NAME = /[\\\0]/;
+const FORBIDDEN_IN_NAME = /[\\\0]/u;
 
 /** Reports whether target is UTF-8 text without NUL that is not empty. */
 function isTarget(target: string): boolean {

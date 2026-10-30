@@ -43,7 +43,7 @@ const SEED_BYTES = 8;
 const MILLISECONDS_PER_SECOND = 1000;
 
 /** The text of a whole number in decimal. */
-const DIGITS = /^[0-9]+$/;
+const DIGITS = /^[0-9]+$/u;
 
 /** Returns the value of a variable, or undefined for an unset or empty one. */
 function variable(name: string): string | undefined {

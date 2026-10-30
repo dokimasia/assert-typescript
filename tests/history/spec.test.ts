@@ -178,7 +178,7 @@ describe("spec", () => {
       },
       {
         name: "two regular expressions of one source",
-        give: [/a+/g, /a+/g],
+        give: [/a+/gu, /a+/gu],
         want: true,
       },
       { name: "a number and a string", give: [1, "1"], want: false },

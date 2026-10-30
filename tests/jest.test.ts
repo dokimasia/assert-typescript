@@ -272,7 +272,7 @@ describe("jest", () => {
         ],
       ] as const;
       for (const [title, message] of refusals) {
-        it(`${title.replace(/^refuses/, "fails the call of")} with the assertion to call`, () => {
+        it(`${title.replace(/^refuses/u, "fails the call of")} with the assertion to call`, () => {
           expect(
             resultOf("strict", "refusals.fixture.cjs", title).failureMessages[0],
           ).toContain(message);

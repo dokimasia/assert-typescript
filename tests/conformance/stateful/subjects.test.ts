@@ -14,6 +14,7 @@ import {
   type Subject,
 } from "../../../src/conformance/stateful/subjects.js";
 import { check } from "../../../src/index.js";
+import { compareText } from "../../../src/order.js";
 import { swarm } from "../../../src/stateful/option.js";
 import { test as it } from "../../../src/vitest.js";
 import { MACHINE_SETUP as DEFAULT, machineOutcome } from "../../helpers.js";
@@ -28,7 +29,7 @@ describe("subjects", () => {
     it("states the seven machine subjects of the definition", ({ seat }) => {
       check.isEqualTo(
         seat,
-        [...SUBJECTS.keys()].sort(),
+        [...SUBJECTS.keys()].sort(compareText),
         [
           "correct-counter",
           "correct-queue",

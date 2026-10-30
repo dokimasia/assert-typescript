@@ -11,7 +11,7 @@
  * flag and a range of one element consume nothing.
  */
 
-import { type FloatBounds, IntegerBounds, type SequenceBounds } from "./choice.js";
+import { type FloatBounds, IntegerBounds, min, type SequenceBounds } from "./choice.js";
 import {
   DOUBLE,
   fromBits,
@@ -171,7 +171,7 @@ export function integer(source: Source, bounds: IntegerBounds): bigint {
   }
   const span = up ? bounds.hi - target : target - bounds.lo;
   const cap = OFFSET_CAPS[Number(source.below(BigInt(OFFSET_CAPS.length)))] as bigint;
-  const offset = source.below((span < cap - 1n ? span : cap - 1n) + 1n);
+  const offset = source.below(min(span, cap - 1n) + 1n);
   return up ? target + offset : target - offset;
 }
 

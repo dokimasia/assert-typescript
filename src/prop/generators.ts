@@ -37,7 +37,7 @@ import {
 } from "./engine/generator.js";
 
 /** The prefix of the message of an error of the engine. */
-const PREFIX = /^prop: /;
+const PREFIX = /^prop: /u;
 
 /** Returns the bigint of an integer that a number states, which must be safe. */
 function exact(call: string, value: number | bigint): bigint {

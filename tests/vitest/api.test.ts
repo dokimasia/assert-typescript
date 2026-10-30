@@ -23,7 +23,7 @@ import { test as it, RECORDS, register } from "../../src/vitest/api.js";
 import { setRecording, temporary } from "../helpers.js";
 
 /** The end of the path of this spec, with either separator. */
-const SPEC = /[/\\]tests[/\\]vitest[/\\]api\.test\.ts$/;
+const SPEC = /[/\\]tests[/\\]vitest[/\\]api\.test\.ts$/u;
 
 /** Returns the names of the members of target and of its prototypes. */
 function membersOf(target: object): string[] {
@@ -310,10 +310,9 @@ describe("api", () => {
       it("starts no guard for a call in a finished hook of the test", () => {
         pristine();
         register();
+        const refused = (): Promise<never> => Promise.reject(new Error("refused"));
         onTestFinished(async () => {
-          await expect(() => Promise.reject(new Error("refused"))).rejectsWith(
-            "the call of the hook is refused",
-          );
+          await expect(refused).rejectsWith("the call of the hook is refused");
         });
       });
 
@@ -411,8 +410,9 @@ describe("api", () => {
       it("refuses toThrow under .not with the negative to call", () => {
         pristine();
         register({ mode: "strict" });
+        const quiet = (): undefined => undefined;
 
-        expect(thrownBy(() => expect(() => undefined).not.toThrow())).toBe(
+        expect(thrownBy(() => expect(quiet).not.toThrow())).toBe(
           "not.toThrow is refused in strict mode. Call doesNotThrow instead.",
         );
       });

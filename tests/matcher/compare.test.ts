@@ -200,14 +200,14 @@ describe("compare", () => {
       },
       {
         name: "returns true for regular expressions of one source with the same flags",
-        giveGot: /x/g,
-        giveWant: /x/g,
+        giveGot: /x/gu,
+        giveWant: /x/gu,
         want: true,
       },
       {
         name: "returns false for regular expressions whose flags differ",
-        giveGot: /x/g,
-        giveWant: /x/i,
+        giveGot: /x/gu,
+        giveWant: /x/iu,
         want: false,
       },
       {

@@ -257,7 +257,7 @@ describe("files", () => {
         });
 
         expect(fault).toMatch(
-          /^expect: the check ends as error \(files\.absent: the entry cannot be read: ENAMETOOLONG.*\), want pass$/,
+          /^expect: the check ends as error \(files\.absent: the entry cannot be read: ENAMETOOLONG.*\), want pass$/u,
         );
       },
     );
@@ -272,7 +272,7 @@ describe("files", () => {
           { workspace: A_FILE, args: [string("a")], expect: "pass" },
           dir,
         ),
-      ).toMatch(/^workspace\.workspace: the entry cannot be written: EEXIST/);
+      ).toMatch(/^workspace\.workspace: the entry cannot be written: EEXIST/u);
     });
 
     it.skipIf(UNENFORCED)(
@@ -284,7 +284,7 @@ describe("files", () => {
           expect: "pass",
         });
 
-        expect(fault).toMatch(/^subject: the subject fails: EACCES/);
+        expect(fault).toMatch(/^subject: the subject fails: EACCES/u);
       },
     );
 
@@ -305,7 +305,7 @@ describe("files", () => {
 
         expect(
           await faultOf("golden-match-tree", golden(goldenArgs(false), A_FILE), dir),
-        ).toMatch(/^golden\.testdata: the entry cannot be written: EEXIST/);
+        ).toMatch(/^golden\.testdata: the entry cannot be written: EEXIST/u);
       });
 
       it("throws the fault of a golden tree after the update that differs from the vector's", async () => {
@@ -334,7 +334,7 @@ describe("files", () => {
             dir,
           ),
         ).toMatch(
-          /^after: the golden tree cannot be read: the tree cannot be read: ENOENT/,
+          /^after: the golden tree cannot be read: the tree cannot be read: ENOENT/u,
         );
       });
     });

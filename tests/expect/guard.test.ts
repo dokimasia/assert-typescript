@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import { Call, Pending } from "../../src/expect/guard.js";
 
 /** The end of the path of this spec, with either separator. */
-const SPEC = /[/\\]tests[/\\]expect[/\\]guard\.test\.ts:\d+:\d+/;
+const SPEC = /[/\\]tests[/\\]expect[/\\]guard\.test\.ts:\d+:\d+/u;
 
 describe("guard", () => {
   describe("new Call", () => {
@@ -61,7 +61,7 @@ describe("guard", () => {
     it("returns an error without frames of the library", () => {
       const stack = String(new Call("completesWithin").neverAwaited().stack);
 
-      expect(stack).not.toMatch(/[/\\]src[/\\]expect[/\\]/);
+      expect(stack).not.toMatch(/[/\\]src[/\\]expect[/\\]/u);
     });
   });
 

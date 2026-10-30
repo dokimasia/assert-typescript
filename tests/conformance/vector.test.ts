@@ -14,6 +14,7 @@ import {
   type Vector,
   vectors,
 } from "../../src/conformance/vector.js";
+import { compareText } from "../../src/order.js";
 import { enter, temporary, WINDOWS } from "../helpers.js";
 
 const VECTORS = vectors();
@@ -63,15 +64,17 @@ const PROP_KINDS = [
  */
 function skipped(v: Vector): boolean {
   const modes =
-    v.kind === "has-mode" || /"(?:mode|executable)":/.test(JSON.stringify(v.raw));
+    v.kind === "has-mode" || /"(?:mode|executable)":/u.test(JSON.stringify(v.raw));
   return (WINDOWS && modes) || skipOf(v) !== undefined;
 }
 
 describe("vector", () => {
   describe("vectors", () => {
     it("returns the vectors of every family that this library runs", () => {
-      expect([...new Set(VECTORS.map((v) => v.kind))].sort()).toEqual(
-        [...FILE_KINDS, ...HISTORY_KINDS, ...PROP_KINDS, ...STATEFUL_KINDS].sort(),
+      expect([...new Set(VECTORS.map((v) => v.kind))].sort(compareText)).toEqual(
+        [...FILE_KINDS, ...HISTORY_KINDS, ...PROP_KINDS, ...STATEFUL_KINDS].sort(
+          compareText,
+        ),
       );
     });
 

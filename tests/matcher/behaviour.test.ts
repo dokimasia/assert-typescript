@@ -109,7 +109,7 @@ describe("behaviour", () => {
         "it stops when told",
       );
 
-      expect(seat.failures[0]?.where?.file).toMatch(/behaviour\.test\.ts$/);
+      expect(seat.failures[0]?.where?.file).toMatch(/behaviour\.test\.ts$/u);
       expect(records(seat)[0]?.["where"]).toEqual({
         file: "behaviour.test.ts",
         line: expect.any(Number),

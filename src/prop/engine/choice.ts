@@ -29,7 +29,7 @@ import {
 } from "./float.js";
 
 /** Returns the smaller of two integers. */
-function min(a: bigint, b: bigint): bigint {
+export function min(a: bigint, b: bigint): bigint {
   return a < b ? a : b;
 }
 

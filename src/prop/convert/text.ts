@@ -9,16 +9,15 @@
 import { type Converter, refuse } from "./converter.js";
 
 /** The text of a UUID, and of an IPv4 address. */
-const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const IPV4_TEXT =
-  /^(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})$/;
-const DECIMAL_TEXT = /^(-?)(\d+)(?:\.(\d+))?$/;
+const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+const IPV4_TEXT = /^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/u;
+const DECIMAL_TEXT = /^(?<sign>-?)(?<integral>\d+)(?:\.(?<fraction>\d+))?$/u;
 
 /** The five groups of the 32 hexadecimal digits of a UUID. */
-const UUID_GROUPS = /^(.{8})(.{4})(.{4})(.{4})(.{12})$/;
+const UUID_GROUPS = /^(?<a>.{8})(?<b>.{4})(?<c>.{4})(?<d>.{4})(?<e>.{12})$/u;
 
 /** A digit other than 0. */
-const NONZERO = /[^0]/;
+const NONZERO = /[^0]/u;
 
 /** The radix of the groups of an IPv6 address. */
 const HEX_RADIX = 16;
@@ -82,7 +81,7 @@ function ipv6Bytes(text: string): Uint8Array | undefined {
 export const UUID: Converter = {
   to: (value) => {
     const hex = Buffer.from(value as Uint8Array).toString("hex");
-    return hex.replace(UUID_GROUPS, "$1-$2-$3-$4-$5");
+    return hex.replace(UUID_GROUPS, "$<a>-$<b>-$<c>-$<d>-$<e>");
   },
   back: (value) => {
     if (value instanceof Uint8Array) {
@@ -108,9 +107,8 @@ export const IP_ADDRESS: Converter = {
     if (typeof value !== "string") {
       refuse(value, "ip-address");
     }
-    const dotted = IPV4_TEXT.exec(value);
-    if (dotted !== null) {
-      const octets = dotted.slice(1).map(Number);
+    if (IPV4_TEXT.test(value)) {
+      const octets = value.split(".").map(Number);
       if (octets.every((octet) => octet <= OCTET_MAX)) {
         return Uint8Array.from(octets);
       }
@@ -142,12 +140,15 @@ export function decimalOf(scale: number): Converter {
       if (parts === null) {
         refuse(value, "decimal");
       }
-      const [, sign, integral, fraction = ""] = parts as unknown as [
-        string,
-        string,
-        string,
-        string?,
-      ];
+      const {
+        sign,
+        integral,
+        fraction = "",
+      } = (parts as RegExpExecArray).groups as {
+        readonly sign: string;
+        readonly integral: string;
+        readonly fraction?: string;
+      };
       if (NONZERO.test(fraction.slice(scale))) {
         throw new RangeError(
           `prop: ${value} has more digits than the scale of ${scale}`,

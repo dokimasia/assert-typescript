@@ -188,7 +188,8 @@
       "linter": {
         "rules": {
           "suspicious": {
-            "noMisplacedAssertion": "off"
+            "noMisplacedAssertion": "off",
+            "useExpect": "off"
           }
         }
       }
@@ -265,6 +266,29 @@
         "rules": {
           "style": {
             "noExcessiveClassesPerFile": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "useThisInClassMethods": {
+              "level": "error",
+              "options": {
+                "ignoreClassesWithImplements": "public-fields",
+                "ignoreMethods": [
+                  "assume",
+                  "fail",
+                  "key",
+                  "skip"
+                ]
+              }
+            }
           }
         }
       }

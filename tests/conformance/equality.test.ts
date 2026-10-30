@@ -73,10 +73,8 @@ describe("equality", () => {
         );
       });
     }
-  });
 
-  describe("canonical", () => {
-    const tests: { name: string; give: unknown; want: string }[] = [
+    const texts: { name: string; give: unknown; want: string }[] = [
       { name: "returns null for undefined", give: undefined, want: "null" },
       { name: "returns the text of a boolean", give: true, want: "bool:true" },
       {
@@ -95,11 +93,11 @@ describe("equality", () => {
         give: Promise.resolve(),
         want: "",
       },
-      { name: "returns the empty text for a regular expression", give: /x/, want: "" },
+      { name: "returns the empty text for a regular expression", give: /x/u, want: "" },
       { name: "returns the empty text for a function", give: () => 1, want: "" },
     ];
 
-    for (const tt of tests) {
+    for (const tt of texts) {
       it(tt.name, ({ seat }) => {
         check.isEqualTo(seat, canonical(tt.give), tt.want, "the canonical text");
       });
