@@ -541,6 +541,7 @@ prop.explain(enabled: boolean): Option
 prop.workers(n: number): Option
 prop.hermetic(): Option
 prop.around(wrapper: Wrapper): Option
+prop.onResult(f: (result: Result) => void): Option
 prop.draws(entries: string): Option
 prop.using<T>(generator: Generator<T>): FormOption
 prop.example<T>(...values: readonly T[]): FormOption
@@ -770,6 +771,21 @@ under the profile `ci`, it returns the seed that a run derives from the
 contract. Otherwise each call returns a new random seed. A tool that runs
 many properties under one seed passes `prop.seed` of the result to each
 run.
+
+`prop.onResult(f)` hands the `prop.Result` of each run to `f`. The call
+runs `f` after the run ends and before it reports its verdict, so `f` also
+receives the result of a run that fails the test. The result has the
+eleven fields of the detail of the run, such as the outcome, the counts of
+valid and rejected cases, the seed and the counterexample of a failing
+case. A tool that runs many properties writes them into a record of its
+own:
+
+```ts
+const results: prop.Result[] = [];
+await prop.forAll(seat, "a write is read back", writeRead, prop.onResult((result) => {
+  results.push(result);
+}));
+```
 
 `prop.around` runs each run of the body inside a wrapper, so that every
 case, shrink candidate and replay starts in a fresh environment, such as

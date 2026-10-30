@@ -11,7 +11,7 @@ import type { Seat } from "../../src/matcher/seat.js";
 import { Running } from "../../src/matcher/verdict.js";
 import { compareText } from "../../src/order.js";
 import type { Case } from "../../src/prop/case.js";
-import { FOR_ALL } from "../../src/prop/detail.js";
+import { FOR_ALL, type Result } from "../../src/prop/detail.js";
 import { encode } from "../../src/prop/engine/token.js";
 import { TraceError } from "../../src/prop/engine/trace.js";
 import {
@@ -28,6 +28,7 @@ import {
   draws,
   hermetic,
   type Option,
+  onResult,
   replay,
   seed,
   shrink,
@@ -244,6 +245,98 @@ describe("property", () => {
         [recorder.failed, call?.["verdict"], detail?.["outcome"], detail?.["reason"]],
         [false, "skip", "skipped", "the environment lacks a capability"],
         "a skip",
+      );
+    });
+
+    it("hands the result of the run to the function of onResult once", async ({
+      seat,
+    }) => {
+      const results: Result[] = [];
+      await runOn(
+        new Recorder(),
+        PASSES,
+        onResult((result) => {
+          results.push(result);
+        }),
+      );
+
+      check.isEqualTo(
+        seat,
+        results.map((result) => [
+          result.outcome,
+          result.cases,
+          result.rejected,
+          result.seed,
+        ]),
+        [["passed", 10, 0, 1n]],
+        "one result of the run",
+      );
+    });
+
+    it("hands the result before the call record is written", async ({ seat }) => {
+      const recorder = new Recorder();
+      const written: number[] = [];
+      await runOn(
+        recorder,
+        PASSES,
+        onResult(() => {
+          written.push(records(recorder).length);
+        }),
+      );
+
+      check.isEqualTo(
+        seat,
+        [written, records(recorder).length],
+        [[0], 1],
+        "the call record of the property follows the function",
+      );
+    });
+
+    it("does not hand a result for a run that a fault of a case ends", async ({
+      seat,
+    }) => {
+      const recorder = new Recorder();
+      const results: Result[] = [];
+      await runOn(
+        recorder,
+        (c) => {
+          c.draw(integer(0, 9), "x");
+          fault(c, new Error("the environment lacks the resource"));
+        },
+        onResult((result) => {
+          results.push(result);
+        }),
+      );
+
+      check.isEqualTo(
+        seat,
+        [results, recorder.faults.length],
+        [[], 1],
+        "the fault ends the call without a result",
+      );
+    });
+
+    it("hands the result to the function of the later of two onResult options", async ({
+      seat,
+    }) => {
+      const first: Result[] = [];
+      const later: Result[] = [];
+      await runOn(
+        new Recorder(),
+        PASSES,
+        onResult((result) => {
+          first.push(result);
+        }),
+        onResult((result) => {
+          later.push(result);
+        }),
+      );
+
+      check.isEqualTo(
+        seat,
+        [first.length, later.length],
+        [0, 1],
+        "the later function alone receives the result",
       );
     });
 

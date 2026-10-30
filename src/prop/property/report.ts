@@ -9,27 +9,36 @@
 import { Mode } from "../../matcher/seat.js";
 import type { Running } from "../../matcher/verdict.js";
 import { detailJson } from "../detail/json.js";
-import { detailOf, recordOf } from "../detail.js";
+import { detailOf, type Result, recordOf, resultOf } from "../detail.js";
 import type { Outcome } from "../engine/tally.js";
 import type { Call } from "../property.js";
 
 /**
- * Reports the outcome as the verdict of the call running. A skipped run
+ * Reports the outcome as the verdict of the call running. onResult receives
+ * the result of the run before the call reports its verdict. A skipped run
  * skips the test of a seat that skips its test.
  *
  * @param running - The call.
  * @param call - The property's call.
  * @param outcome - The outcome of the run.
+ * @param onResult - The function of the option onResult, or undefined.
  */
-export function reportOutcome(running: Running, call: Call, outcome: Outcome): void {
+export function reportOutcome(
+  running: Running,
+  call: Call,
+  outcome: Outcome,
+  onResult?: (result: Result) => void,
+): void {
   const { assertion, contract, where } = call;
+  const detail = detailOf(outcome);
+  onResult?.(resultOf(outcome, detail));
   if (outcome.kind === "passed") {
     running.passRun(
       Mode.Fatal,
       assertion,
       contract,
       where,
-      detailJson(outcome, detailOf(outcome)),
+      detailJson(outcome, detail),
     );
     return;
   }
@@ -39,11 +48,11 @@ export function reportOutcome(running: Running, call: Call, outcome: Outcome): v
       assertion,
       contract,
       where,
-      detailJson(outcome, detailOf(outcome)),
+      detailJson(outcome, detail),
       outcome.reason as string,
     );
     return;
   }
-  const { failure, json } = recordOf(outcome, assertion, contract, where);
+  const { failure, json } = recordOf(outcome, detail, assertion, contract, where);
   running.failRun(Mode.Fatal, failure, json);
 }

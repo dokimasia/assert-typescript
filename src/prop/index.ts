@@ -28,7 +28,9 @@
  * them. {@link values} returns the values of a generator for a seed,
  * outside a property. {@link runSeed} returns the seed that a run takes
  * without the option {@link seed}, so a tool can run many properties under
- * one seed.
+ * one seed. {@link onResult} hands the {@link Result} of each run to a
+ * function, so a tool reads the counts, the seed and the counterexample of
+ * each run.
  *
  * A failing run keeps its minimal case in the store of the test, under
  * `testdata/prop`, and later runs replay it first.
@@ -41,6 +43,7 @@ import { FORM_IDS } from "./form.js";
 registerSentences([FOR_ALL, ...FORM_IDS]);
 
 export { Case } from "./case.js";
+export type { Result } from "./detail.js";
 export { Generator } from "./engine/generator.js";
 export { runSeed } from "./environment.js";
 export { forAll } from "./forall.js";
@@ -121,6 +124,7 @@ export {
   hermetic,
   maxChoices,
   type Option,
+  onResult,
   replay,
   require,
   seed,

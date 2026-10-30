@@ -16,6 +16,7 @@ import {
   explain,
   hermetic,
   maxChoices,
+  onResult,
   replay,
   require as requirement,
   seed,
@@ -31,6 +32,9 @@ import { thrown } from "../helpers.js";
 
 /** A wrapper that runs the body without an environment. */
 const PLAIN = (run: () => Promise<void>): Promise<void> => run();
+
+/** A function that takes the result of a run and does nothing with it. */
+const RECEIVE = (): void => undefined;
 
 describe("option", () => {
   describe("cases", () => {
@@ -279,6 +283,26 @@ describe("option", () => {
     });
   });
 
+  describe("onResult", () => {
+    it("returns the option of the function that receives each result", ({ seat }) => {
+      check.isEqualTo(
+        seat,
+        onResult(RECEIVE),
+        { kind: "on-result", value: RECEIVE },
+        "the function",
+      );
+    });
+
+    it("throws a TypeError for a value that is no function", ({ seat }) => {
+      check.isEqualTo(
+        seat,
+        thrown(() => onResult(null as never)),
+        "prop: onResult(null) states no function",
+        "onResult refuses null",
+      );
+    });
+  });
+
   describe("draws", () => {
     it("returns the option of the entries of a case", ({ seat }) => {
       check.isEqualTo(seat, draws("[]"), { kind: "draws", value: "[]" }, "no entry");
@@ -337,6 +361,7 @@ describe("option", () => {
           explain: true,
           hermetic: false,
           around: undefined,
+          onResult: undefined,
           draws: undefined,
         },
         "the defaults",
@@ -360,6 +385,7 @@ describe("option", () => {
           workers(2),
           hermetic(),
           around(PLAIN),
+          onResult(RECEIVE),
           draws("[]"),
         ]),
         {
@@ -377,6 +403,7 @@ describe("option", () => {
           explain: false,
           hermetic: true,
           around: PLAIN,
+          onResult: RECEIVE,
           draws: "[]",
         },
         "each setting, with the requirements in order and the workers ignored",

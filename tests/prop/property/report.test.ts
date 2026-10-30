@@ -6,7 +6,7 @@
 import { describe } from "vitest";
 import { check } from "../../../src/index.js";
 import { Running } from "../../../src/matcher/verdict.js";
-import { FOR_ALL } from "../../../src/prop/detail.js";
+import { FOR_ALL, type Result } from "../../../src/prop/detail.js";
 import { type Outcome, Tally } from "../../../src/prop/engine/tally.js";
 import { adapt } from "../../../src/prop/property/body.js";
 import { reportOutcome } from "../../../src/prop/property/report.js";
@@ -83,6 +83,55 @@ describe("report", () => {
         [failure?.assertion, failure?.contract, failure?.caseFailure?.assertion],
         [FOR_ALL, "c", "true"],
         "the record of the property",
+      );
+    });
+
+    it("hands the result of a pass to the function of onResult", ({ seat }) => {
+      const results: Result[] = [];
+      reportOutcome(
+        Running.begin(new Recorder(), WHERE),
+        CALL,
+        new Tally(1n).outcome("passed"),
+        (result) => {
+          results.push(result);
+        },
+      );
+
+      check.isEqualTo(
+        seat,
+        results.map((result) => [result.outcome, result.seed]),
+        [["passed", 1n]],
+        "one result of the pass",
+      );
+    });
+
+    it("hands the result before the seat receives the failure", async ({ seat }) => {
+      const failing = await executed(
+        adapt(
+          new Recorder(),
+          undefined,
+          (c) => check.isTrue(c, false, "x is below 5"),
+          CALL,
+          undefined,
+        ),
+        [],
+      );
+      const recorder = new Recorder();
+      const failed: boolean[] = [];
+      reportOutcome(
+        Running.begin(recorder, WHERE),
+        CALL,
+        new Tally(1n).take(failing) as Outcome,
+        () => {
+          failed.push(recorder.failed);
+        },
+      );
+
+      check.isEqualTo(
+        seat,
+        [failed, recorder.failed],
+        [[false], true],
+        "the seat receives the failure after the function returns",
       );
     });
   });

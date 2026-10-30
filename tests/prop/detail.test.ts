@@ -6,7 +6,7 @@
 import { describe } from "vitest";
 import { Failure } from "../../src/failure.js";
 import { check } from "../../src/index.js";
-import { detailOf, FOR_ALL, recordOf } from "../../src/prop/detail.js";
+import { detailOf, FOR_ALL, recordOf, resultOf } from "../../src/prop/detail.js";
 import { Replaying } from "../../src/prop/engine/case/providers.js";
 import { Failed } from "../../src/prop/engine/case/signals.js";
 import { Case } from "../../src/prop/engine/case.js";
@@ -296,10 +296,82 @@ describe("detail", () => {
     });
   });
 
+  describe("resultOf", () => {
+    it("returns the counts and the seed of a run that passed", ({ seat }) => {
+      const run = outcome("passed");
+
+      check.isEqualTo(
+        seat,
+        resultOf(run, detailOf(run)),
+        {
+          outcome: "passed",
+          cases: 3,
+          rejected: 1,
+          seed: 7n,
+          counterexample: null,
+          failure: null,
+          choices: null,
+          others: null,
+          divergence: null,
+          coverage: null,
+          reason: null,
+        },
+        "the counts and the seed alone",
+      );
+    });
+
+    it("returns the seed of the run as a bigint", ({ seat }) => {
+      const run = { ...outcome("passed"), seed: 2n ** 64n - 1n };
+
+      check.isEqualTo(
+        seat,
+        resultOf(run, detailOf(run)).seed,
+        2n ** 64n - 1n,
+        "the largest seed, which the detail states as text",
+      );
+    });
+
+    it("returns the values of the detail of a counterexample", ({ seat }) => {
+      const detail = detailOf(COUNTEREXAMPLE);
+      const result = resultOf(COUNTEREXAMPLE, detail);
+
+      check.isEqualTo<unknown[]>(
+        seat,
+        [
+          result.outcome,
+          result.counterexample,
+          result.failure,
+          result.choices,
+          result.others,
+        ],
+        [
+          detail["outcome"],
+          detail["counterexample"],
+          detail["failure"],
+          detail["choices"],
+          detail["others"],
+        ],
+        "the values of the detail",
+      );
+    });
+
+    it("returns the reason of a run that skipped", ({ seat }) => {
+      const run = outcome("skipped", { reason: "unsupported" });
+
+      check.isEqualTo(
+        seat,
+        resultOf(run, detailOf(run)).reason,
+        "unsupported",
+        "the reason",
+      );
+    });
+  });
+
   describe("recordOf", () => {
     it("returns the record of a run at the property's call", ({ seat }) => {
       const { failure, json } = recordOf(
         COUNTEREXAMPLE,
+        detailOf(COUNTEREXAMPLE),
         FOR_ALL,
         "every total is positive",
         WHERE,

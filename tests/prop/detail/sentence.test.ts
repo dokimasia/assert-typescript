@@ -72,6 +72,7 @@ describe("sentence", () => {
     it("returns the sentence of every part of a counterexample", ({ seat }) => {
       const { failure } = recordOf(
         COUNTEREXAMPLE,
+        detailOf(COUNTEREXAMPLE),
         FOR_ALL,
         "every total is positive",
         WHERE,
@@ -104,7 +105,7 @@ describe("sentence", () => {
           { label: "x", value: 5, anyValueFails: true, nearest: undefined },
         ],
       });
-      const { failure } = recordOf(run, FOR_ALL, "c", WHERE);
+      const { failure } = recordOf(run, detailOf(run), FOR_ALL, "c", WHERE);
 
       check.containsInOrder(
         seat,
@@ -131,7 +132,7 @@ describe("sentence", () => {
 
       check.containsInOrder(
         seat,
-        sentence(recordOf(run, FOR_ALL, "c", WHERE).failure),
+        sentence(recordOf(run, detailOf(run), FOR_ALL, "c", WHERE).failure),
         ["\nfailure: it broke"],
         "the message",
       );
@@ -168,12 +169,8 @@ describe("sentence", () => {
       ] as const;
       for (const tt of tests) {
         it(`states the divergence of ${tt.name}`, ({ seat }) => {
-          const { failure } = recordOf(
-            flaky(tt.give as Divergence),
-            FOR_ALL,
-            "c",
-            WHERE,
-          );
+          const run = flaky(tt.give as Divergence);
+          const { failure } = recordOf(run, detailOf(run), FOR_ALL, "c", WHERE);
 
           check.hasSuffix(seat, sentence(failure), tt.want, "the divergence");
         });
@@ -189,7 +186,7 @@ describe("sentence", () => {
           verdict: "unmet",
         },
       });
-      const { failure } = recordOf(run, FOR_ALL, "c", WHERE);
+      const { failure } = recordOf(run, detailOf(run), FOR_ALL, "c", WHERE);
 
       check.isEqualTo(
         seat,

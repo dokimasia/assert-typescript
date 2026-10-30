@@ -198,6 +198,7 @@
         "workers",
         "hermetic",
         "around",
+        "onResult",
         "draws",
         "using",
         "example",

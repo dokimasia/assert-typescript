@@ -20,7 +20,8 @@
  * vitest does when the test times out, and then writes no store entry.
  *
  * A property with the option around runs each run of its body inside the
- * option's wrapper.
+ * option's wrapper. A property with the option onResult hands the result of
+ * each run to the option's function before it reports the run.
  */
 
 import type { Where } from "../failure.js";
@@ -29,6 +30,7 @@ import { Mode, type Seat } from "../matcher/seat.js";
 import type { Running } from "../matcher/verdict.js";
 import { Faulted } from "./case/state.js";
 import type { Case } from "./case.js";
+import type { Result } from "./detail.js";
 import { claim, type Loaded, load, storeOf } from "./directory.js";
 import { Bridging } from "./engine/bridge.js";
 import { campaign } from "./engine/campaign.js";
@@ -92,6 +94,8 @@ export class Property {
   readonly #dir: string;
   /** The wrapper of each run of the body, or undefined. */
   readonly #around: Wrapper | undefined;
+  /** The function that receives the result of each run, or undefined. */
+  readonly #onResult: ((result: Result) => void) | undefined;
 
   private constructor(
     call: Call,
@@ -101,6 +105,7 @@ export class Property {
     replay: readonly Choice[] | undefined,
     dir: string,
     around: Wrapper | undefined,
+    onResult: ((result: Result) => void) | undefined,
   ) {
     this.call = call;
     this.#settings = settings;
@@ -109,6 +114,7 @@ export class Property {
     this.#replay = replay;
     this.#dir = dir;
     this.#around = around;
+    this.#onResult = onResult;
   }
 
   /**
@@ -156,6 +162,7 @@ export class Property {
       replayOf(config),
       storeOf(seat, config.store),
       config.around,
+      config.onResult,
     );
   }
 
@@ -190,7 +197,7 @@ export class Property {
       );
       const outcome = await this.#drive(running, replayed);
       if (outcome !== undefined) {
-        reportOutcome(running, this.call, outcome);
+        reportOutcome(running, this.call, outcome, this.#onResult);
       }
       return;
     }
@@ -220,7 +227,7 @@ export class Property {
     for (const fault of [...storeFaults(this.#dir, loaded, outcome), ...saved]) {
       note(seat, this.call.op, fault);
     }
-    reportOutcome(running, this.call, outcome);
+    reportOutcome(running, this.call, outcome, this.#onResult);
   }
 
   /**
@@ -261,7 +268,7 @@ export class Property {
     for (const fault of storeFaults(this.#dir, loaded, outcome)) {
       note(seat, this.call.op, fault);
     }
-    reportOutcome(running, this.call, outcome);
+    reportOutcome(running, this.call, outcome, this.#onResult);
   }
 
   /**
@@ -305,7 +312,7 @@ export class Property {
         note(seat, this.call.op, fault);
       }
     }
-    reportOutcome(running, this.call, outcome);
+    reportOutcome(running, this.call, outcome, this.#onResult);
   }
 
   /**

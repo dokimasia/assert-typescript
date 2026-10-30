@@ -20,7 +20,7 @@ import type { Bounds } from "./engine/choice.js";
 import { plain } from "./engine/encoding.js";
 import type { Divergence as EngineDivergence, Execution } from "./engine/execution.js";
 import type { Explained } from "./engine/shrink/explain.js";
-import type { Outcome } from "./engine/tally.js";
+import type { Kind, Outcome } from "./engine/tally.js";
 import { encode } from "./engine/token.js";
 import { entries, isStep } from "./engine/trace.js";
 import { fromKey, textOf } from "./identity.js";
@@ -188,6 +188,37 @@ export interface Shortfall {
 }
 
 /**
+ * The result of one run of a property: the eleven fields of the detail of
+ * the run. onResult hands it to a function when the run ends. A field that
+ * the outcome does not use is null. The record of the run has the same
+ * values, and its call record states the seed as decimal text.
+ */
+export interface Result {
+  /** How the run ended. */
+  readonly outcome: Kind;
+  /** The number of valid cases. */
+  readonly cases: number;
+  /** The number of rejected cases. */
+  readonly rejected: number;
+  /** The seed of the run, which the option seed takes. */
+  readonly seed: bigint;
+  /** The draws and the steps of the failing case of a counterexample or a flaky run, in request order. */
+  readonly counterexample: readonly Entry[] | null;
+  /** The failure record of the failing case. */
+  readonly failure: Failure | null;
+  /** The replay token of a counterexample, which the option replay takes. A counterexample of values has none. */
+  readonly choices: string | null;
+  /** The other failures of a counterexample. */
+  readonly others: readonly Other[] | null;
+  /** What differed first in a flaky run. */
+  readonly divergence: Divergence | null;
+  /** The coverage requirement that the run refuted or left unmet. */
+  readonly coverage: Shortfall | null;
+  /** The reason of a skipped run. */
+  readonly reason: string | null;
+}
+
+/**
  * Returns the detail of a run's record, each field with its value, and null
  * for a field that the outcome does not use.
  *
@@ -232,11 +263,36 @@ export function detailOf(outcome: Outcome): Record<string, unknown> {
 }
 
 /**
+ * Returns the result of a run. The result shares the values of the detail,
+ * and its seed is the bigint of the run.
+ *
+ * @param outcome - The run's outcome.
+ * @param detail - The detail that detailOf returns for the outcome.
+ * @returns The result.
+ */
+export function resultOf(outcome: Outcome, detail: Record<string, unknown>): Result {
+  return {
+    outcome: outcome.kind,
+    cases: outcome.cases,
+    rejected: outcome.rejected,
+    seed: outcome.seed,
+    counterexample: detail["counterexample"] as readonly Entry[] | null,
+    failure: detail["failure"] as Failure | null,
+    choices: detail["choices"] as string | null,
+    others: detail["others"] as readonly Other[] | null,
+    divergence: detail["divergence"] as Divergence | null,
+    coverage: detail["coverage"] as Shortfall | null,
+    reason: detail["reason"] as string | null,
+  };
+}
+
+/**
  * Returns the record of a run that did not pass. A seat without records
  * reads the sentence that this module registers, which states the failing
  * case's notes after the detail.
  *
  * @param outcome - The run's outcome.
+ * @param detail - The detail that detailOf returns for the outcome.
  * @param assertion - The assertion of the record: prop-for-all, or a form's id.
  * @param contract - The property's contract.
  * @param where - The call site of the property.
@@ -244,11 +300,11 @@ export function detailOf(outcome: Outcome): Record<string, unknown> {
  */
 export function recordOf(
   outcome: Outcome,
+  detail: Record<string, unknown>,
   assertion: string,
   contract: string,
   where: Where | undefined,
 ): { readonly failure: Failure; readonly json: Record<string, unknown> } {
-  const detail = detailOf(outcome);
   const failure = new Failure(assertion, contract, detail, where);
   keepNotes(failure, outcome.failing?.case.notes ?? []);
   return { failure, json: detailJson(outcome, detail) };

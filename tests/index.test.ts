@@ -180,6 +180,42 @@ const DECLARED: Record<string, { file: string; text: string }> = {
     text: "readonly contract: string",
   },
   "case.cancellation": { file: "prop/case.d.ts", text: "readonly signal: AbortSignal" },
+  "run-result": { file: "prop/detail.d.ts", text: "export interface Result {" },
+  "run-result.outcome": { file: "prop/detail.d.ts", text: "readonly outcome: Kind" },
+  "run-result.cases": { file: "prop/detail.d.ts", text: "readonly cases: number" },
+  "run-result.rejected": {
+    file: "prop/detail.d.ts",
+    text: "readonly rejected: number",
+  },
+  "run-result.seed": { file: "prop/detail.d.ts", text: "readonly seed: bigint" },
+  "run-result.counterexample": {
+    file: "prop/detail.d.ts",
+    text: "readonly counterexample: readonly Entry[] | null",
+  },
+  "run-result.failure": {
+    file: "prop/detail.d.ts",
+    text: "readonly failure: Failure | null",
+  },
+  "run-result.choices": {
+    file: "prop/detail.d.ts",
+    text: "readonly choices: string | null",
+  },
+  "run-result.others": {
+    file: "prop/detail.d.ts",
+    text: "readonly others: readonly Other[] | null",
+  },
+  "run-result.divergence": {
+    file: "prop/detail.d.ts",
+    text: "readonly divergence: Divergence | null",
+  },
+  "run-result.coverage": {
+    file: "prop/detail.d.ts",
+    text: "readonly coverage: Shortfall | null",
+  },
+  "run-result.reason": {
+    file: "prop/detail.d.ts",
+    text: "readonly reason: string | null",
+  },
   scrubber: { file: "golden/scrub.d.ts", text: "export type Scrubber" },
   tree: { file: "files/tree.d.ts", text: "export type Tree" },
   event: { file: "history/event.d.ts", text: "export type Event = " },

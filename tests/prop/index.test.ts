@@ -89,6 +89,7 @@ describe("index", () => {
         "nullHandleSafe",
         "of",
         "ofShape",
+        "onResult",
         "oneOf",
         "optional",
         "pairwise",

@@ -9,10 +9,11 @@ import { describe } from "vitest";
 import { check } from "../../src/index.js";
 import { nameTest } from "../../src/matcher/seat.js";
 import type { Case } from "../../src/prop/case.js";
+import type { Result } from "../../src/prop/detail.js";
 import { forAll } from "../../src/prop/forall.js";
 import { fuzz } from "../../src/prop/fuzz.js";
 import { bytes } from "../../src/prop/generators/collections.js";
-import { hermetic, seed, store } from "../../src/prop/option.js";
+import { hermetic, onResult, seed, store } from "../../src/prop/option.js";
 import { AssertionFailed, Recorder } from "../../src/seat.js";
 import { test as it } from "../../src/vitest.js";
 import { enter, records, setVariable, temporary } from "../helpers.js";
@@ -42,6 +43,33 @@ describe("fuzz", () => {
       await target(Uint8Array.of(1, 1));
 
       check.isEmpty(seat, recorder.failures, "the replay of no stored case passes");
+    });
+
+    it("hands the result of each call to the function of onResult", async ({
+      seat,
+    }) => {
+      const results: Result[] = [];
+      const target = await fuzz(
+        new Recorder(),
+        "no leading seven",
+        noLeadingSeven,
+        hermetic(),
+        seed(1n),
+        onResult((result) => {
+          results.push(result);
+        }),
+      );
+      await target(Uint8Array.of(1, 1));
+
+      check.isEqualTo(
+        seat,
+        results.map((result) => [result.outcome, result.cases]),
+        [
+          ["passed", 0],
+          ["passed", 1],
+        ],
+        "the result of the replay of the empty store, then the result of the input",
+      );
     });
 
     it("returns a target that rejects a failing input with the sentence of its counterexample", async ({

@@ -12,6 +12,7 @@
  */
 
 import type { Option as Relaxation } from "../matcher/option.js";
+import type { Result } from "./detail.js";
 import { MAX_CHOICES } from "./engine/case.js";
 import type { Generator } from "./engine/generator.js";
 import { DEFAULT_CASES } from "./engine/settings.js";
@@ -51,6 +52,8 @@ function apply(config: Config, option: Option): Config {
       return { ...config, hermetic: true };
     case "around":
       return { ...config, around: option.value };
+    case "on-result":
+      return { ...config, onResult: option.value };
     default:
       return { ...config, draws: option.value };
   }
@@ -116,6 +119,7 @@ export type Option =
   | { readonly kind: "workers"; readonly value: number }
   | { readonly kind: "hermetic" }
   | { readonly kind: "around"; readonly value: Wrapper }
+  | { readonly kind: "on-result"; readonly value: (result: Result) => void }
   | { readonly kind: "draws"; readonly value: string };
 
 /** An option that only a property form takes: the generator of its input, or its examples. */
@@ -129,7 +133,8 @@ export type FormOption = Option | Relaxation | FormOnly;
 
 /**
  * What the options of one run state. A setting that no option states has
- * its default, and seed, replay, store, around and draws are undefined.
+ * its default, and seed, replay, store, around, onResult and draws are
+ * undefined.
  */
 export interface Config {
   readonly cases: number;
@@ -143,6 +148,7 @@ export interface Config {
   readonly explain: boolean;
   readonly hermetic: boolean;
   readonly around: Wrapper | undefined;
+  readonly onResult: ((result: Result) => void) | undefined;
   readonly draws: string | undefined;
 }
 
@@ -167,6 +173,7 @@ export function configure(options: readonly Option[]): Config {
     explain: true,
     hermetic: false,
     around: undefined,
+    onResult: undefined,
     draws: undefined,
   };
   for (const option of options) {
@@ -370,6 +377,34 @@ export function hermetic(): Option {
  */
 export function around(wrapper: Wrapper): Option {
   return { kind: "around", value: wrapper };
+}
+
+/**
+ * Hands the result of each run to f. A call of forAll, of a property form
+ * or of fuzz calls f once for each run. It calls f after the run ends and
+ * before the call reports its verdict, so the notes of the failing case, the
+ * call record, and the failure or the skip that the seat receives all come
+ * after f returns. fuzz calls f for the replay of the stored cases and for
+ * each input.
+ *
+ * A run that a fault ends does not call f, and neither does a call that a
+ * fault ends before its run. An error that f throws passes through the
+ * call, and the call does not report a verdict. Given more than once, the
+ * last f applies.
+ *
+ * The result shares its entries, its failure records and its other failures
+ * with the record that the call reports after f returns, so f must not
+ * change them.
+ *
+ * @param f - The function that receives each result.
+ * @returns The option.
+ * @throws TypeError for an f that is no function.
+ */
+export function onResult(f: (result: Result) => void): Option {
+  if (typeof f !== "function") {
+    throw new TypeError(`prop: onResult(${String(f)}) states no function`);
+  }
+  return { kind: "on-result", value: f };
 }
 
 /**
