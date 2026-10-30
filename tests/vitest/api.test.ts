@@ -12,6 +12,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, chai, describe, expect, onTestFinished } from "vitest";
+import { writeRecord } from "../../src/artifact.js";
 import * as check from "../../src/check.js";
 import { NAMES } from "../../src/expect/matchers.js";
 import type { Failure } from "../../src/failure.js";
@@ -523,6 +524,19 @@ describe("api", () => {
       check.isTrue(seat, true, "the flag is set");
 
       expect(task.meta).not.toHaveProperty(RECORDS);
+    });
+
+    it("writes each record of another kind into the task meta with recording off", ({
+      seat,
+      task,
+    }) => {
+      writeRecord(seat, "dokimi.suite", '{"seed":"7"}');
+      writeRecord(seat, "dokimi.suite", '{"seed":"8"}');
+
+      expect((task.meta as Record<string, unknown>)["dokimi.suite"]).toEqual([
+        { seed: "7" },
+        { seed: "8" },
+      ]);
     });
 
     describe("with recording on", () => {

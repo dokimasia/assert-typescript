@@ -111,6 +111,21 @@ async function served(seat: Seat): Promise<Server> {
 }
 ```
 
+`writeRecord(seat, kind, record)` writes a record of another tool of
+dokimasia into the task meta of the test, under the key `kind`. vitest's
+JSON reporter writes the meta of each test. The kind matches
+`dokimi\.[a-z][a-z0-9-]*`. Only the seat of the vitest fixture has a test,
+so the call does not write on any other seat:
+
+```ts
+import { writeRecord } from "@dokimi/assert";
+import { test } from "@dokimi/assert/vitest";
+
+test("ledger suite", ({ seat }) => {
+  writeRecord(seat, "dokimi.suite", JSON.stringify({ suite: "ledger", seed: "7" }));
+});
+```
+
 A fault that ends the check of `doesReject` ends the call of
 `doesReject` with the same fault, because the check did not decide about
 the implementation.
@@ -504,9 +519,10 @@ prop.registerValues<T>(name: string, ...values: readonly T[])
 prop.registerVariants(name: string, variants: Readonly<Record<string, string | undefined>>)
 ```
 
-**Values of a seed** — The values of a generator for a seed, outside a property. A benchmark that takes its inputs from them measures the same inputs on every run.
+**Seeds and values** — The seed that a run takes without the option seed, and the values of a generator for a seed outside a property. A benchmark that takes its inputs from the values measures the same inputs on every run.
 
 ```ts
+prop.runSeed(seat: Seat, contract: string): bigint
 prop.values<T>(generator: Generator<T>, seed: bigint | number, n: number): T[]
 ```
 
@@ -746,6 +762,14 @@ the text of a shape file instead.
 cases of a seed, which are the same in every implementation of the
 standard. A benchmark takes its inputs from it, so every run measures the
 same inputs.
+
+`prop.runSeed(seat, contract)` returns the seed that a run of `contract`
+takes without `prop.seed`. It returns the value of
+`DOKIMI_ASSERT_PROP_SEED` when the variable is set. In a mutation run and
+under the profile `ci`, it returns the seed that a run derives from the
+contract. Otherwise each call returns a new random seed. A tool that runs
+many properties under one seed passes `prop.seed` of the result to each
+run.
 
 `prop.around` runs each run of the body inside a wrapper, so that every
 case, shrink candidate and replay starts in a fresh environment, such as

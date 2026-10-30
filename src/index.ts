@@ -24,6 +24,7 @@
  */
 
 export { allocsChecked } from "./allocs.js";
+export { writeRecord } from "./artifact.js";
 export * as bench from "./bench.js";
 export * as check from "./check.js";
 export { cleanup } from "./cleanup.js";

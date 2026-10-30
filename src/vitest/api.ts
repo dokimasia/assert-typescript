@@ -26,12 +26,15 @@
  * call into the array under the key `dokimi.assert` of the test's task
  * meta, one record per element, which vitest's JSON reporter writes for
  * each test. The reporter writes the report with `JSON.stringify`, which
- * writes a float's -0 as 0.
+ * writes a float's -0 as 0. writeRecord writes each record of another kind
+ * into the array under its kind of the same meta, and it ignores
+ * `DOKIMI_ASSERT_RECORD`.
  */
 
 import { relative, sep } from "node:path";
 import process from "node:process";
 import { test as base, chai, expect } from "vitest";
+import { attach, CALL_KIND } from "../artifact.js";
 import { type Call, Pending } from "../expect/guard.js";
 import { matchers, NAMES, type State } from "../expect/matchers.js";
 import { compare, open } from "../expect/shadow.js";
@@ -238,7 +241,7 @@ export function register(overlap: Overlap = { mode: "allow" }): void {
 }
 
 /** The key of a test's task meta under which the call records of the test are. */
-export const RECORDS = "dokimi.assert";
+export const RECORDS = CALL_KIND;
 
 /** What this adapter adds to a vitest test's context. */
 export interface SeatFixture {
@@ -257,10 +260,12 @@ export const test = base.extend<SeatFixture>({
   seat: async ({ task, signal, skip }, use) => {
     const collector = new TestSeat(skip).withSignal(signal);
     nameTest(collector, pathOf(task.file.filepath, task));
+    const meta = task.meta as Record<string, unknown>;
+    attach(collector, meta);
     const read = reading();
     if ("on" in read && read.on) {
       const records: unknown[] = [];
-      (task.meta as Record<string, unknown>)[RECORDS] = records;
+      meta[RECORDS] = records;
       write(own(collector), (_seq, line) => {
         records.push(JSON.parse(line));
       });

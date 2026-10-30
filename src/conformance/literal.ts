@@ -32,10 +32,10 @@ const SCALARS = new Set(["bool", "int", "float", "string"]);
 const SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 
 /** The text of a decimal integer. */
-const DECIMAL = /^-?[0-9]+$/;
+const DECIMAL = /^-?[0-9]+$/u;
 
 /** The text of bytes: lowercase hexadecimal, two digits per byte. */
-const HEX_TEXT = /^(?:[0-9a-f]{2})*$/;
+const HEX_TEXT = /^(?:[0-9a-f]{2})*$/u;
 
 /** Returns one of the three floats JSON cannot spell. */
 function named(text: string): number {
@@ -121,7 +121,9 @@ function bytes(value: unknown): Uint8Array {
   if (typeof value !== "string" || !HEX_TEXT.test(value)) {
     throw new Error(`bytes state ${JSON.stringify(value)}, no lowercase hexadecimal`);
   }
-  return Uint8Array.from(value.match(/../g) ?? [], (pair) => Number.parseInt(pair, 16));
+  return Uint8Array.from(value.match(/../gu) ?? [], (pair) =>
+    Number.parseInt(pair, 16),
+  );
 }
 
 /** One value, as a corpus case states it. */

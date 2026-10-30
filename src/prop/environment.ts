@@ -23,7 +23,8 @@
 
 import { randomBytes } from "node:crypto";
 import process from "node:process";
-import { Fault } from "../matcher/fault.js";
+import { end, Fault, ofOperation } from "../matcher/fault.js";
+import type { Seat } from "../matcher/seat.js";
 import { mix } from "./engine/source.js";
 
 /** The variable that a mutation run sets in every process that it instruments. */
@@ -124,6 +125,38 @@ export function seedOf(
     return mix(Buffer.from(contract, "utf8"));
   }
   return randomBytes(SEED_BYTES).readBigUInt64LE();
+}
+
+/**
+ * Returns the seed that a run of contract takes without the option seed.
+ * The run is not hermetic. runSeed returns the value of
+ * DOKIMI_ASSERT_PROP_SEED when the variable is set. In a process of a
+ * mutation run, and under the ci profile, it returns the seed that a run
+ * derives from the contract. Otherwise each call returns a new random seed.
+ * A caller that passes the result to seed in each of its runs gives every
+ * run the seed that its first run would take.
+ *
+ * A malformed DOKIMI_ASSERT_PROP_SEED and a profile other than default, ci
+ * and campaign end the call with a fault of prop.runSeed, as fault ends
+ * one. runSeed then returns 0n.
+ *
+ * @param seat - The seat of the call.
+ * @param contract - The property's contract.
+ * @returns The seed, or 0n after a fault.
+ * @throws The fault, for a malformed variable on a seat without
+ *   reportFault.
+ * @example
+ * const chosen = prop.seed(prop.runSeed(seat, "the suite of the ledger"));
+ * await prop.forAll(seat, "a write is read back", writeRead, chosen);
+ * await prop.forAll(seat, "a delete hides the key", deleteHides, chosen);
+ */
+export function runSeed(seat: Seat, contract: string): bigint {
+  try {
+    return seedOf(contract, undefined, false);
+  } catch (err) {
+    end(seat, ofOperation("prop.runSeed", err));
+    return 0n;
+  }
 }
 
 /**

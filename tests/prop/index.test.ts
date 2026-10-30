@@ -100,6 +100,7 @@ describe("index", () => {
         "replay",
         "require",
         "roundTrip",
+        "runSeed",
         "sampledFrom",
         "seed",
         "shapeOf",

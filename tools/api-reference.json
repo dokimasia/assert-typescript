@@ -178,9 +178,9 @@
       ["of", "ofShape", "shapeOf", "register", "registerValues", "registerVariants"]
     ],
     [
-      "Values of a seed",
-      "The values of a generator for a seed, outside a property. A benchmark that takes its inputs from them measures the same inputs on every run.",
-      ["values"]
+      "Seeds and values",
+      "The seed that a run takes without the option seed, and the values of a generator for a seed outside a property. A benchmark that takes its inputs from the values measures the same inputs on every run.",
+      ["runSeed", "values"]
     ],
     [
       "Property options",

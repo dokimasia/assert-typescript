@@ -15,7 +15,7 @@ import { plain } from "../../prop/engine/encoding.js";
 import * as literal from "../../prop/engine/literal.js";
 
 /** The text of a seed: decimal digits. */
-const DIGITS = /^[0-9]+$/;
+const DIGITS = /^[0-9]+$/u;
 
 /**
  * Returns the corpus form of one choice.

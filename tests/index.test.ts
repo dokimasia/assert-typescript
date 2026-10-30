@@ -351,6 +351,7 @@ describe("index", () => {
         "signalOf",
         "soft",
         "stateful",
+        "writeRecord",
       ],
       "the entry point exports these names",
     );

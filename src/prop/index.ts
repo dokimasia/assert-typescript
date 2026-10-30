@@ -26,7 +26,9 @@
  * {@link register}, {@link registerValues} and {@link registerVariants}
  * state them, and {@link of}, {@link shapeOf} and {@link ofShape} read
  * them. {@link values} returns the values of a generator for a seed,
- * outside a property.
+ * outside a property. {@link runSeed} returns the seed that a run takes
+ * without the option {@link seed}, so a tool can run many properties under
+ * one seed.
  *
  * A failing run keeps its minimal case in the store of the test, under
  * `testdata/prop`, and later runs replay it first.
@@ -40,6 +42,7 @@ registerSentences([FOR_ALL, ...FORM_IDS]);
 
 export { Case } from "./case.js";
 export { Generator } from "./engine/generator.js";
+export { runSeed } from "./environment.js";
 export { forAll } from "./forall.js";
 export {
   accumulates,
