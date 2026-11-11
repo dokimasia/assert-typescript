@@ -151,7 +151,12 @@ class Exploration {
     const outcome = yield* conclude(this.#body, this.#settings, found, this.#observer);
     if (outcome.kind === "flaky") {
       const parts = { failing: outcome.failing, divergence: outcome.divergence };
-      return { ...this.#tally.outcome("flaky", parts), stored: this.#stored };
+      return {
+        ...this.#tally.outcome("flaky", parts),
+        stored: this.#stored,
+        replays: outcome.replays,
+        reproduced: outcome.reproduced,
+      };
     }
     this.#identities.add(identity);
     const others: Execution[] = [];

@@ -16,6 +16,7 @@ import {
 import { check } from "../../../src/index.js";
 import { compareText } from "../../../src/order.js";
 import { swarm } from "../../../src/stateful/option.js";
+import { pct } from "../../../src/stateful/strategy.js";
 import { test as it } from "../../../src/vitest.js";
 import { MACHINE_SETUP as DEFAULT, machineOutcome } from "../../helpers.js";
 
@@ -26,7 +27,7 @@ function outcomeOf(name: string, setup: Setup): Promise<[unknown, unknown]> {
 
 describe("subjects", () => {
   describe("SUBJECTS", () => {
-    it("states the seven machine subjects of the definition", ({ seat }) => {
+    it("states the twelve machine subjects of the definition", ({ seat }) => {
       check.isEqualTo(
         seat,
         [...SUBJECTS.keys()].sort(compareText),
@@ -37,7 +38,12 @@ describe("subjects", () => {
           "counter-refuses-every-third",
           "queue-loses-on-wrap",
           "racy-counter",
+          "register-flushes",
+          "register-flushes-in-two-parts",
+          "spins-until-a-flag",
           "store-loses-on-crash",
+          "ticker",
+          "ticker-skips-its-first-tick",
         ],
         "the names",
       );
@@ -78,6 +84,31 @@ describe("subjects", () => {
         name: "counter-refuses-every-third",
         give: ["counter-refuses-every-third", { ...DEFAULT, steps: [swarm(false)] }],
         want: ["flaky", null],
+      },
+      {
+        name: "register-flushes-in-two-parts",
+        give: ["register-flushes-in-two-parts", DEFAULT],
+        want: ["counterexample", "linearizable"],
+      },
+      {
+        name: "register-flushes",
+        give: ["register-flushes", DEFAULT],
+        want: ["passed", null],
+      },
+      {
+        name: "ticker-skips-its-first-tick",
+        give: ["ticker-skips-its-first-tick", { ...DEFAULT, strategy: pct(1) }],
+        want: ["counterexample", "linearizable"],
+      },
+      {
+        name: "ticker",
+        give: ["ticker", { ...DEFAULT, strategy: pct(1) }],
+        want: ["passed", null],
+      },
+      {
+        name: "spins-until-a-flag",
+        give: ["spins-until-a-flag", { ...DEFAULT, maxReleases: 50 }],
+        want: ["counterexample", null],
       },
     ];
     for (const tt of tests) {

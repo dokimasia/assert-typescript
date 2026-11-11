@@ -155,6 +155,7 @@ export class Property {
       shrinkTime: config.shrinkTime,
       explain: config.explain,
       confirm: config.confirm,
+      replays: config.replays,
     };
     return new Property(
       call,

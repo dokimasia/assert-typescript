@@ -86,12 +86,12 @@ describe("vector", () => {
       expect(VECTORS.filter((v) => HISTORY_KINDS.includes(v.kind))).toHaveLength(112);
     });
 
-    it("returns the 441 property vectors of the definition", () => {
-      expect(VECTORS.filter((v) => PROP_KINDS.includes(v.kind))).toHaveLength(441);
+    it("returns the 445 property vectors of the definition", () => {
+      expect(VECTORS.filter((v) => PROP_KINDS.includes(v.kind))).toHaveLength(445);
     });
 
-    it("returns the 15 machines vectors of the definition", () => {
-      expect(VECTORS.filter((v) => STATEFUL_KINDS.includes(v.kind))).toHaveLength(15);
+    it("returns the 21 machines vectors of the definition", () => {
+      expect(VECTORS.filter((v) => STATEFUL_KINDS.includes(v.kind))).toHaveLength(21);
     });
 
     it("returns files vectors whose ids name their kinds first", () => {

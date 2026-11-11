@@ -197,6 +197,7 @@
         "explain",
         "workers",
         "confirm",
+        "replays",
         "hermetic",
         "around",
         "onResult",
@@ -229,7 +230,8 @@
     "concurrentMean",
     "tasks",
     "uniform",
-    "pct"
+    "pct",
+    "maxReleases"
   ],
   "golden": [
     "match",

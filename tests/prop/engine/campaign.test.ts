@@ -315,6 +315,29 @@ describe("campaign", () => {
       );
     });
 
+    it("states the replays of a failure that no replay reproduces", async ({
+      seat,
+    }) => {
+      let calls = 0;
+      const [outcome] = await explored(
+        body((c) => {
+          calls += 1;
+          c.draw(WIDE, "n");
+          if (calls === 1) {
+            c.fail("first");
+          }
+        }),
+        ticks(10, { stored: [integers(5n)], replays: 2 }),
+      );
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.replays, outcome.reproduced],
+        ["flaky", 2, 0],
+        "the flaky campaign states two replays and no reproduction",
+      );
+    });
+
     it("returns skipped at a case that skips before the first failure", async ({
       seat,
     }) => {

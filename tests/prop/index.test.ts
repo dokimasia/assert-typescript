@@ -23,6 +23,8 @@ const REJECTED = {
   divergence: null,
   coverage: null,
   reason: null,
+  replays: null,
+  reproduced: null,
 };
 
 describe("index", () => {
@@ -100,6 +102,7 @@ describe("index", () => {
         "registerValues",
         "registerVariants",
         "replay",
+        "replays",
         "require",
         "roundTrip",
         "runSeed",

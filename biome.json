@@ -261,6 +261,7 @@
     {
       "includes": [
         "src/bench.ts",
+        "src/conformance/stateful/**",
         "src/matcher/refusal.ts",
         "src/matcher/relation.ts",
         "src/matcher/repeat.ts",

@@ -94,6 +94,8 @@ describe("detail", () => {
           divergence: null,
           coverage: null,
           reason: null,
+          replays: null,
+          reproduced: null,
         },
         "the detail of a pass",
       );
@@ -107,6 +109,17 @@ describe("detail", () => {
         ],
         "the case needs a capability",
         "the reason",
+      );
+    });
+
+    it("returns the replays of a counterexample", ({ seat }) => {
+      const d = detailOf({ ...COUNTEREXAMPLE, replays: 3, reproduced: 2 });
+
+      check.isEqualTo(
+        seat,
+        [d["replays"], d["reproduced"]],
+        [3, 2],
+        "two of three replays reproduced the failure",
       );
     });
 
@@ -346,8 +359,22 @@ describe("detail", () => {
           divergence: null,
           coverage: null,
           reason: null,
+          replays: null,
+          reproduced: null,
         },
         "the counts and the seed alone",
+      );
+    });
+
+    it("returns the replays and the reproductions of a counterexample", ({ seat }) => {
+      const run = { ...COUNTEREXAMPLE, replays: 3, reproduced: 2 };
+      const result = resultOf(run, detailOf(run));
+
+      check.isEqualTo(
+        seat,
+        [result.replays, result.reproduced],
+        [3, 2],
+        "two of three replays reproduced the failure",
       );
     });
 

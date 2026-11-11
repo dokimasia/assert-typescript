@@ -50,7 +50,8 @@ export class Values {
  * and 0 sets no limit. replay, when set, is the one case that the run
  * tries. confirm is the interval of the replays of valid cases: the run
  * replays each valid case whose count is a multiple of confirm, and 0
- * replays none.
+ * replays none. replays is the number of replays of a failing case before
+ * its shrink.
  */
 export interface Settings {
   readonly seed: bigint;
@@ -65,6 +66,7 @@ export interface Settings {
   readonly explain?: boolean;
   readonly replay?: readonly Choice[] | undefined;
   readonly confirm?: number;
+  readonly replays?: number;
 }
 
 /** The settings with every default filled in. */
@@ -73,17 +75,23 @@ export type Resolved = Required<Omit<Settings, "replay">> & Pick<Settings, "repl
 /**
  * Returns settings with every default filled in: 100 cases, the cap of
  * 8,192 choices, no requirement, trace, example or stored case, a shrink
- * budget of 2,000 runs without a time limit, an explanation, and no replay
- * of a valid case.
+ * budget of 2,000 runs without a time limit, an explanation, no replay of a
+ * valid case, and one replay of a failing case.
  *
  * @param settings - What a run is asked to do.
  * @returns The settings with the defaults.
- * @throws RangeError for a run of fewer than one case.
+ * @throws RangeError for a run of fewer than one case or one replay.
  */
 export function resolve(settings: Settings): Resolved {
   const cases = settings.cases ?? DEFAULT_CASES;
   if (cases < 1) {
     throw new RangeError(`prop: a run of ${cases} cases tests nothing`);
+  }
+  const replays = settings.replays ?? 1;
+  if (replays < 1) {
+    throw new RangeError(
+      `prop: a run of ${replays} replays does not replay a failing case`,
+    );
   }
   return {
     seed: settings.seed,
@@ -98,6 +106,7 @@ export function resolve(settings: Settings): Resolved {
     explain: settings.explain ?? true,
     replay: settings.replay,
     confirm: settings.confirm ?? 0,
+    replays,
   };
 }
 

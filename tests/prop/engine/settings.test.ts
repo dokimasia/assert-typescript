@@ -49,6 +49,7 @@ describe("settings", () => {
           explain: true,
           replay: undefined,
           confirm: 0,
+          replays: 1,
         },
         "the defaults",
       );
@@ -59,6 +60,15 @@ describe("settings", () => {
         seat,
         thrown(() => resolve({ seed: SEED, cases: 0 })),
         "prop: a run of 0 cases tests nothing",
+        "the refusal",
+      );
+    });
+
+    it("throws a RangeError for a run of no replay", ({ seat }) => {
+      check.isEqualTo(
+        seat,
+        thrown(() => resolve({ seed: SEED, replays: 0 })),
+        "prop: a run of 0 replays does not replay a failing case",
         "the refusal",
       );
     });

@@ -19,6 +19,7 @@ import {
   maxChoices,
   onResult,
   replay,
+  replays,
   require as requirement,
   seed,
   seedValue,
@@ -292,6 +293,27 @@ describe("option", () => {
     }
   });
 
+  describe("replays", () => {
+    it("returns the option of the number of replays of a failing case", ({ seat }) => {
+      check.isEqualTo(seat, replays(3), { kind: "replays", value: 3 }, "three replays");
+    });
+
+    const refusals = [
+      { name: "throws a RangeError for no replay", give: 0 },
+      { name: "throws a RangeError for a number that is no whole number", give: 2.5 },
+    ];
+    for (const tt of refusals) {
+      it(tt.name, ({ seat }) => {
+        check.isEqualTo(
+          seat,
+          thrown(() => replays(tt.give)),
+          `prop: replays(${tt.give}) states no whole number of 1 or more`,
+          "replays refuses the number",
+        );
+      });
+    }
+  });
+
   describe("hermetic", () => {
     it("returns the option that reads none of the variables", ({ seat }) => {
       check.isEqualTo(seat, hermetic(), { kind: "hermetic" }, "the hermetic option");
@@ -390,6 +412,7 @@ describe("option", () => {
           onResult: undefined,
           draws: undefined,
           confirm: 0,
+          replays: 1,
         },
         "the defaults",
       );
@@ -415,6 +438,7 @@ describe("option", () => {
           onResult(RECEIVE),
           draws("[]"),
           confirm(3),
+          replays(4),
         ]),
         {
           cases: 5,
@@ -434,6 +458,7 @@ describe("option", () => {
           onResult: RECEIVE,
           draws: "[]",
           confirm: 3,
+          replays: 4,
         },
         "each setting, with the requirements in order and the workers ignored",
       );

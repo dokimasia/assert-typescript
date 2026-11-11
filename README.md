@@ -540,6 +540,7 @@ prop.store(dir: string): Option
 prop.explain(enabled: boolean): Option
 prop.workers(n: number): Option
 prop.confirm(every: number): Option
+prop.replays(n: number): Option
 prop.hermetic(): Option
 prop.around(wrapper: Wrapper): Option
 prop.onResult(f: (result: Result) => void): Option
@@ -582,9 +583,13 @@ stateful.concurrentMean(n: number): Option
 stateful.tasks(scheduler: Scheduler): Option
 stateful.uniform(): Strategy
 stateful.pct(depth: number): Strategy
+stateful.maxReleases(n: number): SchedulerOption
 Scheduler.spawn(task: () => Promise<void>): void
 Scheduler.yield(): Promise<void>
+Scheduler.wait(condition: () => boolean): Promise<void>
+Scheduler.clock(): Clock
 Scheduler.run(): Promise<void>
+Scheduler.advance(duration: number): Promise<void>
 ```
 
 Each one carries a full doc comment: what it states, what every
@@ -798,8 +803,8 @@ run.
 `prop.onResult(f)` hands the `prop.Result` of each run to `f`. The call
 runs `f` after the run ends and before it reports its verdict, so `f` also
 receives the result of a run that fails the test. The result has the
-eleven fields of the detail of the run, such as the outcome, the counts of
-valid and rejected cases, the seed and the counterexample of a failing
+thirteen fields of the detail of the run, such as the outcome, the counts
+of valid and rejected cases, the seed and the counterexample of a failing
 case. A tool that runs many properties writes them into a record of its
 own:
 
@@ -819,6 +824,16 @@ of the body:
 
 ```ts
 await prop.forAll(seat, "each step observes the checksum of the state", simulate, prop.confirm(16));
+```
+
+`prop.replays(n)` makes a run replay a failing case `n` times before it
+shrinks the case, once by default. The run shrinks the case when one or
+more replays reproduce the failure, and ends as flaky when none does. The
+`replays` and `reproduced` of the result state how often the failure
+reproduced, such as for a subject that runs on a worker thread of its own:
+
+```ts
+await prop.forAll(seat, "the pool hands out each slot once", acquire, prop.replays(10));
 ```
 
 `prop.around` runs each run of the body inside a wrapper, so that every
@@ -948,6 +963,23 @@ A task marks each point where another task may run with
 `await scheduler.yield()`, because a library cannot intercept a native
 `await`.
 
+A task that awaits `scheduler.wait(cond)` or the `sleep` of
+`scheduler.clock()` is parked, and `run` returns while it waits. The wait
+ends once `cond` returns true. The clock of a scheduler starts at midnight
+UTC 2000-01-01, and only `scheduler.advance(ms)` moves it, from deadline to
+deadline. A task that sleeps 4 ms runs at 4 ms within an advance of 10 ms. `stateful.maxReleases(n)` fails a case whose `run` or `advance`
+releases `n` tasks while a task is still ready, 1,000,000 by default:
+
+```ts
+const scheduler = new stateful.Scheduler(c, stateful.uniform(), stateful.maxReleases(1000));
+scheduler.spawn(async () => {
+  for (;;) {
+    await scheduler.wait(() => store.dirty());
+    store.flush();
+  }
+});
+```
+
 A concurrent section averages 5 steps under the default maximum of 16.
 `stateful.concurrentMean(n)` sets another mean, and the maximum of
 `stateful.concurrent(n)` still stops a section.
@@ -983,7 +1015,7 @@ definition and holds itself to it:
 - 195 corpus cases state what each assertion must report, run against
   both surfaces and the matchers of `expect`, with the call record of
   each call. They are the same cases every other implementation runs.
-- 441 property vectors, 112 history vectors, 15 machine vectors and 57
+- 445 property vectors, 112 history vectors, 21 machine vectors and 57
   file vectors pin the property engine, the history checks, machines and
   the assertions of files.
 - A completeness gate checks that every assertion is present under the

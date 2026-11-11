@@ -42,6 +42,13 @@
  *   count. The actions are increment, enabled while the spec's count is
  *   below 3, and read. The spec is a counter.
  *
+ * SUBJECTS also maps the five subjects that spawn tasks of their own:
+ * register-flushes-in-two-parts, register-flushes, ticker-skips-its-first-tick,
+ * ticker and spins-until-a-flag. Such a subject spawns its tasks on a
+ * scheduler of the case with the strategy and the most releases of the
+ * setup, and the clients of its concurrent section run on the same
+ * scheduler.
+ *
  * Each subject is built anew for every run, so a subject that counts over
  * the cases of a run starts each run at 0.
  */
@@ -51,9 +58,9 @@ import type { Spec } from "../../history/spec.js";
 import type { Case } from "../../prop/case.js";
 import { integer } from "../../prop/generators.js";
 import { type Option, tasks } from "../../stateful/option.js";
-import { Scheduler } from "../../stateful/scheduler.js";
 import { steps } from "../../stateful/steps.js";
 import type { Strategy } from "../../stateful/strategy.js";
+import { flushedRegister, schedulerOf, spinner, ticker } from "./background.js";
 import { queue } from "./queue.js";
 
 /** The largest key of store-loses-on-crash, and the draw of its keys. */
@@ -171,7 +178,7 @@ async function storeLosesOnCrash(c: Case, setup: Setup): Promise<void> {
 
 /** Runs the counter machine on clients that run as tasks, over an increment that may yield between its read and its write. */
 async function sharedCounter(c: Case, setup: Setup, racy: boolean): Promise<void> {
-  const scheduler = new Scheduler(c, setup.strategy);
+  const scheduler = schedulerOf(c, setup);
   let count = 0;
   await steps(
     c,
@@ -233,14 +240,16 @@ function refusingCounter(): Subject {
   };
 }
 
-/** The options of a subject's steps, those of a concurrent section, and the strategy of a subject's scheduler. */
+/** The options of a subject's steps, those of a concurrent section, and the options of a subject's scheduler. */
 export interface Setup {
   /** The options that every subject takes: mean, max and swarm. */
   readonly steps: readonly Option[];
-  /** The options of a concurrent section: clients and concurrent. */
+  /** The options of a concurrent section: clients, concurrent and concurrentMean. */
   readonly section: readonly Option[];
-  /** The strategy of the scheduler that a subject with a concurrent section makes in each case. */
+  /** The strategy of the scheduler that a subject with a concurrent section or with tasks of its own makes in each case. */
   readonly strategy: Strategy;
+  /** The most tasks that one run or one advance of that scheduler releases. */
+  readonly maxReleases: number;
 }
 
 /** A subject: it builds its subject and runs its machine in a case. */
@@ -258,4 +267,12 @@ export const SUBJECTS: ReadonlyMap<string, () => Subject> = new Map<
   ["racy-counter", () => (c, setup) => sharedCounter(c, setup, true)],
   ["correct-counter", () => (c, setup) => sharedCounter(c, setup, false)],
   ["counter-refuses-every-third", refusingCounter],
+  [
+    "register-flushes-in-two-parts",
+    () => (c, setup) => flushedRegister(c, setup, true),
+  ],
+  ["register-flushes", () => (c, setup) => flushedRegister(c, setup, false)],
+  ["ticker-skips-its-first-tick", () => (c, setup) => ticker(c, setup, true)],
+  ["ticker", () => (c, setup) => ticker(c, setup, false)],
+  ["spins-until-a-flag", () => spinner],
 ]);

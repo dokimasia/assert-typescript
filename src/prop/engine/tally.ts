@@ -51,7 +51,10 @@ export interface Shortfall {
  * shrinking and explaining spent. valued is set for a counterexample that
  * an example of values found, which has no token. stored are the runs of
  * the stored cases, in order, up to the one that ended the run. reason is
- * the reason of the case that skipped a skipped run.
+ * the reason of the case that skipped a skipped run. replays counts the
+ * replays of the failing case before its shrink, and reproduced counts the
+ * replays that failed the same way. Both are undefined for a run that
+ * replayed no failing case.
  */
 export interface Outcome {
   readonly kind: Kind;
@@ -68,6 +71,8 @@ export interface Outcome {
   readonly runs: number;
   readonly valued: boolean;
   readonly stored: readonly Execution[];
+  readonly replays?: number | undefined;
+  readonly reproduced?: number | undefined;
 }
 
 /** The counts of a run so far, from which every outcome takes its counts. */

@@ -38,6 +38,7 @@ import { hermetic, seed, store } from "../src/prop/option.js";
 import { VARIABLE } from "../src/record/switch.js";
 import { Recorder, type Seat } from "../src/seat.js";
 import { clients } from "../src/stateful/option.js";
+import { MAX_RELEASES } from "../src/stateful/scheduler.js";
 import { uniform } from "../src/stateful/strategy.js";
 import { test as it } from "../src/vitest.js";
 
@@ -315,6 +316,7 @@ export const MACHINE_SETUP: Setup = {
   steps: [],
   section: [clients(2)],
   strategy: uniform(),
+  maxReleases: MAX_RELEASES,
 };
 
 /**

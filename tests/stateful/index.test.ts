@@ -22,6 +22,7 @@ describe("index", () => {
         "concurrent",
         "concurrentMean",
         "max",
+        "maxReleases",
         "mean",
         "pct",
         "steps",

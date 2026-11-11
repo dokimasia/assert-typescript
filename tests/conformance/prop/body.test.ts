@@ -139,6 +139,23 @@ describe("body", () => {
       );
     });
 
+    it("returns a body that fails above 1000 on its even calls for fails-on-even-calls", async ({
+      seat,
+    }) => {
+      const body = buildBody({ kind: "fails-on-even-calls" });
+      const runs: Execution[] = [];
+      for (const value of [2000n, 2000n, 2000n, 1000n, 2000n, 2000n]) {
+        runs.push(await executed(body, value));
+      }
+
+      check.isEqualTo(
+        seat,
+        runs.map((run) => run.failure?.identity),
+        [undefined, "even", undefined, undefined, undefined, "even"],
+        "the second and the sixth call draw above 1000 on an even call",
+      );
+    });
+
     it("returns a body that skips with the reason whose predicate is true", async ({
       seat,
     }) => {

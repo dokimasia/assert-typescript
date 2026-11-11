@@ -11,7 +11,7 @@
  * it with the identity of the first `fails` entry whose predicate is true,
  * in that order.
  *
- * Five named bodies state what no predicate can:
+ * Six named bodies state what no predicate can:
  *
  * - `draws-nothing` requests no input.
  * - `diverges` draws an integer in [0, 9] on its first call and a boolean on
@@ -23,6 +23,9 @@
  * - `fails-then-skips` draws an integer in [0, 10^9] and fails with
  *   identity `once` the first time that it draws a value above 1,000. Every
  *   later call draws its value and then skips with the reason `after`.
+ * - `fails-on-even-calls` draws an integer in [0, 10^9] and fails with
+ *   identity `even` when the value is above 1,000 and the call is even,
+ *   counting the calls of the body from 1.
  */
 
 import type { Case } from "../../prop/engine/case.js";
@@ -43,10 +46,10 @@ function nameOf(value: unknown): string {
   return value;
 }
 
-/** The generator of the integer that `fails-once` and `fails-then-skips` draw. */
+/** The generator of the integer that `fails-once`, `fails-then-skips` and `fails-on-even-calls` draw. */
 const WIDE = { gen: "integer", min: 0, max: 1_000_000_000 } as const;
 
-/** The value above which `fails-once` and `fails-then-skips` fail. */
+/** The value above which `fails-once`, `fails-then-skips` and `fails-on-even-calls` fail. */
 const FAILS_ABOVE = 1000n;
 
 /** Returns the body that requests no input. */
@@ -101,6 +104,19 @@ function failingThenSkipping(): Body {
     if (value > FAILS_ABOVE) {
       failed = true;
       c.fail("once");
+    }
+  };
+}
+
+/** Returns a body that fails above 1,000 on each of its even calls. */
+function failingOnEvenCalls(): Body {
+  let calls = 0;
+  const wide = build(WIDE);
+  return (c: Case) => {
+    const value = c.draw(wide, DRAWN) as bigint;
+    calls += 1;
+    if (value > FAILS_ABOVE && calls % 2 === 0) {
+      c.fail("even");
     }
   };
 }
@@ -182,6 +198,8 @@ export function buildBody(spec: Spec): Body {
       return failingOnce();
     case "fails-then-skips":
       return failingThenSkipping();
+    case "fails-on-even-calls":
+      return failingOnEvenCalls();
     case undefined:
       return drawing(spec);
     default:

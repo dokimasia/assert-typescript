@@ -81,6 +81,8 @@ describe("detail", () => {
           divergence: null,
           coverage: null,
           reason: null,
+          replays: null,
+          reproduced: null,
         },
         "a pass",
       );

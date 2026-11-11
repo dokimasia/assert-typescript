@@ -4,10 +4,10 @@
 /**
  * The record of a property's run, and its sentence.
  *
- * The record's detail has the eleven fields of prop-for-all: outcome,
+ * The record's detail has the thirteen fields of prop-for-all: outcome,
  * cases, rejected, seed, counterexample, failure, choices, others,
- * divergence, coverage and reason. A field that the outcome does not use is
- * null. The call record of a property states the same detail as JSON, each
+ * divergence, coverage, reason, replays and reproduced. A field that the
+ * outcome does not use is null. The call record of a property states the same detail as JSON, each
  * drawn value as a typed literal of its generator's type.
  */
 
@@ -188,7 +188,7 @@ export interface Shortfall {
 }
 
 /**
- * The result of one run of a property: the eleven fields of the detail of
+ * The result of one run of a property: the thirteen fields of the detail of
  * the run. onResult hands it to a function when the run ends. A field that
  * the outcome does not use is null. The record of the run has the same
  * values, and its call record states the seed as decimal text.
@@ -216,6 +216,10 @@ export interface Result {
   readonly coverage: Shortfall | null;
   /** The reason of a skipped run. */
   readonly reason: string | null;
+  /** The number of replays of the failing case before its shrink, and null for a run that replayed no failing case. */
+  readonly replays: number | null;
+  /** The number of the replays that reproduced the failure, and null where replays is null. */
+  readonly reproduced: number | null;
 }
 
 /**
@@ -261,6 +265,8 @@ export function detailOf(outcome: Outcome): Record<string, unknown> {
             verdict: shortfall.verdict,
           },
     reason: outcome.reason ?? null,
+    replays: outcome.replays ?? null,
+    reproduced: outcome.reproduced ?? null,
   };
 }
 
@@ -285,6 +291,8 @@ export function resultOf(outcome: Outcome, detail: Record<string, unknown>): Res
     divergence: detail["divergence"] as Divergence | null,
     coverage: detail["coverage"] as Shortfall | null,
     reason: detail["reason"] as string | null,
+    replays: detail["replays"] as number | null,
+    reproduced: detail["reproduced"] as number | null,
   };
 }
 

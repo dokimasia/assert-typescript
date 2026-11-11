@@ -216,6 +216,14 @@ const DECLARED: Record<string, { file: string; text: string }> = {
     file: "prop/detail.d.ts",
     text: "readonly reason: string | null",
   },
+  "run-result.replays": {
+    file: "prop/detail.d.ts",
+    text: "readonly replays: number | null",
+  },
+  "run-result.reproduced": {
+    file: "prop/detail.d.ts",
+    text: "readonly reproduced: number | null",
+  },
   scrubber: { file: "golden/scrub.d.ts", text: "export type Scrubber" },
   tree: { file: "files/tree.d.ts", text: "export type Tree" },
   event: { file: "history/event.d.ts", text: "export type Event = " },

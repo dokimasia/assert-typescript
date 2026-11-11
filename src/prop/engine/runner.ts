@@ -35,12 +35,15 @@
  * its failing case. A replay that is rejected or skips does not differ. The
  * replay counts as no case, and an example of values is not replayed.
  *
- * A failing case is replayed, shrunk and explained, and the run ends as a
- * counterexample, or as flaky when the replay differs. A diverging body
- * ends the run as flaky. A shrink budget of 0 reports the first failing
- * case as found, without replay or explanation. A failing example of values
- * has no choices, so the run reports it as found, without replay,
- * explanation or token.
+ * A failing case is replayed `replays` times, once by default, and then
+ * shrunk and explained. The run ends as a counterexample when one or more
+ * replays reproduce the failure, and as flaky with the difference of the
+ * first replay when none does. Every replay runs, so the outcome states how
+ * many of them reproduced the failure. A diverging body ends the run as
+ * flaky. A shrink budget of 0 reports the first failing case as found,
+ * without replay or explanation. A failing example of values has no
+ * choices, so the run reports it as found, without replay, explanation or
+ * token.
  *
  * A run that found no failing case fails anyway when it rejected more than
  * ten times as many cases as were valid, when no case requested an input,
@@ -60,6 +63,7 @@ import { Replaying, Valuing } from "./case/providers.js";
 import type { Choice } from "./choice.js";
 import {
   type Body,
+  type Divergence,
   type Execution,
   execute,
   identityOf,
@@ -162,8 +166,12 @@ function withToken(outcome: Outcome): Outcome {
  * Replays, shrinks and explains the failing case of a counterexample, and
  * returns the outcome with the minimal case, the other failures that the
  * shrink found and the replay token. A shrink budget of 0 adds the token
- * alone. A replay that differs makes the outcome flaky. Any other outcome,
- * and a counterexample of values, which has no choices, return unchanged.
+ * alone. The case replays as often as the setting replays states, and every
+ * replay runs. The case shrinks when one or more replays reproduce the
+ * failure. When none does, the outcome is flaky with the difference of the
+ * first replay. The outcome states the replays and the reproductions. Any
+ * other outcome, and a counterexample of values, which has no choices,
+ * return unchanged.
  *
  * @param body - The body.
  * @param settings - The settings of the run.
@@ -184,9 +192,14 @@ export function* conclude(
   if (settings.shrink === 0) {
     return { ...outcome, token: encode(failing.case.choices) };
   }
-  const divergence = yield* confirm(body, failing, settings.maxChoices, observer);
-  if (divergence !== undefined) {
-    return { ...outcome, kind: "flaky", divergence };
+  const divergences: (Divergence | undefined)[] = [];
+  for (let i = 0; i < settings.replays; i += 1) {
+    divergences.push(yield* confirm(body, failing, settings.maxChoices, observer));
+  }
+  const reproduced = divergences.filter((one) => one === undefined).length;
+  const replayed = { ...outcome, replays: settings.replays, reproduced };
+  if (reproduced === 0) {
+    return { ...replayed, kind: "flaky", divergence: divergences[0] };
   }
   const shrinker = new Shrinker(
     body,
@@ -206,7 +219,7 @@ export function* conclude(
     ? yield* explain(shrinker, first, settings.seed)
     : [];
   return {
-    ...outcome,
+    ...replayed,
     failing: first.execution,
     others,
     explanation,

@@ -50,6 +50,8 @@ function apply(config: Config, option: Option): Config {
       return config;
     case "confirm":
       return { ...config, confirm: option.value };
+    case "replays":
+      return { ...config, replays: option.value };
     case "hermetic":
       return { ...config, hermetic: true };
     case "around":
@@ -120,6 +122,7 @@ export type Option =
   | { readonly kind: "explain"; readonly value: boolean }
   | { readonly kind: "workers"; readonly value: number }
   | { readonly kind: "confirm"; readonly value: number }
+  | { readonly kind: "replays"; readonly value: number }
   | { readonly kind: "hermetic" }
   | { readonly kind: "around"; readonly value: Wrapper }
   | { readonly kind: "on-result"; readonly value: (result: Result) => void }
@@ -138,7 +141,8 @@ export type FormOption = Option | Relaxation | FormOnly;
  * What the options of one run state. A setting that no option states has
  * its default, and seed, replay, store, around, onResult and draws are
  * undefined. confirm is the interval of the replays of valid cases, and 0
- * for none.
+ * for none. replays is the number of replays of a failing case before its
+ * shrink.
  */
 export interface Config {
   readonly cases: number;
@@ -155,13 +159,14 @@ export interface Config {
   readonly onResult: ((result: Result) => void) | undefined;
   readonly draws: string | undefined;
   readonly confirm: number;
+  readonly replays: number;
 }
 
 /**
  * Returns what options state: the defaults, with each option applied in
  * order. The defaults are 100 cases, a shrink budget of 2,000 runs and 30
- * seconds, a cap of 8,192 choices, an explanation, and no replay of a valid
- * case.
+ * seconds, a cap of 8,192 choices, an explanation, no replay of a valid case
+ * and one replay of a failing case.
  *
  * @param options - The options of the run.
  * @returns The settings.
@@ -182,6 +187,7 @@ export function configure(options: readonly Option[]): Config {
     onResult: undefined,
     draws: undefined,
     confirm: 0,
+    replays: 1,
   };
   for (const option of options) {
     config = apply(config, option);
@@ -352,6 +358,26 @@ export function workers(n: number): Option {
 export function confirm(every: number): Option {
   counted("confirm", every, 1);
   return { kind: "confirm", value: every };
+}
+
+/**
+ * Makes a run replay a failing case n times before it shrinks the case. Each
+ * replay runs on the choices of the case, and every replay runs. A replay
+ * reproduces the failure when it requests the same bounds, observes the same
+ * fingerprints and fails with the same identity. The run shrinks the case
+ * when one or more replays reproduce the failure, and ends as flaky with the
+ * difference of the first replay when none does. The result states the
+ * replays and the replays that reproduced the failure. A run without the
+ * option replays a failing case once. A run without a shrink, a replay token
+ * and a failing example of values replay nothing.
+ *
+ * @param n - The number of replays, at least 1.
+ * @returns The option.
+ * @throws RangeError for a number that is no whole number of 1 or more.
+ */
+export function replays(n: number): Option {
+  counted("replays", n, 1);
+  return { kind: "replays", value: n };
 }
 
 /**

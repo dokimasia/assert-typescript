@@ -26,6 +26,7 @@ import {
   type Option as StepsOption,
   swarm,
 } from "../../stateful/option.js";
+import { MAX_RELEASES } from "../../stateful/scheduler.js";
 import { pct, type Strategy, uniform } from "../../stateful/strategy.js";
 import { sameJson } from "../equality.js";
 import { type Setup, SUBJECTS } from "./subjects.js";
@@ -38,6 +39,9 @@ const CONTRACT = "the machine subject of the vector";
 
 /** The clients of a vector's setup that states none. */
 const SETUP_CLIENTS = 2;
+
+/** The identity of the failure of a scheduler at its most releases. */
+const RELEASES = "max-releases";
 
 /** Reports whether value is a JSON object. */
 function isObject(value: unknown): value is Raw {
@@ -74,7 +78,12 @@ function setupOf(written: Raw): Setup {
   if (written["concurrent-mean"] !== undefined) {
     section.push(concurrentMean(Number(written["concurrent-mean"])));
   }
-  return { steps, section, strategy: strategyOf(written["strategy"] ?? "uniform") };
+  return {
+    steps,
+    section,
+    strategy: strategyOf(written["strategy"] ?? "uniform"),
+    maxReleases: Number(written["max-releases"] ?? MAX_RELEASES),
+  };
 }
 
 /** Returns the options of the run that a vector's settings state: its seed and its cases, without the profile, the variables and a store. */
@@ -94,14 +103,19 @@ function settingsOf(written: Raw): Option[] {
 
 /**
  * Returns the detail of a property's call record in the form of the
- * vector's detail, which states the failure by its assertion. No machines
- * vector states another failure, so the runner compares the others of a run
- * as the call record states them.
+ * vector's detail, which states the failure by its assertion. A scheduler
+ * at its most releases fails the case with a record without an assertion,
+ * and the vectors name that failure max-releases. No machines vector states
+ * another failure, so the runner compares the others of a run as the call
+ * record states them.
  */
 function detailOf(record: Raw): Raw {
   const detail = record["detail"] as Raw;
   const failure = detail["failure"];
-  return { ...detail, failure: isObject(failure) ? failure["assertion"] : null };
+  return {
+    ...detail,
+    failure: isObject(failure) ? (failure["assertion"] ?? RELEASES) : null,
+  };
 }
 
 /** Throws a fault for a fault of the run other than the refusal of the trace's entry that the vector states. */

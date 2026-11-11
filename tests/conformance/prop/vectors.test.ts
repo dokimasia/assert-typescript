@@ -188,6 +188,7 @@ describe("vectors", () => {
         shrink: 2000,
         replay: undefined,
         confirm: 0,
+        replays: 1,
       });
     });
 
@@ -203,6 +204,7 @@ describe("vectors", () => {
           shrink: 0,
           replay: "prop1:AAc",
           confirm: 5,
+          replays: 3,
         }),
       ).toEqual({
         seed: 1n,
@@ -214,6 +216,7 @@ describe("vectors", () => {
         shrink: 0,
         replay: [{ kind: "integer", value: 7n }],
         confirm: 5,
+        replays: 3,
       });
     });
   });

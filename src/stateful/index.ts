@@ -38,7 +38,10 @@
  * A concurrent section runs its clients as tasks of a {@link Scheduler},
  * whose releases are choices of the case, so a race replays and shrinks. A
  * subject that runs as tasks calls `await scheduler.yield()` at each point
- * where another task may run.
+ * where another task may run. A task parks with `await scheduler.wait(cond)`
+ * until cond returns true, and sleeps on the clock of its scheduler, which
+ * only `scheduler.advance` moves. {@link maxReleases} sets the most tasks
+ * that one run of a scheduler releases.
  */
 
 export type { Action, Machine } from "./machine.js";
@@ -52,6 +55,6 @@ export {
   swarm,
   tasks,
 } from "./option.js";
-export { Scheduler } from "./scheduler.js";
+export { maxReleases, Scheduler, type SchedulerOption } from "./scheduler.js";
 export { steps } from "./steps.js";
 export { pct, type Strategy, uniform } from "./strategy.js";

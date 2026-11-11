@@ -127,6 +127,7 @@ export {
   type Option,
   onResult,
   replay,
+  replays,
   require,
   seed,
   shrink,

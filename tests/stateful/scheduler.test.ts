@@ -12,15 +12,83 @@ import { check } from "../../src/index.js";
 import { Generating } from "../../src/prop/engine/case/providers.js";
 import { IntegerBounds, UINT64_MAX } from "../../src/prop/engine/choice.js";
 import { Source } from "../../src/prop/engine/source.js";
-import { Scheduler } from "../../src/stateful/scheduler.js";
+import {
+  EPOCH,
+  MAX_RELEASES,
+  maxReleases,
+  Scheduler,
+} from "../../src/stateful/scheduler.js";
 import { pct, type Strategy, uniform } from "../../src/stateful/strategy.js";
 import { test as it } from "../../src/vitest.js";
-import { bodyCase, replaying } from "../helpers.js";
+import { bodyCase, ending, failingOf, replaying, thrown } from "../helpers.js";
 
-/** Returns a scheduler of strategy over a case that replays integer values, its engine case, and an empty log. */
+/** Returns a scheduler of strategy over a case that replays integer values, the case, its engine case, and an empty log. */
 function started(strategy: Strategy, ...values: number[]) {
   const { c, engine } = bodyCase(replaying(...values));
-  return { scheduler: new Scheduler(c, strategy), engine, log: [] as string[] };
+  return { c, scheduler: new Scheduler(c, strategy), engine, log: [] as string[] };
+}
+
+/** Returns a uniform scheduler of at most n releases over a case that replays no value, the case, its engine case, and an empty log. */
+function limited(n: number) {
+  const { c, engine } = bodyCase(replaying());
+  return {
+    c,
+    scheduler: new Scheduler(c, uniform(), maxReleases(n)),
+    engine,
+    log: [] as string[],
+  };
+}
+
+/** The instant at which the clock of a scheduler starts, in milliseconds since the Unix epoch. */
+const MIDNIGHT = Date.UTC(2000, 0, 1);
+
+/** Returns the milliseconds that the clock of scheduler has advanced. */
+function elapsed(scheduler: Scheduler): number {
+  return scheduler.clock().now() - MIDNIGHT;
+}
+
+/** Returns a task that logs name and 1, waits until ready returns true, and logs name and 2. */
+function waiting(
+  scheduler: Scheduler,
+  log: string[],
+  name: string,
+  ready: () => boolean,
+) {
+  return async () => {
+    log.push(`${name}1`);
+    await scheduler.wait(ready);
+    log.push(`${name}2`);
+  };
+}
+
+/** Returns a task that sleeps each period of periods in milliseconds in turn, and logs the time of each wake. */
+function ticking(
+  scheduler: Scheduler,
+  log: string[],
+  name: string,
+  periods: readonly number[],
+) {
+  return async () => {
+    for (const period of periods) {
+      await scheduler.clock().sleep(period);
+      log.push(`${name}@${elapsed(scheduler)}`);
+    }
+  };
+}
+
+/** Returns a task that logs name and 1, sets flag, yields, and logs name and 2. */
+function setting(
+  scheduler: Scheduler,
+  log: string[],
+  name: string,
+  flag: { set: boolean },
+) {
+  return async () => {
+    log.push(`${name}1`);
+    flag.set = true;
+    await scheduler.yield();
+    log.push(`${name}2`);
+  };
 }
 
 /** Returns a task that logs name and its part, and yields between parts. */
@@ -58,6 +126,33 @@ describe("scheduler", () => {
       await scheduler.run();
 
       check.isEmpty(seat, engine.requests, "no release");
+    });
+
+    it("releases at most a million tasks in one run by default", ({ seat }) => {
+      check.isEqualTo(seat, MAX_RELEASES, 1_000_000, "the default of the definition");
+    });
+
+    it("applies the last maxReleases of its options", async ({ seat }) => {
+      const { c } = bodyCase(replaying());
+      const scheduler = new Scheduler(c, uniform(), maxReleases(1), maxReleases(3));
+      const log: string[] = [];
+      scheduler.spawn(task(scheduler, log, "a", 3));
+      await scheduler.run();
+
+      check.isEqualTo(seat, log, ["a1", "a2", "a3"], "three releases pass");
+    });
+
+    it("ends a parked task when its case ends", async ({ seat }) => {
+      const { c, scheduler, log } = started(uniform());
+      const flag = { set: false };
+      await ending(c, async () => {
+        scheduler.spawn(waiting(scheduler, log, "a", () => flag.set));
+        await scheduler.run();
+      });
+      flag.set = true;
+      await scheduler.run();
+
+      check.isEqualTo(seat, log, ["a1"], "the task does not return from its wait");
     });
   });
 
@@ -115,6 +210,325 @@ describe("scheduler", () => {
         String(await rejection(scheduler.run())),
         "Error: stateful: a task called yield() again in one turn",
         "the misuse",
+      );
+    });
+  });
+
+  describe("Scheduler.wait", () => {
+    it("makes a waiting task ready once another task makes its condition true", async ({
+      seat,
+    }) => {
+      const { scheduler, log } = started(uniform());
+      const flag = { set: false };
+      scheduler.spawn(waiting(scheduler, log, "a", () => flag.set));
+      scheduler.spawn(setting(scheduler, log, "b", flag));
+      await scheduler.run();
+
+      check.isEqualTo(
+        seat,
+        log,
+        ["a1", "b1", "b2", "a2"],
+        "a runs once b set the flag",
+      );
+    });
+
+    it("returns from run while a task waits", async ({ seat }) => {
+      const { scheduler, log } = started(uniform());
+      const flag = { set: false };
+      scheduler.spawn(waiting(scheduler, log, "a", () => flag.set));
+      await scheduler.run();
+      const parked = [...log];
+      flag.set = true;
+      await scheduler.run();
+
+      check.isEqualTo(
+        seat,
+        [parked, log],
+        [["a1"], ["a1", "a2"]],
+        "the next run wakes the task",
+      );
+    });
+
+    it("continues the turn of a wait whose condition is true", async ({ seat }) => {
+      const { scheduler, engine, log } = started(uniform());
+      scheduler.spawn(waiting(scheduler, log, "a", () => true));
+      await scheduler.run();
+
+      check.isEqualTo(
+        seat,
+        [log, engine.requests.length],
+        [["a1", "a2"], 1],
+        "one release",
+      );
+    });
+
+    it("makes woken tasks ready after the ready tasks in the order of their waits", async ({
+      seat,
+    }) => {
+      const { scheduler, log } = started(uniform());
+      const flag = { set: false };
+      scheduler.spawn(waiting(scheduler, log, "w", () => flag.set));
+      scheduler.spawn(waiting(scheduler, log, "v", () => flag.set));
+      scheduler.spawn(setting(scheduler, log, "s", flag));
+      await scheduler.run();
+
+      check.isEqualTo(
+        seat,
+        log,
+        ["w1", "v1", "s1", "s2", "w2", "v2"],
+        "s yields before the wake, and w waited before v",
+      );
+    });
+
+    it("rejects with what a condition throws between two turns", async ({ seat }) => {
+      const { scheduler, log } = started(uniform());
+      const broken = new Error("broken");
+      let calls = 0;
+      scheduler.spawn(
+        waiting(scheduler, log, "w", () => {
+          calls += 1;
+          if (calls > 1) {
+            throw broken;
+          }
+          return false;
+        }),
+      );
+      scheduler.spawn(task(scheduler, log, "a", 1));
+
+      check.isEqualTo(
+        seat,
+        [await rejection(scheduler.run()), log],
+        [broken, ["w1"]],
+        "the run ends before a",
+      );
+    });
+
+    it("returns a settled promise outside a task for a condition that is true", async ({
+      seat,
+    }) => {
+      const { scheduler, engine } = started(uniform());
+      await scheduler.wait(() => true);
+
+      check.isEmpty(seat, engine.requests, "no release");
+    });
+
+    it("throws an Error outside a task for a condition that is false", ({ seat }) => {
+      const { scheduler } = started(uniform());
+
+      check.isEqualTo(
+        seat,
+        thrown(() => scheduler.wait(() => false)),
+        "stateful: a wait outside a task waits for a condition that is false",
+        "the body cannot park",
+      );
+    });
+
+    it("throws an Error for a wait in a turn that a yield ended", async ({ seat }) => {
+      const { scheduler } = started(uniform());
+      scheduler.spawn(async () => {
+        void scheduler.yield();
+        await scheduler.wait(() => false);
+      });
+
+      check.isEqualTo(
+        seat,
+        String(await rejection(scheduler.run())),
+        "Error: stateful: a task called wait() again in one turn",
+        "the misuse",
+      );
+    });
+  });
+
+  describe("Scheduler.clock", () => {
+    it("starts the clock at midnight UTC 2000-01-01", ({ seat }) => {
+      const { scheduler } = started(uniform());
+
+      check.isEqualTo(
+        seat,
+        [scheduler.clock().now(), EPOCH],
+        [MIDNIGHT, BigInt(MIDNIGHT) * 1_000_000n],
+        "the instant in milliseconds and in nanoseconds",
+      );
+    });
+
+    it("stays at its time through a run", async ({ seat }) => {
+      const { scheduler, log } = started(uniform());
+      scheduler.spawn(ticking(scheduler, log, "t", [4]));
+      await scheduler.run();
+
+      check.isEqualTo(
+        seat,
+        [log, elapsed(scheduler)],
+        [[], 0],
+        "the task still sleeps",
+      );
+    });
+
+    it("continues the turn of a sleep of no time", async ({ seat }) => {
+      const { scheduler, engine, log } = started(uniform());
+      scheduler.spawn(ticking(scheduler, log, "t", [0, 0]));
+      await scheduler.run();
+
+      check.isEqualTo(
+        seat,
+        [log, engine.requests.length],
+        [["t@0", "t@0"], 1],
+        "one release",
+      );
+    });
+
+    it("wakes a sleep of a fraction of a millisecond at its nanosecond", async ({
+      seat,
+    }) => {
+      const { scheduler, log } = started(uniform());
+      scheduler.spawn(ticking(scheduler, log, "t", [0.25]));
+      await scheduler.advance(1);
+
+      check.isEqualTo(seat, log, ["t@0.25"], "the task wakes at 0.25 ms");
+    });
+
+    it("returns a settled promise outside a task for a sleep of no time", async ({
+      seat,
+    }) => {
+      const { scheduler, engine } = started(uniform());
+      await scheduler.clock().sleep(0);
+
+      check.isEmpty(seat, engine.requests, "no release");
+    });
+
+    it("throws an Error outside a task for a sleep of a positive duration", ({
+      seat,
+    }) => {
+      const { scheduler } = started(uniform());
+
+      check.isEqualTo(
+        seat,
+        thrown(() => scheduler.clock().sleep(1)),
+        "stateful: a sleep outside a task waits for a clock that only the body moves",
+        "the body cannot park",
+      );
+    });
+
+    it("throws a RangeError for a sleep of no finite duration", ({ seat }) => {
+      const { scheduler } = started(uniform());
+
+      check.isEqualTo(
+        seat,
+        thrown(() => scheduler.clock().sleep(Number.NaN)),
+        "stateful: sleep(NaN) states no finite duration",
+        "the refusal",
+      );
+    });
+  });
+
+  describe("Scheduler.advance", () => {
+    it("runs each tick at its own deadline", async ({ seat }) => {
+      const { scheduler, log } = started(uniform());
+      scheduler.spawn(ticking(scheduler, log, "t", [4, 4, 4]));
+      await scheduler.advance(10);
+      const first = [[...log], elapsed(scheduler)];
+      await scheduler.advance(2);
+
+      check.isEqualTo(
+        seat,
+        [first, [log, elapsed(scheduler)]],
+        [
+          [["t@4", "t@8"], 10],
+          [["t@4", "t@8", "t@12"], 12],
+        ],
+        "ticks at 4 and 8 within 10 ms, and at 12 in 2 ms more",
+      );
+    });
+
+    it("ends a sleep whose deadline is the end time within the advance", async ({
+      seat,
+    }) => {
+      const { scheduler, log } = started(uniform());
+      scheduler.spawn(ticking(scheduler, log, "t", [4]));
+      await scheduler.advance(4);
+
+      check.isEqualTo(seat, log, ["t@4"], "a sleep of 4 ms ends within 4 ms");
+    });
+
+    it("wakes tasks in the order of their deadlines and then of their sleeps", async ({
+      seat,
+    }) => {
+      const { scheduler, log } = started(uniform());
+      scheduler.spawn(ticking(scheduler, log, "c", [6]));
+      scheduler.spawn(ticking(scheduler, log, "a", [2]));
+      scheduler.spawn(ticking(scheduler, log, "b", [6]));
+      await scheduler.advance(6);
+
+      check.isEqualTo(
+        seat,
+        log,
+        ["a@2", "c@6", "b@6"],
+        "c and b share a deadline, and c slept first",
+      );
+    });
+
+    it("releases the ready tasks without a move of the clock for no time", async ({
+      seat,
+    }) => {
+      const { scheduler, log } = started(uniform());
+      scheduler.spawn(task(scheduler, log, "a", 2));
+      await scheduler.advance(0);
+
+      check.isEqualTo(
+        seat,
+        [log, elapsed(scheduler)],
+        [["a1", "a2"], 0],
+        "as a run releases them",
+      );
+    });
+
+    it("moves the clock by nothing for a negative duration", async ({ seat }) => {
+      const { scheduler } = started(uniform());
+      await scheduler.advance(-5);
+
+      check.isEqualTo(seat, elapsed(scheduler), 0, "the clock stays at its start");
+    });
+
+    it("throws an Error for a task that calls advance", async ({ seat }) => {
+      const { scheduler } = started(uniform());
+      scheduler.spawn(async () => {
+        await scheduler.advance(1);
+      });
+
+      check.isEqualTo(
+        seat,
+        String(await rejection(scheduler.run())),
+        "Error: stateful: a task called advance() of its own scheduler",
+        "the nested advance",
+      );
+    });
+
+    it("makes the change points of one run over its deadlines", async ({ seat }) => {
+      const { scheduler, engine, log } = started(pct(2));
+      scheduler.spawn(ticking(scheduler, log, "t", [4, 4]));
+      await scheduler.advance(10);
+
+      check.isEqualTo(
+        seat,
+        [log, engine.requests.map((request) => request.bounds)],
+        [
+          ["t@4", "t@8"],
+          [new IntegerBounds(0n, UINT64_MAX), BINARY],
+        ],
+        "one priority, then one presence for the depth of 2",
+      );
+    });
+
+    it("rejects with a RangeError for a duration that is no finite number", async ({
+      seat,
+    }) => {
+      const { scheduler } = started(uniform());
+
+      check.isEqualTo(
+        seat,
+        String(await rejection(scheduler.advance(Number.POSITIVE_INFINITY))),
+        "RangeError: stateful: advance(Infinity) states no finite duration",
+        "the refusal",
       );
     });
   });
@@ -372,5 +786,99 @@ describe("scheduler", () => {
         "the two priorities alone",
       );
     });
+
+    it("keeps the PCT priority of a task through a wait", async ({ seat }) => {
+      const { scheduler, log } = started(pct(1), 9, 1, 1);
+      const flag = { set: false };
+      scheduler.spawn(waiting(scheduler, log, "a", () => flag.set));
+      scheduler.spawn(setting(scheduler, log, "b", flag));
+      scheduler.spawn(task(scheduler, log, "c", 1));
+      await scheduler.run();
+
+      check.isEqualTo(
+        seat,
+        log,
+        ["a1", "b1", "a2", "c1", "b2"],
+        "a has priority 9, and c became ready before b yielded",
+      );
+    });
+
+    it("fails the case once it has released the most tasks while a task is still ready", async ({
+      seat,
+    }) => {
+      const { c, scheduler, engine } = limited(5);
+      const signal = await ending(c, async () => {
+        scheduler.spawn(async () => {
+          for (;;) {
+            await scheduler.yield();
+          }
+        });
+        await scheduler.run();
+      });
+
+      check.isEqualTo(
+        seat,
+        [failingOf(signal).failure.contract, engine.requests.length],
+        [
+          "the task scheduler released 5 tasks in one run, and a task is still ready",
+          5,
+        ],
+        "a task that yields without an end fails the case after five releases",
+      );
+    });
+
+    it("counts the releases of each run on its own", async ({ seat }) => {
+      const { scheduler, log } = limited(3);
+      scheduler.spawn(task(scheduler, log, "a", 3));
+      await scheduler.run();
+      scheduler.spawn(task(scheduler, log, "b", 3));
+      await scheduler.run();
+
+      check.isEqualTo(
+        seat,
+        log,
+        ["a1", "a2", "a3", "b1", "b2", "b3"],
+        "two runs of three releases",
+      );
+    });
+
+    it("counts the releases of an advance over its deadlines", async ({ seat }) => {
+      const { c, scheduler, log } = limited(2);
+      const signal = await ending(c, async () => {
+        scheduler.spawn(ticking(scheduler, log, "t", [1, 1, 1]));
+        await scheduler.advance(5);
+      });
+
+      check.isEqualTo(
+        seat,
+        [failingOf(signal).failure.contract, log],
+        [
+          "the task scheduler released 2 tasks in one run, and a task is still ready",
+          ["t@1"],
+        ],
+        "the third release is past the limit",
+      );
+    });
+  });
+
+  describe("maxReleases", () => {
+    it("returns the option of the most releases", ({ seat }) => {
+      check.isEqualTo(seat, maxReleases(5), { maxReleases: 5 }, "five releases");
+    });
+
+    const refusals = [
+      { name: "throws a RangeError for no release", give: 0 },
+      { name: "throws a RangeError for a count that is no integer", give: 2.5 },
+    ];
+    for (const tt of refusals) {
+      it(tt.name, ({ seat }) => {
+        check.isEqualTo(
+          seat,
+          thrown(() => maxReleases(tt.give)),
+          `stateful: maxReleases(${tt.give}) is no integer of 1 or more`,
+          "maxReleases refuses the count",
+        );
+      });
+    }
   });
 });

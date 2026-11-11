@@ -213,6 +213,7 @@ export function settingsOf(written: Raw): Settings {
     shrink: Number(written["shrink"] ?? DEFAULT_BUDGET),
     replay: replayed === undefined ? undefined : token.decode(String(replayed)),
     confirm: Number(written["confirm"] ?? 0),
+    replays: Number(written["replays"] ?? 1),
   };
 }
 

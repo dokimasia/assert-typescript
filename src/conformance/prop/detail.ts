@@ -4,7 +4,7 @@
 /**
  * The detail of a run, as a property vector states it.
  *
- * The detail has the eleven fields of prop-for-all. A field that the
+ * The detail has the thirteen fields of prop-for-all. A field that the
  * outcome does not use is null. The counterexample lists the minimal case's steps
  * and draws, each draw with its typed literal, whether any value fails
  * there, and its nearest passing value.
@@ -139,5 +139,7 @@ export function detail(outcome: Outcome): Record<string, unknown> {
             verdict: shortfall.verdict,
           },
     reason: outcome.reason ?? null,
+    replays: outcome.replays ?? null,
+    reproduced: outcome.reproduced ?? null,
   };
 }

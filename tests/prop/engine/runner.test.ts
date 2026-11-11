@@ -1260,6 +1260,116 @@ describe("runner", () => {
         );
       });
     }
+
+    it("replays a failing case once by default", async ({ seat }) => {
+      const outcome = await ran(aboveMillion, { seed: SEED });
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.replays, outcome.reproduced],
+        ["counterexample", 1, 1],
+        "the one replay reproduces the failure",
+      );
+    });
+
+    it("runs every replay of a failing case before the shrink", async ({ seat }) => {
+      const seen = new Seen();
+      const outcome = await ran(aboveMillion, { seed: SEED, replays: 3 }, seen);
+      const first = seen.phases.indexOf("replay");
+
+      check.isEqualTo(
+        seat,
+        [seen.phases.slice(first, first + 4), outcome.replays, outcome.reproduced],
+        [["replay", "replay", "replay", "shrink"], 3, 3],
+        "the three replays run before the first shrink candidate",
+      );
+    });
+
+    it("shrinks a failure that one replay of three reproduces", async ({ seat }) => {
+      let calls = 0;
+      const outcome = await ran(
+        body((c) => {
+          calls += 1;
+          if (c.draw(WIDE, "n") > MILLION && calls % 2 === 0) {
+            c.fail("even");
+          }
+        }),
+        { seed: SEED, replays: 3 },
+      );
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.replays, outcome.reproduced],
+        ["counterexample", 3, 1],
+        "the failing call is even, so only the second replay fails again",
+      );
+    });
+
+    it("returns flaky with the divergence of the first of three replays", async ({
+      seat,
+    }) => {
+      let failed = false;
+      const outcome = await ran(
+        body((c) => {
+          if (c.draw(WIDE, "n") > MILLION && !failed) {
+            failed = true;
+            c.fail("once");
+          }
+        }),
+        { seed: SEED, replays: 3 },
+      );
+      const { divergence } = outcome;
+
+      check.isEqualTo(
+        seat,
+        [
+          outcome.kind,
+          outcome.replays,
+          outcome.reproduced,
+          [
+            divergence?.what,
+            divergence?.index,
+            divergence?.recorded,
+            divergence?.replayed,
+          ],
+        ],
+        ["flaky", 3, 0, ["verdict", 1, "once", undefined]],
+        "no replay fails again, because the body fails once",
+      );
+    });
+
+    const unreplayed: { name: string; give: Partial<Settings> }[] = [
+      { name: "a run without a shrink", give: { shrink: 0 } },
+      { name: "a replay token", give: { replay: integers(MILLION + 1n) } },
+      {
+        name: "a failing example of values",
+        give: { examples: [new Values([MILLION + 5n])] },
+      },
+    ];
+    for (const tt of unreplayed) {
+      it(`reports the failing case of ${tt.name} without a replay`, async ({
+        seat,
+      }) => {
+        const seen = new Seen();
+        const outcome = await ran(
+          aboveMillion,
+          { seed: SEED, replays: 3, ...tt.give },
+          seen,
+        );
+
+        check.isEqualTo(
+          seat,
+          [
+            outcome.kind,
+            outcome.replays,
+            outcome.reproduced,
+            seen.phases.includes("replay"),
+          ],
+          ["counterexample", undefined, undefined, false],
+          "the run does not replay the failing case",
+        );
+      });
+    }
   });
 
   describe("runStored", () => {
