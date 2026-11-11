@@ -226,6 +226,7 @@
     "swarm",
     "clients",
     "concurrent",
+    "concurrentMean",
     "tasks",
     "uniform",
     "pct"

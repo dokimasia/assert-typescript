@@ -125,7 +125,11 @@ class Run<S> {
       if (this.#trace !== undefined) {
         followConcurrent(this.#c, this.#trace, eligible, count, this.#config);
       }
-      if (eligible.length === 0 || !this.#on((e) => more(e, count, sizes))) {
+      const mean = this.#config.concurrentMean;
+      if (
+        eligible.length === 0 ||
+        !this.#on((e) => more(e, count, sizes, false, mean))
+      ) {
         break;
       }
       const client = clientOf(this.#c, clients);

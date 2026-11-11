@@ -11,6 +11,7 @@ import type { Seat } from "../../src/seat.js";
 import {
   clients,
   concurrent,
+  concurrentMean,
   configure,
   max,
   mean,
@@ -58,6 +59,7 @@ describe("option", () => {
           clients: 1,
           concurrent: 16,
           scheduler: undefined,
+          concurrentMean: undefined,
         },
         "the defaults",
       );
@@ -118,6 +120,20 @@ describe("option", () => {
         seat,
         () => concurrent(-1),
         "stateful: concurrent(-1) is no integer of 0 or more",
+      );
+    });
+  });
+
+  describe("concurrentMean", () => {
+    it("returns the option of the mean number of steps of a section", ({ seat }) => {
+      sets(seat, concurrentMean(0), { concurrentMean: 0 });
+    });
+
+    it("throws a RangeError for a mean below 0", ({ seat }) => {
+      refuses(
+        seat,
+        () => concurrentMean(-1),
+        "stateful: concurrentMean(-1) is no integer of 0 or more",
       );
     });
   });

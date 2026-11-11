@@ -20,6 +20,7 @@ import { Recorder } from "../../seat.js";
 import {
   clients,
   concurrent,
+  concurrentMean,
   max,
   mean,
   type Option as StepsOption,
@@ -69,6 +70,9 @@ function setupOf(written: Raw): Setup {
   const section = [clients(Number(written["clients"] ?? SETUP_CLIENTS))];
   if (written["concurrent"] !== undefined) {
     section.push(concurrent(Number(written["concurrent"])));
+  }
+  if (written["concurrent-mean"] !== undefined) {
+    section.push(concurrentMean(Number(written["concurrent-mean"])));
   }
   return { steps, section, strategy: strategyOf(written["strategy"] ?? "uniform") };
 }

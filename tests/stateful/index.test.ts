@@ -20,6 +20,7 @@ describe("index", () => {
         "Scheduler",
         "clients",
         "concurrent",
+        "concurrentMean",
         "max",
         "mean",
         "pct",

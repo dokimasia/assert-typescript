@@ -45,6 +45,7 @@ export type { Action, Machine } from "./machine.js";
 export {
   clients,
   concurrent,
+  concurrentMean,
   max,
   mean,
   type Option,

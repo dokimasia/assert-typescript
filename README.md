@@ -578,6 +578,7 @@ stateful.max(n: number): Option
 stateful.swarm(on: boolean): Option
 stateful.clients(n: number): Option
 stateful.concurrent(n: number): Option
+stateful.concurrentMean(n: number): Option
 stateful.tasks(scheduler: Scheduler): Option
 stateful.uniform(): Strategy
 stateful.pct(depth: number): Strategy
@@ -945,6 +946,10 @@ A task marks each point where another task may run with
 `await scheduler.yield()`, because a library cannot intercept a native
 `await`.
 
+A concurrent section averages 5 steps under the default maximum of 16.
+`stateful.concurrentMean(n)` sets another mean, and the maximum of
+`stateful.concurrent(n)` still stops a section.
+
 ## Without a runner
 
 The core has no runner dependency. Construct a seat and flush it where
@@ -976,7 +981,7 @@ definition and holds itself to it:
 - 195 corpus cases state what each assertion must report, run against
   both surfaces and the matchers of `expect`, with the call record of
   each call. They are the same cases every other implementation runs.
-- 441 property vectors, 110 history vectors, 14 machine vectors and 57
+- 441 property vectors, 110 history vectors, 15 machine vectors and 57
   file vectors pin the property engine, the history checks, machines and
   the assertions of files.
 - A completeness gate checks that every assertion is present under the

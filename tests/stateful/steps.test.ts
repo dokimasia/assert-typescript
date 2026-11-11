@@ -27,6 +27,7 @@ import type { Action, Machine } from "../../src/stateful/machine.js";
 import {
   clients,
   concurrent,
+  concurrentMean,
   max,
   mean,
   type Option,
@@ -692,6 +693,30 @@ describe("steps", () => {
       }
 
       check.isEqualTo(seat, got, want, "below(3) after a coin of 5 in 6");
+    });
+
+    it("continues a concurrent section by its mean up to the most steps", async ({
+      seat,
+    }) => {
+      const got: unknown[] = [];
+      const want: unknown[] = [];
+      for (let seed = 0n; seed < 20n; seed += 1n) {
+        const { c, engine } = bodyCase(new Generating(new Source(seed)));
+        const twin = new Source(seed);
+        await steps(
+          c,
+          { actions: [new Log().action("a")] },
+          ...section(c, concurrentMean(12)),
+        );
+        const listed: bigint[] = [];
+        while (listed.length < 16 && twin.coin(12n, 13n)) {
+          listed.push(twin.below(3n));
+        }
+        got.push(engine.steps.map(([, step]) => step.client));
+        want.push(listed.map(Number));
+      }
+
+      check.isEqualTo(seat, got, want, "below(3) after a coin of 12 in 13");
     });
 
     it("checks the history once every task of a section ends", async ({ seat }) => {

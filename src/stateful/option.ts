@@ -15,6 +15,7 @@ const DEFAULTS: Config = {
   clients: 1,
   concurrent: 16,
   scheduler: undefined,
+  concurrentMean: undefined,
 };
 
 /** Throws a RangeError for an n that is no integer of least or more. */
@@ -38,6 +39,8 @@ export interface Config {
   readonly concurrent: number;
   /** The scheduler whose tasks run the clients of a concurrent section. */
   readonly scheduler: Scheduler | undefined;
+  /** The mean number of steps of a concurrent section, or undefined for the mean of a collection of 0 to concurrent elements. */
+  readonly concurrentMean: number | undefined;
 }
 
 /** An option of steps. A later option overrides an earlier one of the same setting. */
@@ -109,6 +112,21 @@ export function clients(n: number): Option {
 export function concurrent(n: number): Option {
   atLeast("concurrent", n, 0);
   return { set: (config) => ({ ...config, concurrent: n }) };
+}
+
+/**
+ * Returns the option that sets the mean number of steps of a concurrent
+ * section. A section without the option averages 5 steps for a maximum of
+ * 10 or more, and half the maximum, rounded up, below it. The maximum of
+ * {@link concurrent} still stops a section.
+ *
+ * @param n - The mean.
+ * @returns The option.
+ * @throws RangeError for an n that is no integer of 0 or more.
+ */
+export function concurrentMean(n: number): Option {
+  atLeast("concurrentMean", n, 0);
+  return { set: (config) => ({ ...config, concurrentMean: n }) };
 }
 
 /**

@@ -54,8 +54,8 @@ describe("vectors", () => {
       expect([...RUNNERS.keys()]).toEqual(["machines"]);
     });
 
-    it("runs the 14 machines vectors of the definition", () => {
-      expect(VECTORS.size).toBe(14);
+    it("runs the 15 machines vectors of the definition", () => {
+      expect(VECTORS.size).toBe(15);
     });
 
     for (const id of VECTORS.keys()) {
@@ -72,6 +72,12 @@ describe("vectors", () => {
 
     it("agrees with a vector of a setup of a mean and a most steps of a section", async () => {
       const raw = { ...vector(PASSING), setup: { mean: 5, concurrent: 4 } };
+
+      await expect(MACHINES(raw)).resolves.toBeUndefined();
+    });
+
+    it("agrees with a vector of a setup of the mean steps of a section", async () => {
+      const raw = { ...vector(PASSING), setup: { "concurrent-mean": 1 } };
 
       await expect(MACHINES(raw)).resolves.toBeUndefined();
     });
