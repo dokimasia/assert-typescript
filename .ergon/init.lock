@@ -1,5 +1,5 @@
 {
-  "ergon": "0.17.1",
+  "ergon": "0.17.2",
   "files": [
     {
       "path": ".commitlint.yaml",
@@ -66,7 +66,7 @@
       "path": ".github/workflows/ci.yml",
       "producer": "github",
       "local": "a1cd997f12626743243981ff5d6db59626163aa2e3b689d80535024466578d31",
-      "sha256": "fcfba17b1561689f4ceebb28bbc7d5f5e8036cd301b7e682b22fe6d00b3baea5"
+      "sha256": "4596c1d1c7953e27e032b0517ed93fb3d08c5dc56e562dd9e7e5727ec2a6d5d2"
     },
     {
       "path": ".github/workflows/codeql.yml",
@@ -76,7 +76,7 @@
     {
       "path": ".github/workflows/nightly.yml",
       "producer": "github",
-      "sha256": "c9b6249e77ef9bfcd5c8e5d064d5417464d71c48c56f45e9eeca1f63011790d6"
+      "sha256": "fef872b9a6e776d4b74c2605587c82f0e36f68d6534f4683e1ae00809ffebaef"
     },
     {
       "path": ".github/workflows/release.yml",
@@ -134,7 +134,7 @@
       "path": "biome.json",
       "producer": "js",
       "local": "82146e7cd0ab2a9d0c88168e5a24823be3f8f78eb22350c27aa640a6e860a7cb",
-      "sha256": "178b1a81d1bcab0db04150f859fa2a683a3f43f10aa6531ecf126ac8afb2693f"
+      "sha256": "7aef1bc2a85f67a11b5255590141edd9e787646dc3c97dbdce09dc37d8a96e14"
     }
   ],
   "settings": {
