@@ -15,14 +15,19 @@
  * followed by `.json`. The same failure, shrunk to the same choices, has the
  * same name in every language.
  *
- * An entry of format 1 is an object with exactly these fields: `store`, the
- * format; `definition`, the definition version that wrote the entry, as
+ * An entry of format 1 or 2 is an object with exactly these fields: `store`,
+ * the format; `definition`, the definition version that wrote the entry, as
  * MAJOR.MINOR.PATCH; `property`, the property's contract; `identity`, the
  * failure's identity; `choices`, the replay token of the minimal case;
- * `counterexample`, one object per draw with its `label` and, when the value
- * has a typed literal, its `value`; and `found`, the UTC date on which the
- * runner wrote the entry. A file nests objects and arrays at most 64 levels
- * deep, the root object being the first level.
+ * `counterexample`, one object per entry of the counterexample in request
+ * order; and `found`, the UTC date on which the runner wrote the entry. A
+ * draw entry has its `label` and, when the value has a typed literal, its
+ * `value`. An entry of format 2 also has the step entries of a machine: the
+ * action as `step`, with the `client` of a step of a concurrent section from
+ * 0 to 2^31 − 1, or `drain` set to true for a step of the drain. A runner
+ * writes format 2 for a counterexample with a step entry, and format 1 for
+ * every other counterexample. A file nests objects and arrays at most 64
+ * levels deep, the root object being the first level.
  *
  * A runner gives each file one verdict: `replay` for an entry of the
  * property, `other` for an entry of another property of the test, `skip`
@@ -36,13 +41,16 @@ import { JsonError, parse } from "./json.js";
 import { mix } from "./source.js";
 import { decode, encode } from "./token.js";
 
-/** The format of the entries that this module writes and replays. */
+/** The format of an entry whose counterexample has draw entries alone. */
 const FORMAT = 1n;
+
+/** The format of an entry whose counterexample also has the step entries of a machine. */
+const STEPS_FORMAT = 2n;
 
 /** The version of the tokens that the token module encodes. */
 const TOKEN_VERSION = 1n;
 
-/** The largest line of an identity, the largest signed 32-bit integer. */
+/** The largest line of an identity, and the largest client of a step entry: the largest signed 32-bit integer. */
 const LINE_MAX = 2_147_483_647n;
 
 /** The base and the digits of the key in a file's name. */
@@ -77,6 +85,9 @@ const IDENTITIES = [
 
 /** The keys of a draw of the counterexample, sorted, without and with a value. */
 const DRAWS = new Set(["label", "label,value"]);
+
+/** The keys of a step of the counterexample, sorted: a sequential step, a step of a concurrent section and a step of the drain. */
+const STEPS = new Set(["step", "client,step", "drain,step"]);
 
 /** The start of a token, which states its version. */
 const TOKEN = /^prop(?<version>[1-9][0-9]*):/u;
@@ -147,10 +158,38 @@ function isDate(found: unknown): boolean {
   );
 }
 
-/** Reports whether every field of an entry of format 1 has its form. The token's own form is checked apart. */
-function wellFormed(document: Readonly<Record<string, unknown>>): boolean {
+/** Reports whether a step of the counterexample has its form: an action that is a string, a client from 0 to 2^31 − 1, and a drain mark of true. */
+function isStepEntry(fields: Readonly<Record<string, unknown>>): boolean {
+  const client = fields["client"] ?? 0n;
+  return (
+    STEPS.has(keysOf(fields)) &&
+    typeof fields["step"] === "string" &&
+    typeof client === "bigint" &&
+    client >= 0n &&
+    client <= LINE_MAX &&
+    (fields["drain"] ?? true) === true
+  );
+}
+
+/** Reports whether an entry of the counterexample has its form. A step entry has its form only when steps is true. */
+function isItem(item: unknown, steps: boolean): boolean {
+  if (!isObject(item)) {
+    return false;
+  }
+  if (DRAWS.has(keysOf(item))) {
+    return typeof item["label"] === "string";
+  }
+  return steps && isStepEntry(item);
+}
+
+/** Reports whether every field of an entry of a format has its form. The token's own form is checked apart. */
+function wellFormed(
+  document: Readonly<Record<string, unknown>>,
+  version: bigint,
+): boolean {
   const identity = document["identity"];
-  const draws = document["counterexample"];
+  const items = document["counterexample"];
+  const steps = version === STEPS_FORMAT;
   return (
     typeof document["definition"] === "string" &&
     VERSION.test(document["definition"]) &&
@@ -159,11 +198,8 @@ function wellFormed(document: Readonly<Record<string, unknown>>): boolean {
     IDENTITIES.includes(keysOf(identity)) &&
     Object.entries(identity).every(([key, value]) => identityValue(key, value)) &&
     typeof document["choices"] === "string" &&
-    Array.isArray(draws) &&
-    draws.every(
-      (draw) =>
-        isObject(draw) && DRAWS.has(keysOf(draw)) && typeof draw["label"] === "string",
-    ) &&
+    Array.isArray(items) &&
+    items.every((item) => isItem(item, steps)) &&
     isDate(document["found"])
   );
 }
@@ -175,11 +211,11 @@ function parseEntry(text: string): readonly [string, Choice[]] {
   if (typeof version !== "bigint" || version < FORMAT) {
     throw new JsonError("prop: store names no format");
   }
-  if (version > FORMAT) {
+  if (version > STEPS_FORMAT) {
     throw new Later();
   }
   const entryOf = document as Readonly<Record<string, unknown>>;
-  if (keysOf(entryOf) !== FIELDS.join(",") || !wellFormed(entryOf)) {
+  if (keysOf(entryOf) !== FIELDS.join(",") || !wellFormed(entryOf, version)) {
     throw new JsonError("prop: the entry's fields are not those of its format");
   }
   const token = entryOf["choices"] as string;
@@ -213,7 +249,7 @@ export interface Failure {
   readonly choices: readonly Choice[];
   /** The identity, with the keys of one of the four identity shapes. */
   readonly identity: Readonly<Record<string, string | number>>;
-  /** Each draw: its label, and its value's typed literal when it has one. */
+  /** The entries of the counterexample in request order: each draw with its label and its value's typed literal when it has one, and each step of a machine with its action, client and drain mark. */
   readonly counterexample: readonly Readonly<Record<string, unknown>>[];
 }
 
@@ -234,9 +270,10 @@ export function name(contract: string, choices: readonly Choice[]): string {
 }
 
 /**
- * Returns the entry that a runner of definition writes on the date found. A
- * draw whose value would nest the entry past 64 levels is recorded by its
- * label alone.
+ * Returns the entry that a runner of definition writes on the date found:
+ * of format 2 for a counterexample with a step entry, and of format 1
+ * otherwise. A draw whose value would nest the entry past 64 levels is
+ * recorded by its label alone.
  *
  * @param failure - The failure.
  * @param definition - The definition version, as MAJOR.MINOR.PATCH.
@@ -248,16 +285,17 @@ export function entry(
   definition: string,
   found: string,
 ): Record<string, unknown> {
+  const steps = failure.counterexample.some((item) => "step" in item);
   return {
-    store: Number(FORMAT),
+    store: Number(steps ? STEPS_FORMAT : FORMAT),
     definition,
     property: failure.contract,
     identity: { ...failure.identity },
     choices: encode(failure.choices),
-    counterexample: failure.counterexample.map((draw) =>
-      "value" in draw && depth(draw["value"]) > MAX_DEPTH - ABOVE_VALUE
-        ? { label: draw["label"] }
-        : { ...draw },
+    counterexample: failure.counterexample.map((item) =>
+      "value" in item && depth(item["value"]) > MAX_DEPTH - ABOVE_VALUE
+        ? { label: item["label"] }
+        : { ...item },
     ),
     found,
   };

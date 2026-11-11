@@ -4,7 +4,11 @@
 /** The spec of the outputs of the token and store vectors. */
 
 import { describe } from "vitest";
-import { storeOf, tokenOf } from "../../../src/conformance/prop/replay.js";
+import {
+  storedCaseOf,
+  storeOf,
+  tokenOf,
+} from "../../../src/conformance/prop/replay.js";
 import { vectors } from "../../../src/conformance/vector.js";
 import { check } from "../../../src/index.js";
 import { Fault } from "../../../src/matcher/fault.js";
@@ -97,5 +101,43 @@ describe("replay", () => {
         "the fault at the entry",
       );
     });
+  });
+
+  describe("storedCaseOf", () => {
+    it("returns the choices and the counterexample of a stored case", ({ seat }) => {
+      check.isEqualTo(
+        seat,
+        storedCaseOf({ choices: [3], counterexample: [{ label: "value" }] }, 0),
+        {
+          choices: [{ kind: "integer", value: 3n }],
+          counterexample: [{ label: "value" }],
+        },
+        "the stored case",
+      );
+    });
+
+    const refusals: { name: string; give: unknown }[] = [
+      { name: "choices alone", give: [3] },
+      { name: "an object without a counterexample", give: { choices: [3] } },
+      {
+        name: "a counterexample that is no list",
+        give: { choices: [3], counterexample: {} },
+      },
+    ];
+    for (const tt of refusals) {
+      it(`throws a fault at the stored case for ${tt.name}`, ({ seat }) => {
+        const err = check.doesThrow(seat, () => storedCaseOf(tt.give, 1), "a refusal");
+
+        check.isEqualTo(
+          seat,
+          err instanceof Fault ? [err.at, err.reason] : err,
+          [
+            "settings.stored[1]",
+            "the stored case is no object of its choices and its counterexample",
+          ],
+          "the fault at the stored case",
+        );
+      });
+    }
   });
 });

@@ -9,11 +9,16 @@
  *
  * 1. Traces, examples and stored: each trace of a case whose draws and
  *    steps the caller states, then each example of a case whose values the
- *    caller states, in order, then each stored choice sequence. An example
+ *    caller states, in order, then each stored case. An example
  *    is a choice sequence, or the values of its draws when its generator has
  *    no inverse. These cases do not enter the case tree. A trace that the
  *    body cannot follow throws TraceError, which ends the run before any
- *    other case runs.
+ *    other case runs. A stored case runs its choices. When the case of the
+ *    choices does not fail and does not decode to the counterexample of its
+ *    entry, the run follows that counterexample as a trace. The case of the
+ *    trace counts when it fails or takes every entry, and the case of the
+ *    choices counts when the body refuses an entry of the trace or leaves
+ *    one untaken. Such a refusal does not end the run.
  * 2. Simplest: one case whose every choice is its target.
  * 3. Random: case i of the seed, for i = 0, 1, 2, …, until `cases` valid
  *    cases have run, the domain is exhausted, or ten times `cases` random
@@ -75,6 +80,7 @@ import { knownCases, type Resolved, resolve, type Settings } from "./settings.js
 import { confirm, confirmValid } from "./shrink/confirm.js";
 import { explain } from "./shrink/explain.js";
 import { type Failure, Shrinker } from "./shrink.js";
+import { runKnown, type StoredRun } from "./stored.js";
 import { type Outcome, Tally } from "./tally.js";
 import { encode } from "./token.js";
 import type { Work } from "./work.js";
@@ -91,14 +97,18 @@ function* tryKnown(
   settings: Resolved,
   tally: Tally,
   observer: Observer,
-  stored: Execution[],
+  stored: StoredRun[],
 ): Work<Outcome | undefined> {
   for (const [phase, provider] of knownCases(settings)) {
-    const execution = yield* execute(body, provider, settings.maxChoices);
-    observer(phase, execution);
-    if (phase === "stored") {
-      stored.push(execution);
-    }
+    const { maxChoices } = settings;
+    const execution = yield* runKnown(
+      body,
+      phase,
+      provider,
+      maxChoices,
+      observer,
+      stored,
+    );
     const valued = provider instanceof Valuing;
     const outcome = tally.take(execution);
     if (outcome !== undefined) {
@@ -117,7 +127,7 @@ function* tryKnown(
 /** Runs the phases until the run ends, without concluding a counterexample. */
 function* explore(body: Body, settings: Resolved, observer: Observer): Work<Outcome> {
   const tally = new Tally(settings.seed);
-  const stored: Execution[] = [];
+  const stored: StoredRun[] = [];
   const known = yield* tryKnown(body, settings, tally, observer, stored);
   if (known !== undefined) {
     return known;
@@ -278,7 +288,7 @@ export function* runStored(
 ): Work<Outcome> {
   const resolved = resolve({ ...settings, traces: [], examples: [] });
   const tally = new Tally(resolved.seed);
-  const stored: Execution[] = [];
+  const stored: StoredRun[] = [];
   const outcome = yield* tryKnown(body, resolved, tally, observer, stored);
   if (outcome === undefined) {
     return { ...tally.outcome("passed"), stored };

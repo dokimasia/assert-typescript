@@ -248,7 +248,7 @@ describe("directory", () => {
 
     it("skips an entry of a later format", ({ seat }) => {
       const dir = temporary();
-      writeFileSync(join(dir, "later.json"), JSON.stringify({ store: 2 }));
+      writeFileSync(join(dir, "later.json"), JSON.stringify({ store: 3 }));
 
       check.isEqualTo(
         seat,

@@ -573,7 +573,7 @@ describe("property", () => {
       setVariable(MUTANT, undefined);
       const dir = temporary();
       await storeAFailure(dir);
-      writeFileSync(join(dir, "later.json"), JSON.stringify({ store: 2 }));
+      writeFileSync(join(dir, "later.json"), JSON.stringify({ store: 3 }));
       const [written] = readdirSync(dir).filter((file) => file !== "later.json");
       const recorder = new Recorder();
       await runOn(

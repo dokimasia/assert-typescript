@@ -28,6 +28,7 @@ import { caseSource } from "../../../src/prop/engine/source.js";
 import type { Outcome } from "../../../src/prop/engine/tally.js";
 import { drive } from "../../../src/prop/engine/work.js";
 import { test as it } from "../../../src/vitest.js";
+import { storedCase } from "../../helpers.js";
 
 const SEED = 7n;
 const WIDE = new Integer(new IntegerBounds(0n, 1_000_000_000n));
@@ -218,7 +219,7 @@ describe("campaign", () => {
         ticks(2, {
           traces: [[{ label: "n", value: 1n }]],
           examples: [integers(5n, 6n), new Values([7n, 8n])],
-          stored: [integers(3n, 4n)],
+          stored: [storedCase(3n, 4n)],
         }),
       );
 
@@ -304,7 +305,7 @@ describe("campaign", () => {
             c.fail("first");
           }
         }),
-        ticks(10, { stored: [integers(5n)] }),
+        ticks(10, { stored: [storedCase(5n)] }),
       );
 
       check.isEqualTo(
@@ -327,7 +328,7 @@ describe("campaign", () => {
             c.fail("first");
           }
         }),
-        ticks(10, { stored: [integers(5n)], replays: 2 }),
+        ticks(10, { stored: [storedCase(5n)], replays: 2 }),
       );
 
       check.isEqualTo(
@@ -346,7 +347,7 @@ describe("campaign", () => {
           c.draw(WIDE, "n");
           c.skip("the environment lacks a capability");
         }),
-        ticks(10, { stored: [integers(5n)] }),
+        ticks(10, { stored: [storedCase(5n)] }),
       );
 
       check.isEqualTo(
@@ -440,7 +441,7 @@ describe("campaign", () => {
             c.fail("second");
           }
         }),
-        ticks(10, { stored: [integers(5n)], confirm: 1 }),
+        ticks(10, { stored: [storedCase(5n)], confirm: 1 }),
       );
       const { divergence } = outcome;
 

@@ -34,12 +34,13 @@ import {
 import { concludeCase, run, runStored } from "../../../src/prop/engine/runner.js";
 import { type Settings, Values } from "../../../src/prop/engine/settings.js";
 import { caseSource } from "../../../src/prop/engine/source.js";
+import { Stored } from "../../../src/prop/engine/stored.js";
 import type { Outcome } from "../../../src/prop/engine/tally.js";
 import { decode } from "../../../src/prop/engine/token.js";
 import { TraceError } from "../../../src/prop/engine/trace.js";
 import { drive } from "../../../src/prop/engine/work.js";
 import { test as it } from "../../../src/vitest.js";
-import { body, integers } from "../../helpers.js";
+import { body, integers, storedCase } from "../../helpers.js";
 
 const SEED = 7n;
 const DIGIT = new Integer(new IntegerBounds(0n, 9n));
@@ -227,7 +228,7 @@ describe("runner", () => {
             c.fail("seven");
           }
         }),
-        { seed: SEED, stored: [integers(7n)] },
+        { seed: SEED, stored: [storedCase(7n)] },
       );
 
       check.isEqualTo(
@@ -660,7 +661,7 @@ describe("runner", () => {
           seed: SEED,
           cases: 1,
           examples: [integers(5n)],
-          stored: [integers(3n), integers(4n)],
+          stored: [storedCase(3n), storedCase(4n)],
         },
         seen,
       );
@@ -1155,7 +1156,7 @@ describe("runner", () => {
           seed: SEED,
           cases: 1,
           examples: [integers(5n)],
-          stored: [integers(3n)],
+          stored: [storedCase(3n)],
           confirm: 1,
         },
         seen,
@@ -1172,7 +1173,7 @@ describe("runner", () => {
     it("returns flaky for a known case whose replay fails", async ({ seat }) => {
       const outcome = await ran(failingOnItsSecondCall(), {
         seed: SEED,
-        stored: [integers(3n)],
+        stored: [storedCase(3n)],
         confirm: 1,
       });
 
@@ -1372,6 +1373,57 @@ describe("runner", () => {
     }
   });
 
+  describe("run with a stored case of other values", () => {
+    it("replays the trace of a stored case whose choices decode to other values", async ({
+      seat,
+    }) => {
+      const stored = new Stored(
+        integers(3n),
+        [{ label: "n", value: MILLION + 1n }],
+        () => false,
+      );
+      const outcome = await ran(aboveMillion, {
+        seed: SEED,
+        cases: 1,
+        stored: [stored],
+        shrink: 0,
+      });
+
+      check.isEqualTo(
+        seat,
+        [
+          outcome.kind,
+          outcome.failing?.case.draws[0]?.value,
+          outcome.stored.map((one) => one.replayed),
+        ],
+        ["counterexample", MILLION + 1n, [true]],
+        "the run fails at the value of the entry",
+      );
+    });
+
+    it("reports the case of the trace of a stored case as found", async ({ seat }) => {
+      const stored = new Stored(
+        integers(3n),
+        [{ label: "n", value: MILLION + 1n }],
+        () => false,
+      );
+      const outcome = await drive(
+        runStored(aboveMillion, { seed: SEED, stored: [stored] }),
+      );
+
+      check.isEqualTo(
+        seat,
+        [
+          outcome.kind,
+          decode(outcome.token as string),
+          outcome.stored.map((one) => one.replayed),
+        ],
+        ["counterexample", integers(MILLION + 1n), [true]],
+        "the token is the token of the case of the trace",
+      );
+    });
+  });
+
   describe("runStored", () => {
     it("returns flaky without a token for a stored case whose replay fails", async ({
       seat,
@@ -1380,7 +1432,7 @@ describe("runner", () => {
       const outcome = await drive(
         runStored(
           failingOnItsSecondCall(),
-          { seed: SEED, stored: [integers(1n), integers(2n)], confirm: 1 },
+          { seed: SEED, stored: [storedCase(1n), storedCase(2n)], confirm: 1 },
           seen.observer,
         ),
       );
@@ -1395,7 +1447,10 @@ describe("runner", () => {
 
     it("counts the stored cases that pass", async ({ seat }) => {
       const outcome = await drive(
-        runStored(aboveMillion, { seed: SEED, stored: [integers(1n), integers(2n)] }),
+        runStored(aboveMillion, {
+          seed: SEED,
+          stored: [storedCase(1n), storedCase(2n)],
+        }),
       );
 
       check.isEqualTo(
@@ -1413,7 +1468,10 @@ describe("runner", () => {
       const outcome = await drive(
         runStored(
           aboveMillion,
-          { seed: SEED, stored: [integers(1n), integers(MILLION + 9n), integers(3n)] },
+          {
+            seed: SEED,
+            stored: [storedCase(1n), storedCase(MILLION + 9n), storedCase(3n)],
+          },
           seen.observer,
         ),
       );
@@ -1434,7 +1492,7 @@ describe("runner", () => {
               c.skip("the stored case skips");
             }
           }),
-          { seed: SEED, stored: [integers(1n), integers(2n), integers(3n)] },
+          { seed: SEED, stored: [storedCase(1n), storedCase(2n), storedCase(3n)] },
         ),
       );
 

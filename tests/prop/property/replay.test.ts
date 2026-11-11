@@ -8,7 +8,7 @@ import { check } from "../../../src/index.js";
 import { Fault } from "../../../src/matcher/fault.js";
 import { choiceOf, IntegerBounds } from "../../../src/prop/engine/choice.js";
 import * as token from "../../../src/prop/engine/token.js";
-import { type Entry, TraceError } from "../../../src/prop/engine/trace.js";
+import { type Entry, TraceError, UNSTATED } from "../../../src/prop/engine/trace.js";
 import { configure, hermetic, replay } from "../../../src/prop/option.js";
 import { entriesOf, refusalOf, replayOf } from "../../../src/prop/property/replay.js";
 import { test as it } from "../../../src/vitest.js";
@@ -164,6 +164,24 @@ describe("replay", () => {
         fault.reason,
         'the draw labelled "y" takes the entry labelled "x"',
         "the fault at the label",
+      );
+    });
+
+    it("states an entry of a draw that has no typed literal", ({ seat }) => {
+      const fault = refusalOf(
+        new TraceError(0, "x", "value"),
+        [{ label: "x", value: UNSTATED }],
+        "counterexample",
+      );
+
+      check.isEqualTo(
+        seat,
+        [fault.at, fault.reason],
+        [
+          "counterexample[0].value",
+          'the entry of the draw labelled "x" has no typed literal',
+        ],
+        "the fault at the entry of the counterexample",
       );
     });
   });

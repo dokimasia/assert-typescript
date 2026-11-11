@@ -47,7 +47,7 @@ import type { Config, Wrapper } from "./option.js";
 import { adapt, observerOf } from "./property/body.js";
 import { entriesOf, refusalOf, replayOf } from "./property/replay.js";
 import { reportOutcome } from "./property/report.js";
-import { saveOutcome, storeFaults } from "./property/store.js";
+import { saveOutcome, storedCases, storeFaults } from "./property/store.js";
 import { close } from "./registry.js";
 
 /** The settings of a property's runs, with the cap on choices that every run states. */
@@ -208,10 +208,7 @@ export class Property {
     if (loaded === undefined) {
       return;
     }
-    const settings = {
-      ...this.#settings,
-      stored: loaded.entries.map((entry) => entry.choices),
-    };
+    const settings = { ...this.#settings, stored: storedCases(loaded) };
     const saved: Fault[] = [];
     const concluded = (found: Outcome): void => {
       saved.push(...saveOutcome(this.#dir, this.call.contract, found));
@@ -237,7 +234,8 @@ export class Property {
    * Replays the stored cases of the property on seat, oldest first, as the
    * call running, and reports how they ended: a pass that counts them, or
    * the first that does not pass, as found. It notes each stored case that
-   * decodes to other values than its entry records.
+   * decodes to other values than its entry records, and whether the run
+   * replayed the counterexample of its entry.
    *
    * It ends the call with a fault for each fault for which run ends its call
    * before a case.
@@ -255,10 +253,7 @@ export class Property {
     if (loaded === undefined) {
       return;
     }
-    const settings = {
-      ...this.#settings,
-      stored: loaded.entries.map((entry) => entry.choices),
-    };
+    const settings = { ...this.#settings, stored: storedCases(loaded) };
     const work = runStored(
       adapt(seat, running.slot, body, this.call, this.#around),
       settings,

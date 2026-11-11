@@ -43,7 +43,8 @@ async function start(
  * target, then random cases of the seed with a prefix case and an edge case
  * after each, until the cases option's number of valid cases ran, the run
  * tested every input of the domain, or ten times as many cases were
- * generated. A failing case is replayed, shrunk to the smallest case that
+ * generated. A stored case whose choices decode to other values than its
+ * file records replays the values and the steps of the file. A failing case is replayed, shrunk to the smallest case that
  * fails the same way, and explained.
  *
  * A run that found no failing case fails when it rejected more than ten

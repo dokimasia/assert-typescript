@@ -10,6 +10,7 @@
 import * as coverage from "./coverage.js";
 import type { Divergence, Execution } from "./execution.js";
 import type { Explained } from "./shrink/explain.js";
+import type { StoredRun } from "./stored.js";
 
 /** A run that rejects more than this many cases for every valid one ends as rejected. */
 const MAX_REJECTIONS = 10;
@@ -70,7 +71,7 @@ export interface Outcome {
   readonly token?: string | undefined;
   readonly runs: number;
   readonly valued: boolean;
-  readonly stored: readonly Execution[];
+  readonly stored: readonly StoredRun[];
   readonly replays?: number | undefined;
   readonly reproduced?: number | undefined;
 }

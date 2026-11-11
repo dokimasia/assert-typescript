@@ -4,7 +4,8 @@
 /**
  * The options of a property that state a case to replay: the token of the
  * option replay, and the entries of the option draws. A fault of an entry is
- * at the entry, under draws.
+ * at the entry, under draws, or under the counterexample of an entry of the
+ * store.
  */
 
 import { Fault } from "../../matcher/fault.js";
@@ -12,7 +13,7 @@ import type { Step } from "../engine/case/record.js";
 import type { Choice } from "../engine/choice.js";
 import * as literal from "../engine/literal.js";
 import * as token from "../engine/token.js";
-import { type Entry, isStep, type TraceError } from "../engine/trace.js";
+import { type Entry, isStep, type TraceError, UNSTATED } from "../engine/trace.js";
 import { tokenOf } from "../environment.js";
 import type { Config } from "../option.js";
 
@@ -103,19 +104,31 @@ export function replayOf(config: Config): Choice[] | undefined {
 }
 
 /**
- * Returns the fault at the entry of the draws option that the body cannot
- * follow.
+ * Returns the fault at the entry of a trace that the body cannot follow.
+ * field is the input of the trace: the draws option, or the counterexample
+ * of an entry of the store.
  *
  * @param err - The refusal of the trace.
- * @param entries - The entries of the draws option.
+ * @param entries - The entries of the trace.
+ * @param field - The input of the trace, at the front of the location.
  * @returns The fault.
  */
-export function refusalOf(err: TraceError, entries: readonly Entry[]): Fault {
-  const at = `${DRAWS}[${err.entry}].${err.reason}`;
+export function refusalOf(
+  err: TraceError,
+  entries: readonly Entry[],
+  field: string = DRAWS,
+): Fault {
+  const at = `${field}[${err.entry}].${err.reason}`;
   const entry = entries[err.entry] as Entry;
   const label = JSON.stringify(err.what);
   if (err.reason === "step") {
     return new Fault(at, `the machine cannot take the step ${label} there`);
+  }
+  if (err.reason === "value" && !isStep(entry) && entry.value === UNSTATED) {
+    return new Fault(
+      at,
+      `the entry of the draw labelled ${label} has no typed literal`,
+    );
   }
   if (err.reason === "value") {
     return new Fault(

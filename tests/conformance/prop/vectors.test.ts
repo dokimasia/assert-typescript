@@ -11,6 +11,7 @@ import { checkProp, KINDS, settingsOf } from "../../../src/conformance/prop/vect
 import { vectors } from "../../../src/conformance/vector.js";
 import { Fault } from "../../../src/matcher/fault.js";
 import { compareText } from "../../../src/order.js";
+import { UNSTATED } from "../../../src/prop/engine/trace.js";
 
 /** The property vectors of the definition, by id. */
 const VECTORS = new Map(vectors().map((v) => [v.id, v.raw]));
@@ -193,31 +194,44 @@ describe("vectors", () => {
     });
 
     it("returns the stated settings", () => {
-      expect(
-        settingsOf({
-          seed: "1",
-          cases: 5,
-          "max-choices": 10,
-          requirements: [{ label: "even", share: 0.5 }],
-          examples: [[1]],
-          stored: [[{ sequence: [2] }]],
-          shrink: 0,
-          replay: "prop1:AAc",
-          confirm: 5,
-          replays: 3,
-        }),
-      ).toEqual({
-        seed: 1n,
+      const { stored, ...rest } = settingsOf({
+        seed: "1",
         cases: 5,
-        maxChoices: 10,
+        "max-choices": 10,
         requirements: [{ label: "even", share: 0.5 }],
-        examples: [[{ kind: "integer", value: 1n }]],
-        stored: [[{ kind: "sequence", value: [2] }]],
+        examples: [[1]],
+        stored: [
+          { choices: [{ sequence: [2] }], counterexample: [{ label: "value" }] },
+        ],
         shrink: 0,
-        replay: [{ kind: "integer", value: 7n }],
+        replay: "prop1:AAc",
         confirm: 5,
         replays: 3,
       });
+
+      expect([
+        rest,
+        stored?.map((one) => [one.choices, one.trace, typeof one.matches]),
+      ]).toEqual([
+        {
+          seed: 1n,
+          cases: 5,
+          maxChoices: 10,
+          requirements: [{ label: "even", share: 0.5 }],
+          examples: [[{ kind: "integer", value: 1n }]],
+          shrink: 0,
+          replay: [{ kind: "integer", value: 7n }],
+          confirm: 5,
+          replays: 3,
+        },
+        [
+          [
+            [{ kind: "sequence", value: [2] }],
+            [{ label: "value", value: UNSTATED }],
+            "function",
+          ],
+        ],
+      ]);
     });
   });
 

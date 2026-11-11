@@ -795,7 +795,9 @@ smallest such list, `[0, 1]`. The failure states the counterexample and
 the token that replays it, through `prop.replay` or the variable
 `DOKIMI_ASSERT_PROP_REPLAY`. The store of the test, under
 `testdata/prop`, keeps each counterexample, and the next run replays it
-first.
+first. When a change of a generator or of the actions of a machine makes
+the stored choices decode to other values, the run replays the values and
+the steps that the file records.
 
 A property form states one assertion for every input, such as
 `prop.isEqualTo` of two functions of the input. `prop.using` states the
@@ -1034,7 +1036,7 @@ definition and holds itself to it:
 - 195 corpus cases state what each assertion must report, run against
   both surfaces and the matchers of `expect`, with the call record of
   each call. They are the same cases every other implementation runs.
-- 445 property vectors, 112 history vectors, 22 machine vectors and 57
+- 452 property vectors, 112 history vectors, 25 machine vectors and 57
   file vectors pin the property engine, the history checks, machines and
   the assertions of files.
 - A completeness gate checks that every assertion is present under the

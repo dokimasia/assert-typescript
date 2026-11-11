@@ -32,6 +32,7 @@ import { CannotInvert } from "../src/prop/engine/inverse/refusal.js";
 import type { Emitted, Emitter } from "../src/prop/engine/inverse/steps.js";
 import { emit } from "../src/prop/engine/inverse.js";
 import { DEFAULT_BUDGET, Shrinker } from "../src/prop/engine/shrink.js";
+import { Stored } from "../src/prop/engine/stored.js";
 import { drive } from "../src/prop/engine/work.js";
 import { forAll } from "../src/prop/forall.js";
 import { hermetic, seed, store } from "../src/prop/option.js";
@@ -415,6 +416,11 @@ export function decodeFrom<T>(
 /** Returns integer choices of values. */
 export function integers(...values: bigint[]): Choice[] {
   return values.map((value) => ({ kind: "integer", value }));
+}
+
+/** Returns the stored case of the integer choices of values, without a trace. */
+export function storedCase(...values: bigint[]): Stored {
+  return new Stored(integers(...values));
 }
 
 /** Returns the value that a case draws from generator on the recorded choices. */

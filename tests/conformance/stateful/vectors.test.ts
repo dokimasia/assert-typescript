@@ -54,8 +54,8 @@ describe("vectors", () => {
       expect([...RUNNERS.keys()]).toEqual(["machines"]);
     });
 
-    it("runs the 22 machines vectors of the definition", () => {
-      expect(VECTORS.size).toBe(22);
+    it("runs the 25 machines vectors of the definition", () => {
+      expect(VECTORS.size).toBe(25);
     });
 
     for (const id of VECTORS.keys()) {
@@ -116,6 +116,11 @@ describe("vectors", () => {
         name: "a setting that the runner takes no",
         give: { ...vector(PASSING), settings: { seed: "1", shrink: 5 } },
         want: ["settings.shrink", "the runner takes no such setting"],
+      },
+      {
+        name: "stored cases that are no list",
+        give: { ...vector(PASSING), settings: { seed: "1", stored: {} } },
+        want: ["settings.stored", "the stored cases are no list"],
       },
       {
         name: "an error that the run does not end with",

@@ -24,6 +24,10 @@
  * A trace that the body cannot follow throws TraceError, which names the
  * entry. The error is not a failure of the case: it ends the run before any
  * case runs.
+ *
+ * The counterexample of a stored case is a trace too. Its draw entry has the
+ * value UNSTATED where the entry of the store records no typed literal of the
+ * value, and the body refuses such an entry.
  */
 
 import type { Provider, Request } from "./case/providers.js";
@@ -32,6 +36,9 @@ import type { Case, Decoder } from "./case.js";
 import type { Choice, Value } from "./choice.js";
 import type { Generator } from "./generator.js";
 import { inverseOf } from "./inverse.js";
+
+/** The value of a draw entry that records no value. */
+export const UNSTATED: unique symbol = Symbol("UNSTATED");
 
 /** A draw entry: the label of a draw and the value that it decoded. */
 export interface Draw {
@@ -132,8 +139,8 @@ export class Tracing implements Provider {
    *
    * @param generator - The draw's generator.
    * @param label - The draw's label.
-   * @throws TraceError when the next entry is no draw entry with label, or
-   *   the generator cannot produce its value.
+   * @throws TraceError when the next entry is no draw entry with label,
+   *   records no value, or has a value that the generator cannot produce.
    */
   drawing(generator: Decoder, label: string): void {
     const entry = this.#entries[this.#at];
@@ -143,12 +150,20 @@ export class Tracing implements Provider {
     if (isStep(entry) || entry.label !== label) {
       throw new TraceError(this.#at, label, "label");
     }
+    if (entry.value === UNSTATED) {
+      throw new TraceError(this.#at, label, "value");
+    }
     const choices = inverseOf(generator as Generator<unknown>, entry.value);
     if (choices === undefined) {
       throw new TraceError(this.#at, label, "value");
     }
     this.#queue.push(...choices);
     this.#at += 1;
+  }
+
+  /** The number of entries that the draws and the steps took, which is the position of the next entry. */
+  get taken(): number {
+    return this.#at;
   }
 
   /** Returns the next entry when it is a step entry. */

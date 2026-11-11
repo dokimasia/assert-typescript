@@ -36,6 +36,7 @@ import { conclude } from "./runner.js";
 import { knownCases, type Resolved, resolve, type Settings } from "./settings.js";
 import { confirmValid } from "./shrink/confirm.js";
 import { caseSource, type Source } from "./source.js";
+import { runKnown, type StoredRun } from "./stored.js";
 import { type Outcome, shortfallOf, Tally } from "./tally.js";
 import type { Work } from "./work.js";
 
@@ -58,7 +59,7 @@ class Exploration {
   readonly #best = new Map<string, number>();
   readonly #identities = new Set<string>();
   #found: Outcome | undefined;
-  readonly #stored: Execution[] = [];
+  readonly #stored: StoredRun[] = [];
 
   constructor(body: Body, settings: CampaignSettings, observer: Observer) {
     this.#body = body;
@@ -71,12 +72,16 @@ class Exploration {
 
   /** Runs the known cases, and returns the outcome that ends the campaign. */
   *known(): Work<Outcome | undefined> {
+    const { maxChoices } = this.#settings;
     for (const [phase, provider] of knownCases(this.#settings)) {
-      const execution = yield* execute(this.#body, provider, this.#settings.maxChoices);
-      this.#observer(phase, execution);
-      if (phase === "stored") {
-        this.#stored.push(execution);
-      }
+      const execution = yield* runKnown(
+        this.#body,
+        phase,
+        provider,
+        maxChoices,
+        this.#observer,
+        this.#stored,
+      );
       const ended = yield* this.#take(execution, provider instanceof Valuing);
       if (ended !== undefined) {
         return ended;

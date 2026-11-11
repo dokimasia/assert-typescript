@@ -96,7 +96,7 @@ export interface Stored {
   readonly name: string;
   /** The minimal case's choices. */
   readonly choices: readonly Choice[];
-  /** Each draw of the counterexample, as the entry records it. */
+  /** Each draw and each step of the counterexample, as the entry records it. */
   readonly counterexample: readonly Readonly<Record<string, unknown>>[];
 }
 

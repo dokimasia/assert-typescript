@@ -14,7 +14,7 @@ import {
 } from "../../../src/prop/engine/settings.js";
 import { Tracing } from "../../../src/prop/engine/trace.js";
 import { test as it } from "../../../src/vitest.js";
-import { integers, thrown } from "../../helpers.js";
+import { integers, storedCase, thrown } from "../../helpers.js";
 
 const SEED = 7n;
 
@@ -81,7 +81,7 @@ describe("settings", () => {
           seed: SEED,
           traces: [[{ label: "n", value: 5n }]],
           examples: [integers(3n), new Values([4n])],
-          stored: [integers(6n)],
+          stored: [storedCase(6n)],
         }),
       );
 
@@ -92,9 +92,9 @@ describe("settings", () => {
           ["example", Tracing.name],
           ["example", "Replaying"],
           ["example", "Valuing"],
-          ["stored", "Replaying"],
+          ["stored", "Stored"],
         ],
-        "four cases",
+        "four cases, the last of them the stored case",
       );
     });
   });

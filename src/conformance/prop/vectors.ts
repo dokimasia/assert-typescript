@@ -30,13 +30,14 @@ import { caseSource } from "../../prop/engine/source.js";
 import type { Requirement } from "../../prop/engine/tally.js";
 import * as token from "../../prop/engine/token.js";
 import { drive } from "../../prop/engine/work.js";
+import { storedOf } from "../../prop/stored.js";
 import { sameJson } from "../equality.js";
 import { buildBody } from "./body.js";
 import { choiceLiteral, parseChoices, seedOf } from "./choices.js";
 import { detail } from "./detail.js";
 import { formsOf } from "./forms.js";
 import { build } from "./generator.js";
-import { storeOf, tokenOf } from "./replay.js";
+import { storedCaseOf, storeOf, tokenOf } from "./replay.js";
 
 /** A vector's JSON object. */
 type Raw = Readonly<Record<string, unknown>>;
@@ -209,7 +210,10 @@ export function settingsOf(written: Raw): Settings {
       (r): Requirement => ({ label: String(r["label"]), share: Number(r["share"]) }),
     ),
     examples: ((written["examples"] ?? []) as unknown[]).map(parseChoices),
-    stored: ((written["stored"] ?? []) as unknown[]).map(parseChoices),
+    stored: ((written["stored"] ?? []) as unknown[]).map((one, i) => {
+      const { choices, counterexample } = storedCaseOf(one, i);
+      return storedOf(choices, counterexample);
+    }),
     shrink: Number(written["shrink"] ?? DEFAULT_BUDGET),
     replay: replayed === undefined ? undefined : token.decode(String(replayed)),
     confirm: Number(written["confirm"] ?? 0),

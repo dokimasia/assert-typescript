@@ -14,6 +14,7 @@ import {
   isStep,
   TraceError,
   Tracing,
+  UNSTATED,
 } from "../../../src/prop/engine/trace.js";
 import { test as it } from "../../../src/vitest.js";
 
@@ -165,6 +166,17 @@ describe("trace", () => {
       );
     });
 
+    it("throws a TraceError for an entry that records no value", ({ seat }) => {
+      const c = new Case(new Tracing([{ label: "x", value: UNSTATED }]));
+
+      check.isEqualTo(
+        seat,
+        refusal(seat, () => c.draw(DIGIT, "x")),
+        [0, "x", "value"],
+        "the entry has no typed literal",
+      );
+    });
+
     it("throws an error of the generator that is no refusal", ({ seat }) => {
       const broken = new Mapped(
         DIGIT,
@@ -208,6 +220,28 @@ describe("trace", () => {
         c.integer(new IntegerBounds(1n, 1n)),
         1n,
         "0 is outside [1, 1]",
+      );
+    });
+  });
+
+  describe("Tracing.taken", () => {
+    it("counts the entries that the draws and the steps took", ({ seat }) => {
+      const trace = new Tracing([
+        { label: "v", value: 1n },
+        { action: "get" },
+        { label: "w", value: 2n },
+      ]);
+      const c = new Case(trace);
+      const before = trace.taken;
+      c.draw(DIGIT, "v");
+      const drawn = trace.taken;
+      trace.take();
+
+      check.isEqualTo(
+        seat,
+        [before, drawn, trace.taken],
+        [0, 1, 2],
+        "the draw and the step each take one entry",
       );
     });
   });

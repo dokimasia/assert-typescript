@@ -170,6 +170,29 @@ describe("store", () => {
       );
     });
 
+    it("writes format 2 for a counterexample with a step entry", ({ seat }) => {
+      const steps = entry(
+        {
+          ...FAILURE,
+          counterexample: [
+            { step: "put" },
+            { label: "v", value: { type: "int", value: 0 } },
+            { step: "get", client: 1 },
+            { step: "deliver", drain: true },
+          ],
+        },
+        "1.2.0",
+        "2026-10-01",
+      );
+
+      check.isEqualTo(
+        seat,
+        [steps["store"], verdictOf(steps)],
+        [2, "replay"],
+        "the entry of a machine replays",
+      );
+    });
+
     it("records a value past the deepest level by its label", ({ seat }) => {
       const deep = entry(
         {
@@ -227,6 +250,14 @@ describe("store", () => {
         name: "an entry found on a leap day of a fourth century",
         give: { found: "2000-02-29" },
       },
+      {
+        name: "an entry of format 2 with the largest client",
+        give: { store: 2, counterexample: [{ step: "put", client: LINE_MAX }] },
+      },
+      {
+        name: "an entry of format 2 without a step entry",
+        give: { store: 2 },
+      },
     ];
     for (const tt of replays) {
       it(`replays ${tt.name}`, ({ seat }) => {
@@ -244,7 +275,7 @@ describe("store", () => {
     });
 
     const skips = [
-      { name: "an entry of format 2", give: '{"store": 2}' },
+      { name: "an entry of format 3", give: '{"store": 3}' },
       {
         name: "an entry of a far later format",
         give: '{"store": 1000000000000000000000000000000}',
@@ -379,6 +410,34 @@ describe("store", () => {
         give: { counterexample: [{ label: 5 }] },
       },
       { name: "a draw that is no object", give: { counterexample: ["x"] } },
+      {
+        name: "a step entry of format 1",
+        give: { counterexample: [{ step: "put" }] },
+      },
+      {
+        name: "a step entry of format 2 whose action is no string",
+        give: { store: 2, counterexample: [{ step: 1 }] },
+      },
+      {
+        name: "a client below 0",
+        give: { store: 2, counterexample: [{ step: "put", client: -1 }] },
+      },
+      {
+        name: "a client past the largest",
+        give: { store: 2, counterexample: [{ step: "put", client: LINE_MAX + 1 }] },
+      },
+      {
+        name: "a client that is a fraction",
+        give: { store: 2, counterexample: [{ step: "put", client: 1.5 }] },
+      },
+      {
+        name: "a drain mark that is not true",
+        give: { store: 2, counterexample: [{ step: "put", drain: false }] },
+      },
+      {
+        name: "a step entry of a client and the drain",
+        give: { store: 2, counterexample: [{ step: "put", client: 1, drain: true }] },
+      },
       { name: "a date that does not exist", give: { found: "2026-02-30" } },
       {
         name: "a date of a century that is no leap year",

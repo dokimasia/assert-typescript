@@ -12,6 +12,7 @@ import { MAX_CHOICES } from "./case.js";
 import type { Choice } from "./choice.js";
 import type { Phase } from "./execution.js";
 import { DEFAULT_BUDGET } from "./shrink.js";
+import type { Stored } from "./stored.js";
 import type { Requirement } from "./tally.js";
 import { type Entry, Tracing } from "./trace.js";
 
@@ -44,7 +45,8 @@ export class Values {
  * What a run is asked to do. traces are the cases whose draws and machine
  * steps the caller states, which run first, and examples the cases whose
  * values the caller states, which run next: each the choice sequence that
- * decodes to its values, or its Values. shrink is the budget of runs that
+ * decodes to its values, or its Values. stored are the stored cases, from
+ * the oldest. shrink is the budget of runs that
  * shrinking and explaining every failure may spend, and 0 turns both off.
  * shrinkTime is the milliseconds that they may take on the platform clock,
  * and 0 sets no limit. replay, when set, is the one case that the run
@@ -60,7 +62,7 @@ export interface Settings {
   readonly requirements?: readonly Requirement[];
   readonly traces?: readonly (readonly Entry[])[];
   readonly examples?: readonly (readonly Choice[] | Values)[];
-  readonly stored?: readonly (readonly Choice[])[];
+  readonly stored?: readonly Stored[];
   readonly shrink?: number;
   readonly shrinkTime?: number;
   readonly explain?: boolean;
@@ -113,17 +115,20 @@ export function resolve(settings: Settings): Resolved {
 /**
  * Returns the cases that a run tries before it generates any, in order,
  * each with its phase and the provider of its values: each trace and each
- * example under example, then each stored case under stored.
+ * example under example, then each stored case under stored, which
+ * runStoredCase runs.
  *
  * @param settings - The settings of the run.
- * @returns The phase and the provider of each case.
+ * @returns The phase and the provider of each case, or the stored case.
  */
-export function knownCases(settings: Resolved): (readonly [Phase, Provider])[] {
+export function knownCases(
+  settings: Resolved,
+): (readonly [Phase, Provider | Stored])[] {
   return [
     ...settings.traces.map((trace) => ["example", new Tracing(trace)] as const),
     ...settings.examples.map(
       (example) => ["example", exampleProvider(example)] as const,
     ),
-    ...settings.stored.map((stored) => ["stored", new Replaying(stored)] as const),
+    ...settings.stored.map((stored) => ["stored", stored] as const),
   ];
 }
