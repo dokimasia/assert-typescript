@@ -111,6 +111,22 @@ async function served(seat: Seat): Promise<Server> {
 }
 ```
 
+`skip(seat, reason)` skips the test of a helper's seat through the member
+`skip` of the seat. A `Recorder` and the seat of a jest test have no member
+`skip`, so the helper ends the call with a fault there:
+
+```ts
+import { type Seat, skip } from "@dokimi/assert";
+
+function docker(seat: Seat): Docker | undefined {
+  if (!hasDocker()) {
+    skip(seat, "the test needs docker");
+    return undefined;
+  }
+  return new Docker();
+}
+```
+
 `writeRecord(seat, kind, record)` writes a record of another tool of
 dokimasia into the task meta of the test, under the key `kind`. vitest's
 JSON reporter writes the meta of each test. The kind matches

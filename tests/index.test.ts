@@ -394,6 +394,7 @@ describe("index", () => {
         "history",
         "prop",
         "signalOf",
+        "skip",
         "soft",
         "stateful",
         "writeRecord",

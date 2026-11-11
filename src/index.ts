@@ -53,5 +53,6 @@ export {
   Standard,
   signalOf,
 } from "./seat.js";
+export { skip } from "./skip.js";
 export * as soft from "./soft.js";
 export * as stateful from "./stateful/index.js";
