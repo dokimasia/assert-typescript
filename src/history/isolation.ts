@@ -5,10 +5,10 @@
  * The checks that the list-append or register transactions of a history
  * exhibit no anomaly that an isolation level forbids.
  *
- * A check first reads the micro-operations for the six anomalies that need
- * no dependency graph. It then derives the write-write, write-read and
+ * A check first reads the micro-operations for the seven anomalies that
+ * need no dependency graph. It then derives the write-write, write-read and
  * read-write dependencies between committed transactions, and searches the
- * graph for the five kinds of cycle. A level forbids a set of the eleven
+ * graph for the five kinds of cycle. A level forbids a set of the twelve
  * kinds, and the record reports the first of them that the history
  * exhibits.
  */
@@ -96,6 +96,12 @@ function observationJson(o: Observation): Record<string, unknown> {
         value: literalOf(o.value),
         appender: o.appender,
         next: literalOf(o.next),
+      };
+    case "lost-update":
+      return {
+        calls: o.calls,
+        key,
+        read: o.register ? orNull(o.read) : literalOf(o.reads[0]),
       };
     default:
       return {

@@ -132,6 +132,115 @@ describe("isolation", () => {
       );
     });
 
+    it("reports a lost update of two appends at both levels", ({ seat }) => {
+      const history = new History();
+      runTxn(history, 0, append("x", 1));
+      const first = invokeTxn(history, 1, readOf("x", null), append("x", 2));
+      const second = invokeTxn(history, 2, readOf("x", null), append("x", 3));
+      first.ok([readOf("x", [1]), append("x", 2)]);
+      second.ok([readOf("x", [1]), append("x", 3)]);
+
+      check.isEqualTo(
+        seat,
+        [
+          LEVELS.map((level) => outcome(history, level)),
+          checkIsolation(history.events(), SERIALIZABLE)?.transactions.map(
+            (txn) => txn.call,
+          ),
+          json(history, SERIALIZABLE)["explanation"],
+        ],
+        [
+          [
+            ["lost-update", ["lost-update", "G2"]],
+            ["lost-update", ["lost-update"]],
+          ],
+          [2, 3],
+          [{ calls: [2, 3], key: literalOf("x"), read: literalOf([1]) }],
+        ],
+        "both levels report the lost update",
+      );
+    });
+
+    it("reports the first call whose read matches the read of an earlier call", ({
+      seat,
+    }) => {
+      const history = new History();
+      runTxn(history, 0, readOf("x", []), append("x", 1));
+      runTxn(history, 1, readOf("y", []), append("y", 2));
+      runTxn(history, 2, readOf("y", []), append("y", 3));
+      runTxn(history, 3, readOf("x", []), append("x", 4));
+
+      check.isEqualTo(
+        seat,
+        json(history, SNAPSHOT_ISOLATION)["explanation"],
+        [{ calls: [2, 4], key: literalOf("y"), read: literalOf([]) }],
+        "the explanation has the reads of y",
+      );
+    });
+
+    for (const completes of ["fail", "unknown"] as const) {
+      it(`leaves a call that completes as ${completes} out of a lost update`, ({
+        seat,
+      }) => {
+        const history = new History();
+        runTxn(history, 0, append("x", 1));
+        runTxn(history, 1, readOf("x", [1]), append("x", 2));
+        const second = invokeTxn(history, 2, readOf("x", null), append("x", 3));
+        if (completes === "fail") {
+          second.fail("aborted");
+        } else {
+          second.unknown("timed out");
+        }
+
+        check.isEqualTo(
+          seat,
+          LEVELS.map((level) => outcome(history, level)),
+          [undefined, undefined],
+          "neither level reports an anomaly",
+        );
+      });
+    }
+
+    it("reports a lost update of two register writes at both levels", ({ seat }) => {
+      const history = new History();
+      runTxn(history, 0, write("x", 1));
+      const first = invokeTxn(history, 1, readOf("x", null), write("x", 2));
+      const second = invokeTxn(history, 2, readOf("x", null), write("x", 3));
+      first.ok([readOf("x", 1), write("x", 2)]);
+      second.ok([readOf("x", 1), write("x", 3)]);
+
+      check.isEqualTo(
+        seat,
+        [
+          LEVELS.map((level) => outcome(history, level)),
+          json(history, SERIALIZABLE)["explanation"],
+        ],
+        [
+          [
+            ["lost-update", ["lost-update", "G2"]],
+            ["lost-update", ["lost-update"]],
+          ],
+          [{ calls: [2, 3], key: literalOf("x"), read: literalOf(1) }],
+        ],
+        "both levels report the lost update",
+      );
+    });
+
+    it("reports a lost update of the initial value of a register", ({ seat }) => {
+      const history = new History();
+      const first = invokeTxn(history, 0, readOf("x", null), write("x", 1));
+      const second = invokeTxn(history, 1, readOf("x", null), write("x", 2));
+      first.ok([readOf("x", null), write("x", 1)]);
+      second.ok([readOf("x", null), write("x", 2)]);
+
+      check.isEqualTo(
+        seat,
+        json(history, SNAPSHOT_ISOLATION)["explanation"],
+        [{ calls: [0, 1], key: literalOf("x"), read: null }],
+        "the explanation states the initial value",
+      );
+    });
+
     it("reports a duplicate append at snapshot isolation", ({ seat }) => {
       const history = new History();
       runTxn(history, 0, append("x", 1));
@@ -435,6 +544,20 @@ describe("isolation", () => {
           },
         ],
         "1 is followed by 2",
+      );
+    });
+
+    it("returns the explanation of a lost update", ({ seat }) => {
+      const history = new History();
+      runTxn(history, 0, append("x", 1));
+      runTxn(history, 1, readOf("x", [1]), append("x", 2));
+      runTxn(history, 2, readOf("x", [1]), append("x", 3));
+
+      check.isEqualTo(
+        seat,
+        json(history, SERIALIZABLE)["explanation"],
+        [{ calls: [2, 4], key: literalOf("x"), read: literalOf([1]) }],
+        "the explanation has the two calls and their read",
       );
     });
 

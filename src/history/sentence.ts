@@ -77,7 +77,7 @@ function registerText(value: unknown): string {
 
 /** Returns the text of the observation of an anomaly of a register history. */
 function registerObservationText(o: Observation): string {
-  const [call] = o.calls;
+  const [call, other] = o.calls;
   const key = show(o.key);
   switch (o.anomaly) {
     case "garbage-read":
@@ -94,6 +94,8 @@ function registerObservationText(o: Observation): string {
     }
     case "aborted-read":
       return `call ${call} read ${show(o.value)} from ${key}, which call ${o.appender} wrote and aborted`;
+    case "lost-update":
+      return `calls ${call} and ${other} read ${registerText(o.read)} from ${key}, and both wrote to it`;
     default:
       return `call ${call} read ${show(o.value)} from ${key}, which call ${o.appender} followed with ${show(o.next)}`;
   }
@@ -128,6 +130,8 @@ function observationText(o: Observation): string {
       return `calls ${call} and ${other} read ${listText(read as unknown[])} and ${listText(second as unknown[])} from ${key}, and neither is a prefix of the other`;
     case "aborted-read":
       return `call ${call} read ${show(o.value)} from ${key}, which call ${o.appender} appended and aborted`;
+    case "lost-update":
+      return `calls ${call} and ${other} read ${listText(read as unknown[])} from ${key}, and both appended to it`;
     default:
       return `call ${call} read ${key} ending in ${show(o.value)}, which call ${o.appender} followed with ${show(o.next)}`;
   }

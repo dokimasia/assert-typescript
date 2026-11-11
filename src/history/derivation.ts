@@ -18,14 +18,16 @@
 
 import type { Anomaly, Edge, Instance } from "./anomaly.js";
 import { Dependencies } from "./dependencies.js";
+import { internalInconsistency } from "./internal.js";
 import {
   abortedRead,
+  add,
   duplicateAppend,
   type Facts,
   garbageRead,
   id,
   intermediateRead,
-  internalInconsistency,
+  lostUpdate,
   nameOf,
   observation,
   type Read,
@@ -40,16 +42,6 @@ interface Versions {
   readonly order: readonly unknown[];
   readonly writers: readonly (number | undefined)[];
   readonly unobserved: readonly (readonly [call: number, value: unknown])[];
-}
-
-/** Adds value to the list of key in map. */
-function add<K, V>(map: Map<K, V[]>, key: K, value: V): void {
-  const list = map.get(key);
-  if (list === undefined) {
-    map.set(key, [value]);
-  } else {
-    list.push(value);
-  }
 }
 
 /** Returns the evidence that next comes after value in key's version order. */
@@ -206,6 +198,8 @@ export class Analysis {
         return abortedRead(this.#facts);
       case "intermediate-read":
         return intermediateRead(this.#facts);
+      case "lost-update":
+        return lostUpdate(this.#facts);
       default:
         return this.#dependencies.instance(anomaly);
     }

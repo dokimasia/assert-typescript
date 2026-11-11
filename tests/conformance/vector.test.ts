@@ -82,8 +82,8 @@ describe("vector", () => {
       expect(VECTORS.filter((v) => FILE_KINDS.includes(v.kind))).toHaveLength(57);
     });
 
-    it("returns the 110 history vectors of the definition", () => {
-      expect(VECTORS.filter((v) => HISTORY_KINDS.includes(v.kind))).toHaveLength(110);
+    it("returns the 112 history vectors of the definition", () => {
+      expect(VECTORS.filter((v) => HISTORY_KINDS.includes(v.kind))).toHaveLength(112);
     });
 
     it("returns the 441 property vectors of the definition", () => {

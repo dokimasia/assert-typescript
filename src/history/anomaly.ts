@@ -17,6 +17,7 @@ export type Anomaly =
   | "incompatible-order"
   | "aborted-read"
   | "intermediate-read"
+  | "lost-update"
   | "G0"
   | "G1c"
   | "G-single"
@@ -31,6 +32,7 @@ export const ANOMALIES: readonly Anomaly[] = [
   "incompatible-order",
   "aborted-read",
   "intermediate-read",
+  "lost-update",
   "G0",
   "G1c",
   "G-single",
@@ -77,10 +79,12 @@ export interface Edge {
  * - incompatible-order: calls and reads of the two reads, and key.
  * - aborted-read: calls of the one read, key, value and appender.
  * - intermediate-read: calls of the one read, key, value, appender and next.
+ * - lost-update: calls of the two transactions, key, and reads with the list
+ *   that both read.
  *
  * An observation of a register history has register set, and its appender
  * is the writer of the value. Its internal inconsistency states read and
- * known in place of reads and expected.
+ * known in place of reads and expected. Its lost update also states read.
  */
 export interface Observation {
   /** The anomaly that the observation shows. */

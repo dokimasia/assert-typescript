@@ -16,7 +16,9 @@ import { Controlled } from "../src/clock.js";
 import type { Setup, Subject } from "../src/conformance/stateful/subjects.js";
 import { unlock } from "../src/files/writer.js";
 import { type Call, History } from "../src/history/history.js";
+import type { Facts } from "../src/history/reads.js";
 import type { Spec } from "../src/history/spec.js";
+import type { Transaction } from "../src/history/transaction.js";
 import { dropped } from "../src/matcher/pending.js";
 import { execute as executeCase } from "../src/prop/case/execute.js";
 import { Case, type Failing as CaseFailing, type Location } from "../src/prop/case.js";
@@ -280,6 +282,32 @@ export function writeSkew(): History {
   first.ok([readOf("x", []), append("y", 1)]);
   second.ok([readOf("y", []), append("x", 2)]);
   return history;
+}
+
+/** Returns the facts of reads and appends, with no transaction and no aborted call. */
+export function factsOf(fields: Partial<Facts>): Facts {
+  return {
+    register: false,
+    txns: [],
+    reads: [],
+    appender: new Map(),
+    later: new Map(),
+    aborted: new Set(),
+    ...fields,
+  };
+}
+
+/** Returns an ok transaction of call 0 of mops. */
+export function okTxn(...mops: Transaction["mops"]): Transaction {
+  return {
+    call: 0,
+    completion: 1,
+    kind: "ok",
+    process: 0,
+    args: [],
+    output: undefined,
+    mops,
+  };
 }
 
 /** The setup of a machines vector that states none. */

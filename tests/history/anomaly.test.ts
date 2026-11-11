@@ -10,7 +10,7 @@ import { test as it } from "../../src/vitest.js";
 
 describe("anomaly", () => {
   describe("ANOMALIES", () => {
-    it("lists the eleven kinds in report order", ({ seat }) => {
+    it("lists the twelve kinds in report order", ({ seat }) => {
       check.isEqualTo(
         seat,
         ANOMALIES,
@@ -21,6 +21,7 @@ describe("anomaly", () => {
           "incompatible-order",
           "aborted-read",
           "intermediate-read",
+          "lost-update",
           "G0",
           "G1c",
           "G-single",

@@ -7,12 +7,13 @@ import { describe } from "vitest";
 import { identityOf } from "../../src/history/history.js";
 import {
   abortedRead,
+  add,
   duplicateAppend,
-  type Facts,
+  firstReads,
   garbageRead,
   id,
   intermediateRead,
-  internalInconsistency,
+  lostUpdate,
   nameOf,
   observation,
   same,
@@ -21,34 +22,28 @@ import {
 import type { Transaction } from "../../src/history/transaction.js";
 import { check } from "../../src/index.js";
 import { test as it } from "../../src/vitest.js";
-
-/** Returns the facts of reads and appends, with no transaction and no aborted call. */
-function factsOf(fields: Partial<Facts>): Facts {
-  return {
-    register: false,
-    txns: [],
-    reads: [],
-    appender: new Map(),
-    later: new Map(),
-    aborted: new Set(),
-    ...fields,
-  };
-}
-
-/** Returns an ok transaction of call 0 of mops. */
-function okTxn(...mops: Transaction["mops"]): Transaction {
-  return {
-    call: 0,
-    completion: 1,
-    kind: "ok",
-    process: 0,
-    args: [],
-    output: undefined,
-    mops,
-  };
-}
+import { factsOf, okTxn } from "../helpers.js";
 
 describe("reads", () => {
+  describe("add", () => {
+    it("appends each value to the list of its key", ({ seat }) => {
+      const map = new Map<string, number[]>();
+      add(map, "x", 1);
+      add(map, "y", 2);
+      add(map, "x", 3);
+
+      check.isEqualTo(
+        seat,
+        map,
+        new Map([
+          ["x", [1, 3]],
+          ["y", [2]],
+        ]),
+        "x has two values",
+      );
+    });
+  });
+
   describe("id", () => {
     it("returns the identity of a stated key or value", ({ seat }) => {
       check.isEqualTo(seat, id("x"), identityOf("x") as string, "the identity of x");
@@ -165,122 +160,6 @@ describe("reads", () => {
     });
   });
 
-  describe("internalInconsistency", () => {
-    it("returns a read that misses the transaction's own append", ({ seat }) => {
-      const txn = okTxn(
-        { fn: "append", key: "x", value: 1n },
-        { fn: "read", key: "x", value: [] },
-      );
-
-      check.isEqualTo(
-        seat,
-        internalInconsistency(factsOf({ txns: [txn] }))?.explanation,
-        [
-          observation("internal-inconsistency", {
-            calls: [0],
-            key: "x",
-            reads: [[]],
-            expected: [1n],
-          }),
-        ],
-        "the append of 1",
-      );
-    });
-
-    it("returns a read of a value that the transaction appends after it", ({
-      seat,
-    }) => {
-      const txn = okTxn(
-        { fn: "read", key: "x", value: [2n] },
-        { fn: "append", key: "x", value: 2n },
-      );
-
-      check.isEqualTo(
-        seat,
-        internalInconsistency(factsOf({ txns: [txn] }))?.explanation.map(
-          (one) => "future" in one && one.future,
-        ),
-        [2n],
-        "the future value 2",
-      );
-    });
-
-    it("returns undefined for a transaction that reads its own appends", ({ seat }) => {
-      const txn = okTxn(
-        { fn: "append", key: "x", value: 1n },
-        { fn: "read", key: "x", value: [0n, 1n] },
-      );
-
-      check.isNil(seat, internalInconsistency(factsOf({ txns: [txn] })), "consistent");
-    });
-
-    it("returns a register read of another value than the transaction wrote", ({
-      seat,
-    }) => {
-      const txn = okTxn(
-        { fn: "write", key: "x", value: 1n },
-        { fn: "read", key: "x", value: [] },
-      );
-
-      check.isEqualTo(
-        seat,
-        internalInconsistency(factsOf({ register: true, txns: [txn] }))?.explanation,
-        [
-          observation("internal-inconsistency", {
-            calls: [0],
-            key: "x",
-            register: true,
-            known: 1n,
-            whole: true,
-          }),
-        ],
-        "the write of 1 and a read of the initial value",
-      );
-    });
-
-    it("returns a register read of a value that the transaction writes after it", ({
-      seat,
-    }) => {
-      const txn = okTxn(
-        { fn: "read", key: "x", value: [2n] },
-        { fn: "write", key: "x", value: 2n },
-      );
-
-      check.isEqualTo(
-        seat,
-        internalInconsistency(factsOf({ register: true, txns: [txn] }))?.explanation,
-        [
-          observation("internal-inconsistency", {
-            calls: [0],
-            key: "x",
-            register: true,
-            read: 2n,
-            future: 2n,
-            hasFuture: true,
-          }),
-        ],
-        "the future value 2",
-      );
-    });
-
-    it("returns undefined for a register transaction that reads its own writes", ({
-      seat,
-    }) => {
-      const txn = okTxn(
-        { fn: "write", key: "x", value: 1n },
-        { fn: "write", key: "x", value: 2n },
-        { fn: "read", key: "x", value: [2n] },
-        { fn: "read", key: "x", value: [2n] },
-      );
-
-      check.isNil(
-        seat,
-        internalInconsistency(factsOf({ register: true, txns: [txn] })),
-        "consistent",
-      );
-    });
-  });
-
   describe("same", () => {
     const tests: {
       name: string;
@@ -363,5 +242,158 @@ describe("reads", () => {
 
       check.isNil(seat, intermediateRead(facts), "its own append");
     });
+  });
+
+  describe("firstReads", () => {
+    it("returns each read that is the first micro-operation on its key", ({ seat }) => {
+      const txn = okTxn(
+        { fn: "read", key: "x", value: [1n] },
+        { fn: "append", key: "y", value: 2n },
+        { fn: "read", key: "y", value: [2n] },
+        { fn: "read", key: "x", value: [1n] },
+        { fn: "read", key: "z", value: [] },
+      );
+
+      check.isEqualTo(
+        seat,
+        firstReads(txn),
+        [
+          { fn: "read", key: "x", value: [1n] },
+          { fn: "read", key: "z", value: [] },
+        ],
+        "the first reads of x and z",
+      );
+    });
+  });
+
+  describe("lostUpdate", () => {
+    it("returns two calls that read one list of a key and both append to it", ({
+      seat,
+    }) => {
+      const facts = factsOf({
+        txns: [
+          { ...okTxn({ fn: "append", key: "x", value: 1n }), call: 0 },
+          {
+            ...okTxn(
+              { fn: "read", key: "x", value: [1n] },
+              { fn: "append", key: "x", value: 2n },
+            ),
+            call: 2,
+          },
+          {
+            ...okTxn(
+              { fn: "read", key: "x", value: [1n] },
+              { fn: "append", key: "x", value: 3n },
+            ),
+            call: 4,
+          },
+        ],
+      });
+
+      check.isEqualTo(
+        seat,
+        lostUpdate(facts),
+        single(
+          "lost-update",
+          [2, 4],
+          observation("lost-update", { calls: [2, 4], key: "x", reads: [[1n]] }),
+        ),
+        "the two calls and their read",
+      );
+    });
+
+    it("returns the value of the two reads of a register", ({ seat }) => {
+      const facts = factsOf({
+        register: true,
+        txns: [0, 2].map((call) => ({
+          ...okTxn(
+            { fn: "read", key: "x", value: [1n] },
+            { fn: "write", key: "x", value: BigInt(call + 2) },
+          ),
+          call,
+        })),
+      });
+
+      check.isEqualTo(
+        seat,
+        lostUpdate(facts)?.explanation,
+        [
+          observation("lost-update", {
+            calls: [0, 2],
+            key: "x",
+            reads: [[1n]],
+            register: true,
+            read: 1n,
+          }),
+        ],
+        "the value 1",
+      );
+    });
+
+    const tests: { name: string; give: readonly Transaction[] }[] = [
+      {
+        name: "two reads of a key that one of the calls does not append to",
+        give: [
+          {
+            ...okTxn(
+              { fn: "read", key: "x", value: [] },
+              { fn: "append", key: "x", value: 1n },
+            ),
+            call: 0,
+          },
+          {
+            ...okTxn(
+              { fn: "read", key: "x", value: [] },
+              { fn: "append", key: "y", value: 2n },
+            ),
+            call: 2,
+          },
+        ],
+      },
+      {
+        name: "two reads of different lists",
+        give: [
+          {
+            ...okTxn(
+              { fn: "read", key: "x", value: [] },
+              { fn: "append", key: "x", value: 1n },
+            ),
+            call: 0,
+          },
+          {
+            ...okTxn(
+              { fn: "read", key: "x", value: [1n] },
+              { fn: "append", key: "x", value: 2n },
+            ),
+            call: 2,
+          },
+        ],
+      },
+      {
+        name: "a call that did not commit",
+        give: [
+          {
+            ...okTxn(
+              { fn: "read", key: "x", value: [] },
+              { fn: "append", key: "x", value: 1n },
+            ),
+            call: 0,
+          },
+          {
+            ...okTxn(
+              { fn: "read", key: "x", value: [] },
+              { fn: "append", key: "x", value: 2n },
+            ),
+            call: 2,
+            kind: "fail",
+          },
+        ],
+      },
+    ];
+    for (const tt of tests) {
+      it(`returns undefined for ${tt.name}`, ({ seat }) => {
+        check.isNil(seat, lostUpdate(factsOf({ txns: tt.give })), "no lost update");
+      });
+    }
   });
 });

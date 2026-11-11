@@ -884,7 +884,9 @@ history of list-append transactions or of register transactions. A history
 that writes with `["write", key, value]` is a register history. Its reads
 return the value of the register, or null for the initial value. A
 register history shows fewer anomalies than a list-append history, because
-blind writes do not reveal an order between them.
+blind writes do not reveal an order between them. Both levels forbid a lost
+update, in which two committed transactions read the same list or value of
+a key first and then both append or write to it.
 
 ## Machines
 
@@ -981,7 +983,7 @@ definition and holds itself to it:
 - 195 corpus cases state what each assertion must report, run against
   both surfaces and the matchers of `expect`, with the call record of
   each call. They are the same cases every other implementation runs.
-- 441 property vectors, 110 history vectors, 15 machine vectors and 57
+- 441 property vectors, 112 history vectors, 15 machine vectors and 57
   file vectors pin the property engine, the history checks, machines and
   the assertions of files.
 - A completeness gate checks that every assertion is present under the

@@ -261,6 +261,21 @@ describe("sentence", () => {
         want: 'call 2 read 1 from "x", which call 0 followed with 2',
       },
       {
+        name: "a lost update of a register",
+        give: observed("lost-update", {
+          calls: [2, 4],
+          reads: [[1]],
+          register: true,
+          read: 1,
+        }),
+        want: 'calls 2 and 4 read 1 from "x", and both wrote to it',
+      },
+      {
+        name: "a lost update of the initial value of a register",
+        give: observed("lost-update", { calls: [0, 2], reads: [[]], register: true }),
+        want: 'calls 0 and 2 read the initial value from "x", and both wrote to it',
+      },
+      {
         name: "a garbage read",
         give: observed("garbage-read", { reads: [[9]], value: 9 }),
         want: 'call 0 read [9] from "x", and no transaction appended 9',
@@ -314,6 +329,11 @@ describe("sentence", () => {
           next: 2,
         }),
         want: 'call 2 read "x" ending in 1, which call 0 followed with 2',
+      },
+      {
+        name: "a lost update",
+        give: observed("lost-update", { calls: [2, 4], reads: [[1]] }),
+        want: 'calls 2 and 4 read [1] from "x", and both appended to it',
       },
     ];
     for (const tt of tests) {

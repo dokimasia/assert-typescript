@@ -2,128 +2,15 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * The anomalies that the reads of a history show without a cycle: a read of
- * a value that no transaction appended, a value read twice, a read that
- * contradicts its own transaction, a read of an aborted append, and a read
- * of an intermediate append.
+ * The facts of the reads of a history, and the anomalies that the reads
+ * show without a cycle: a read of a value that no transaction appended, a
+ * value read twice, a read of an aborted append, a read of an intermediate
+ * append, and two updates of one version of a key.
  */
 
 import type { Anomaly, Instance, Observation } from "./anomaly.js";
 import { identityOf } from "./history.js";
-import { APPEND, READ, type Transaction, WRITE } from "./transaction.js";
-
-/** Returns the values of the read at position that txn appends to the key after it. */
-function future(
-  txn: Transaction,
-  position: number,
-  read: readonly unknown[],
-): unknown[] {
-  const key = id((txn.mops[position] as Transaction["mops"][number]).key);
-  const later = new Set(
-    txn.mops
-      .slice(position + 1)
-      .filter((mop) => mop.fn === APPEND && id(mop.key) === key)
-      .map((mop) => id(mop.value)),
-  );
-  return read.filter((value) => later.has(id(value)));
-}
-
-/** Reports whether a read is the expected list, or ends with it when the transaction knew only the list's end. */
-function agrees(
-  read: readonly unknown[],
-  whole: boolean,
-  expected: readonly unknown[],
-): boolean {
-  const got = read.map(id);
-  const want = expected.map(id);
-  const tail = whole ? got : got.slice(Math.max(0, got.length - want.length));
-  return tail.length === want.length && tail.every((one, i) => one === want[i]);
-}
-
-/**
- * Returns the first read of an ok transaction that contradicts the
- * transaction, or undefined. Before a key's first read, the transaction
- * knows only that the key ends with its own appends. After a read, it knows
- * the whole list, and its later appends extend it. A read contains none of
- * the values that the transaction appends to the key after it.
- */
-function internal(txn: Transaction): Instance | undefined {
-  const known = new Map<
-    string,
-    readonly [whole: boolean, expected: readonly unknown[]]
-  >();
-  for (const [position, mop] of txn.mops.entries()) {
-    const key = id(mop.key);
-    const [whole, expected] = known.get(key) ?? [false, []];
-    if (mop.fn === READ) {
-      const read = mop.value as readonly unknown[];
-      const later = future(txn, position, read);
-      if (later.length > 0 || (known.has(key) && !agrees(read, whole, expected))) {
-        return single(
-          "internal-inconsistency",
-          [txn.call],
-          observation("internal-inconsistency", {
-            calls: [txn.call],
-            key: mop.key,
-            reads: [read],
-            expected,
-            whole,
-            future: later[0],
-            hasFuture: later.length > 0,
-          }),
-        );
-      }
-      known.set(key, [true, [...read]]);
-    } else {
-      known.set(key, [whole, [...expected, mop.value]]);
-    }
-  }
-  return undefined;
-}
-
-/**
- * Returns the first register read of an ok transaction that contradicts the
- * transaction, or undefined. After a write or a read of a key, the
- * transaction knows the key's value. A later read returns that value, and
- * no read returns a value that the transaction writes to the key after the
- * read.
- */
-function internalRegister(txn: Transaction): Instance | undefined {
-  const known = new Map<string, readonly unknown[]>();
-  for (const [position, mop] of txn.mops.entries()) {
-    const key = id(mop.key);
-    const isRead = mop.fn === READ;
-    const read = isRead ? (mop.value as readonly unknown[]) : [mop.value];
-    const writesLater =
-      isRead &&
-      read.length > 0 &&
-      txn.mops
-        .slice(position + 1)
-        .some(
-          (later) =>
-            later.fn === WRITE && id(later.key) === key && same([later.value], read),
-        );
-    const expected = known.get(key);
-    if (writesLater || (isRead && expected !== undefined && !same(expected, read))) {
-      return single(
-        "internal-inconsistency",
-        [txn.call],
-        observation("internal-inconsistency", {
-          calls: [txn.call],
-          key: mop.key,
-          register: true,
-          read: read[0],
-          known: expected?.[0],
-          whole: expected !== undefined,
-          future: writesLater ? read[0] : undefined,
-          hasFuture: writesLater,
-        }),
-      );
-    }
-    known.set(key, read);
-  }
-  return undefined;
-}
+import { type Mop, READ, type Transaction } from "./transaction.js";
 
 /** What the transactions of a history state, as the search of an anomaly of a read reads it. */
 export interface Facts {
@@ -146,6 +33,16 @@ export interface Read {
   readonly call: number;
   readonly key: unknown;
   readonly read: readonly unknown[];
+}
+
+/** Adds value to the list of key in map. */
+export function add<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  const list = map.get(key);
+  if (list === undefined) {
+    map.set(key, [value]);
+  } else {
+    list.push(value);
+  }
 }
 
 /** Reports whether two register reads, each the list of its one value or the empty list, are one. */
@@ -242,18 +139,6 @@ export function duplicateAppend(facts: Facts): Instance | undefined {
   return undefined;
 }
 
-/** Returns the first committed read that contradicts its own transaction. */
-export function internalInconsistency(facts: Facts): Instance | undefined {
-  const contradicted = facts.register ? internalRegister : internal;
-  for (const txn of facts.txns) {
-    const found = txn.kind === "ok" ? contradicted(txn) : undefined;
-    if (found !== undefined) {
-      return found;
-    }
-  }
-  return undefined;
-}
-
 /** Returns the first committed read of a value that an aborted call appended. */
 export function abortedRead(facts: Facts): Instance | undefined {
   for (const { call, key, read } of facts.reads) {
@@ -300,6 +185,59 @@ export function intermediateRead(facts: Facts): Instance | undefined {
           register: facts.register,
         }),
       );
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Returns each read of txn that is the first micro-operation of txn on its
+ * key, in the order of the micro-operations.
+ */
+export function firstReads(txn: Transaction): Mop[] {
+  const touched = new Set<string>();
+  const found: Mop[] = [];
+  for (const mop of txn.mops) {
+    const key = id(mop.key);
+    if (mop.fn === READ && !touched.has(key)) {
+      found.push(mop);
+    }
+    touched.add(key);
+  }
+  return found;
+}
+
+/**
+ * Returns the first two ok transactions that both update one version of a
+ * key that they read. Each transaction reads the key with its first
+ * micro-operation on the key, and appends or writes to the key after the
+ * read. Both reads returned the same list or value. The second transaction
+ * is the first one whose read matches the read of an earlier transaction.
+ */
+export function lostUpdate(facts: Facts): Instance | undefined {
+  const readers = new Map<string, number>();
+  for (const txn of facts.txns.filter((one) => one.kind === "ok")) {
+    const written = new Set(
+      txn.mops.filter((mop) => mop.fn !== READ).map((mop) => id(mop.key)),
+    );
+    for (const mop of firstReads(txn).filter((one) => written.has(id(one.key)))) {
+      const read = mop.value as readonly unknown[];
+      const name = JSON.stringify([id(mop.key), read.map(id)]);
+      const first = readers.get(name);
+      if (first !== undefined) {
+        return single(
+          "lost-update",
+          [first, txn.call],
+          observation("lost-update", {
+            calls: [first, txn.call],
+            key: mop.key,
+            reads: [read],
+            register: facts.register,
+            read: facts.register ? read[0] : undefined,
+          }),
+        );
+      }
+      readers.set(name, txn.call);
     }
   }
   return undefined;

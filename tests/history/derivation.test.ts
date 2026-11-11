@@ -315,6 +315,58 @@ describe("derivation", () => {
       );
     });
 
+    it("returns a lost update of two appends after reads of one list", ({ seat }) => {
+      const history = new History();
+      runTxn(history, 0, append("x", 1));
+      runTxn(history, 1, readOf("x", [1]), append("x", 2));
+      runTxn(history, 2, readOf("x", [1]), append("x", 3));
+
+      check.isEqualTo(
+        seat,
+        instance(history, "lost-update"),
+        {
+          anomaly: "lost-update",
+          calls: [2, 4],
+          cycle: undefined,
+          explanation: [
+            observed("lost-update", { calls: [2, 4], key: "x", reads: [[1]] }),
+          ],
+        },
+        "the instance has the two calls and their read",
+      );
+    });
+
+    it("returns a lost update of two writes after reads of one value", ({ seat }) => {
+      const history = new History();
+      runTxn(history, 0, write("x", 1));
+      runTxn(history, 1, readOf("x", 1), write("x", 2));
+      runTxn(history, 2, readOf("x", 1), write("x", 3));
+
+      check.isEqualTo(
+        seat,
+        new Analysis(transactions(history.events()), true).instance("lost-update")
+          ?.explanation,
+        [
+          observed("lost-update", {
+            calls: [2, 4],
+            key: "x",
+            reads: [[1]],
+            register: true,
+            read: 1,
+          }),
+        ],
+        "the observation has the value of the reads",
+      );
+    });
+
+    it("returns no lost update of a read after a write of the key", ({ seat }) => {
+      const history = new History();
+      runTxn(history, 0, append("x", 1), readOf("x", [1]));
+      runTxn(history, 1, append("x", 2), readOf("x", [1, 2]));
+
+      check.isNil(seat, instance(history, "lost-update"), "no read of x is external");
+    });
+
     it("returns a G0 cycle of write dependencies with the evidence of each", ({
       seat,
     }) => {

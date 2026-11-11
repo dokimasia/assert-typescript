@@ -13,8 +13,8 @@
  */
 
 import type { Edge } from "./anomaly.js";
-import { id, same } from "./reads.js";
-import { READ, type Transaction, WRITE } from "./transaction.js";
+import { add, firstReads, id, same } from "./reads.js";
+import { type Transaction, WRITE } from "./transaction.js";
 
 /** A version pair of a register: a value, the transaction that installed a later value, and that value. The empty list is the initial value. */
 type Pair = readonly [before: readonly unknown[], call: number, value: unknown];
@@ -25,27 +25,18 @@ type ExternalRead = readonly [call: number, read: readonly unknown[]];
 /** The evidence of a dependency of to on from. */
 type Evidence = (from: number, to: number) => Edge;
 
-/** Adds value to the list of key in map. */
-function add<V>(map: Map<string, V[]>, key: string, value: V): void {
-  map.set(key, [...(map.get(key) ?? []), value]);
-}
-
 /**
  * Returns the external reads of an ok register transaction by key: the
  * list of the first read of each key that the transaction reads before it
  * writes the key.
  */
 function externalReads(txn: Transaction): Map<string, readonly unknown[]> {
-  const touched = new Set<string>();
-  const found = new Map<string, readonly unknown[]>();
-  for (const mop of txn.kind === "ok" ? txn.mops : []) {
-    const key = id(mop.key);
-    if (mop.fn === READ && !touched.has(key)) {
-      found.set(key, mop.value as readonly unknown[]);
-    }
-    touched.add(key);
-  }
-  return found;
+  return new Map(
+    (txn.kind === "ok" ? firstReads(txn) : []).map((mop) => [
+      id(mop.key),
+      mop.value as readonly unknown[],
+    ]),
+  );
 }
 
 /** Returns the value of the last write of each key of a register transaction. */
