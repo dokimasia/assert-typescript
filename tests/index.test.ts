@@ -377,6 +377,7 @@ describe("index", () => {
         "check",
         "cleanup",
         "doesReject",
+        "equateBy",
         "equateEmpty",
         "equateNans",
         "fault",

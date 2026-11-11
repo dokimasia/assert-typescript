@@ -64,6 +64,7 @@ function sorted(options: readonly FormOption[]): Sorted {
       case "equate-empty":
       case "equate-nans":
       case "by-identity":
+      case "equate-by":
         out.relaxations.push(option);
         break;
       default:

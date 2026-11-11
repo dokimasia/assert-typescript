@@ -101,6 +101,7 @@ describe("definition", () => {
         relaxationNames(),
         {
           "by-identity": "byIdentity",
+          "equate-by": "equateBy",
           "equate-empty": "equateEmpty",
           "equate-nans": "equateNans",
         },

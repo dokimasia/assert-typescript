@@ -4,7 +4,13 @@
 /** The spec of the machinery of the property forms. */
 
 import { describe } from "vitest";
-import { byIdentity, check, equateEmpty, equateNans } from "../../src/index.js";
+import {
+  byIdentity,
+  check,
+  equateBy,
+  equateEmpty,
+  equateNans,
+} from "../../src/index.js";
 import { Mode } from "../../src/matcher/seat.js";
 import * as value from "../../src/matcher/value.js";
 import { Mapped } from "../../src/prop/engine/generator.js";
@@ -213,7 +219,15 @@ describe("form", () => {
     }) => {
       const recorder = new Recorder();
       let passed: readonly unknown[] = [];
-      const relaxations = [equateEmpty(), equateNans(), byIdentity()];
+      const relaxations = [
+        equateEmpty(),
+        equateNans(),
+        byIdentity(),
+        equateBy(
+          (v): v is string => typeof v === "string",
+          (t) => t.toLowerCase(),
+        ),
+      ];
       await runForm(
         recorder,
         BOTH,

@@ -621,6 +621,27 @@ An option applies to the call it is passed to and nothing else. There is
 no global setting, because a rule changed in one place and read in
 another is how two tests come to mean different things.
 
+`equateBy(is, f)` makes each value that the guard `is` accepts compare by
+`f(value)`, at the top and at every depth. A type with state of its own,
+such as a cache, then compares by the part that the test checks. The
+record of a failure of `isEqualTo` states the results of `f`:
+
+```ts
+import { check, equateBy } from "@dokimi/assert";
+
+class Page {
+  constructor(readonly text: string, readonly rendered?: string) {}
+}
+
+check.isEqualTo(
+  seat,
+  store.read("page-1"),
+  new Page("hello"),
+  "the store returns the written page",
+  equateBy((v): v is Page => v instanceof Page, (page) => page.text),
+);
+```
+
 ## Async and the forgotten await
 
 These assertions return a promise:

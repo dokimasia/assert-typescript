@@ -9,12 +9,56 @@
 
 import { describe, expect, it } from "vitest";
 import { equal } from "../../src/matcher/compare.js";
-import { type Relaxations, settings } from "../../src/matcher/option.js";
+import {
+  byIdentity,
+  equateBy,
+  type Relaxations,
+  settings,
+} from "../../src/matcher/option.js";
 
 const STRICT = settings([]);
 const NANS = settings([{ kind: "equate-nans" }]);
 const EMPTY = settings([{ kind: "equate-empty" }]);
 const IDENTITY = settings([{ kind: "by-identity" }]);
+
+/** A value with its text and a cache that a read of the value sets. */
+class Cached {
+  readonly text: string;
+  readonly cache: number;
+
+  constructor(text: string, cache = 0) {
+    this.text = text;
+    this.cache = cache;
+  }
+}
+
+/** A value of one of two sides, whose transform returns the value of the other side. */
+interface Sided {
+  readonly side: "left" | "right";
+  readonly n: number;
+}
+
+/** Returns a guard of the values of one side. */
+function onSide(side: Sided["side"]): (value: unknown) => value is Sided {
+  return (value): value is Sided =>
+    typeof value === "object" && value !== null && (value as Sided).side === side;
+}
+
+/** Reports whether a value is a Cached. */
+function isCached(value: unknown): value is Cached {
+  return value instanceof Cached;
+}
+
+/** Reports whether a value is a string. */
+function isText(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+/** The relaxations that compare a cached value by its text. */
+const BY_TEXT = settings([equateBy(isCached, (c) => c.text)]);
+
+/** The relaxations that compare a string by its lower case. */
+const BY_LOWER = settings([equateBy(isText, (t) => t.toLowerCase())]);
 
 /** A value that contains itself. */
 interface Loop {
@@ -425,5 +469,147 @@ describe("compare", () => {
         expect(equal(tt.giveGot, tt.giveWant, tt.giveRelax ?? STRICT)).toBe(tt.want);
       });
     }
+
+    const transforms: {
+      name: string;
+      giveGot: unknown;
+      giveWant: unknown;
+      giveRelax: Relaxations;
+      want: boolean;
+    }[] = [
+      {
+        name: "returns true for two values whose transforms are equal",
+        giveGot: new Cached("a", 1),
+        giveWant: new Cached("a", 2),
+        giveRelax: BY_TEXT,
+        want: true,
+      },
+      {
+        name: "returns true for two elements of an array whose transforms are equal",
+        giveGot: [new Cached("a", 1)],
+        giveWant: [new Cached("a", 2)],
+        giveRelax: BY_TEXT,
+        want: true,
+      },
+      {
+        name: "returns true for two keys of a map whose transforms are equal",
+        giveGot: new Map([[new Cached("a", 1), 0]]),
+        giveWant: new Map([[new Cached("a", 2), 0]]),
+        giveRelax: BY_TEXT,
+        want: true,
+      },
+      {
+        name: "returns true for two values of a map whose transforms are equal",
+        giveGot: new Map([["k", new Cached("a", 1)]]),
+        giveWant: new Map([["k", new Cached("a", 2)]]),
+        giveRelax: BY_TEXT,
+        want: true,
+      },
+      {
+        name: "returns true for two fields of an object whose transforms are equal",
+        giveGot: { x: new Cached("a", 1) },
+        giveWant: { x: new Cached("a", 2) },
+        giveRelax: BY_TEXT,
+        want: true,
+      },
+      {
+        name: "returns true for two members of a set whose transforms are equal",
+        giveGot: new Set([new Cached("a", 1)]),
+        giveWant: new Set([new Cached("a", 2)]),
+        giveRelax: BY_TEXT,
+        want: true,
+      },
+      {
+        name: "returns true for a value against the result of its transform",
+        giveGot: new Cached("a", 1),
+        giveWant: "a",
+        giveRelax: BY_TEXT,
+        want: true,
+      },
+      {
+        name: "returns true for two keys of a map of strings that differ in case",
+        giveGot: new Map([["A", 1]]),
+        giveWant: new Map([["a", 1]]),
+        giveRelax: BY_LOWER,
+        want: true,
+      },
+      {
+        name: "returns true for results whose parts compare under the transforms again",
+        giveGot: new Cached("A"),
+        giveWant: new Cached("a"),
+        giveRelax: settings([
+          equateBy(isCached, (c) => [c.text]),
+          equateBy(isText, (t) => t.toLowerCase()),
+        ]),
+        want: true,
+      },
+      {
+        name: "returns true for two transforms that map each other's values at one place",
+        giveGot: { side: "left", n: 1 },
+        giveWant: { side: "left", n: 1 },
+        giveRelax: settings([
+          equateBy(onSide("left"), (v) => ({ side: "right", n: v.n })),
+          equateBy(onSide("right"), (v) => ({ side: "left", n: v.n })),
+        ]),
+        want: true,
+      },
+      {
+        name: "returns true for two values whose transforms apply before byIdentity",
+        giveGot: new Cached("a", 1),
+        giveWant: new Cached("a", 2),
+        giveRelax: settings([byIdentity(), equateBy(isCached, (c) => c.text)]),
+        want: true,
+      },
+      {
+        name: "returns true under the last transform whose guard accepts a value",
+        giveGot: new Cached("a", 1),
+        giveWant: new Cached("a", 2),
+        giveRelax: settings([
+          equateBy(isCached, (c) => c.cache),
+          equateBy(isCached, (c) => c.text),
+        ]),
+        want: true,
+      },
+      {
+        name: "returns false for two values whose transforms differ",
+        giveGot: new Cached("a"),
+        giveWant: new Cached("b"),
+        giveRelax: BY_TEXT,
+        want: false,
+      },
+      {
+        name: "returns false for two values that differ in their cache without the option",
+        giveGot: new Cached("a", 1),
+        giveWant: new Cached("a", 2),
+        giveRelax: STRICT,
+        want: false,
+      },
+      {
+        name: "returns false under the last transform whose results differ",
+        giveGot: new Cached("a", 1),
+        giveWant: new Cached("a", 2),
+        giveRelax: settings([
+          equateBy(isCached, (c) => c.text),
+          equateBy(isCached, (c) => c.cache),
+        ]),
+        want: false,
+      },
+    ];
+
+    for (const tt of transforms) {
+      it(tt.name, () => {
+        expect(equal(tt.giveGot, tt.giveWant, tt.giveRelax)).toBe(tt.want);
+      });
+    }
+
+    it("throws the error of a transform", () => {
+      const boom = settings([
+        equateBy(isCached, () => {
+          throw new Error("boom");
+        }),
+      ]);
+
+      expect(() => equal(new Cached("a"), new Cached("a"), boom)).toThrow("boom");
+    });
   });
 });

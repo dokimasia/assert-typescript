@@ -6,7 +6,7 @@
 import { describe } from "vitest";
 import { check } from "../src/index.js";
 import * as matcher from "../src/matcher/option.js";
-import { byIdentity, equateEmpty, equateNans } from "../src/option.js";
+import { byIdentity, equateBy, equateEmpty, equateNans } from "../src/option.js";
 import { Recorder } from "../src/seat.js";
 import { test as it } from "../src/vitest.js";
 
@@ -18,10 +18,30 @@ describe("option", () => {
         equateEmpty === matcher.equateEmpty,
         equateNans === matcher.equateNans,
         byIdentity === matcher.byIdentity,
+        equateBy === matcher.equateBy,
       ],
-      [true, true, true],
+      [true, true, true, true],
       "each public option is the matcher's function",
     );
+  });
+
+  describe("equateBy", () => {
+    it("relaxes the call that it is passed to alone", ({ seat }) => {
+      const recorder = new Recorder();
+      const lower = equateBy(
+        (v): v is string => typeof v === "string",
+        (t) => t.toLowerCase(),
+      );
+      check.isEqualTo(recorder, "A", "a", "by the lower case", lower);
+      check.isEqualTo(recorder, "A", "a", "strict");
+
+      check.isEqualTo(
+        seat,
+        recorder.failures.map((f) => f.contract),
+        ["strict"],
+        "only the call without the option fails",
+      );
+    });
   });
 
   describe("equateEmpty", () => {

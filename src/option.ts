@@ -12,6 +12,15 @@
  * ```ts
  * check.isEqualTo(seat, reply.items, [], "no items came back", equateEmpty());
  * ```
+ *
+ * equateBy compares the values that a guard accepts by a transform that the
+ * caller states.
  */
 
-export { byIdentity, equateEmpty, equateNans, type Option } from "./matcher/option.js";
+export {
+  byIdentity,
+  equateBy,
+  equateEmpty,
+  equateNans,
+  type Option,
+} from "./matcher/option.js";

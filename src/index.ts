@@ -34,7 +34,13 @@ export { fault } from "./fault.js";
 export * as files from "./files/index.js";
 export * as golden from "./golden.js";
 export * as history from "./history/index.js";
-export { byIdentity, equateEmpty, equateNans, type Option } from "./option.js";
+export {
+  byIdentity,
+  equateBy,
+  equateEmpty,
+  equateNans,
+  type Option,
+} from "./option.js";
 export * as prop from "./prop/index.js";
 export { doesReject } from "./rejects.js";
 export {

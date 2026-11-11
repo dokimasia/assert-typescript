@@ -12,7 +12,7 @@
  */
 
 import { equal as compare } from "./compare.js";
-import { type Option, settings } from "./option.js";
+import { type Option, settings, transformed } from "./option.js";
 import type { Mode, Seat } from "./seat.js";
 import { fail, pass } from "./verdict.js";
 
@@ -111,7 +111,11 @@ function numberOf(value: unknown): number | undefined {
   return undefined;
 }
 
-/** Fail when got and want differ. */
+/**
+ * Fail when got and want differ. The record states the result of the
+ * transform of an option of equateBy in place of want and of got when its
+ * guard accepts them.
+ */
 export function equal(
   seat: Seat,
   mode: Mode,
@@ -121,14 +125,20 @@ export function equal(
   ...options: Option[]
 ): void {
   seat.helper();
-  if (!compare(got, want, settings(options))) {
-    fail(seat, mode, "equal", msg, { want, got });
+  const relax = settings(options);
+  if (!compare(got, want, relax)) {
+    const detail = { want: transformed(want, relax), got: transformed(got, relax) };
+    fail(seat, mode, "equal", msg, detail);
     return;
   }
   pass(seat, mode, "equal", msg);
 }
 
-/** Fail when got and want are equal. */
+/**
+ * Fail when got and want are equal. The record states the result of the
+ * transform of an option of equateBy in place of got when its guard accepts
+ * it.
+ */
 export function notEqual(
   seat: Seat,
   mode: Mode,
@@ -138,8 +148,9 @@ export function notEqual(
   ...options: Option[]
 ): void {
   seat.helper();
-  if (compare(got, want, settings(options))) {
-    fail(seat, mode, "not-equal", msg, { got });
+  const relax = settings(options);
+  if (compare(got, want, relax)) {
+    fail(seat, mode, "not-equal", msg, { got: transformed(got, relax) });
     return;
   }
   pass(seat, mode, "not-equal", msg);

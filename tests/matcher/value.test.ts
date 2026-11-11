@@ -7,10 +7,21 @@
  */
 
 import { describe } from "vitest";
-import { equateEmpty, equateNans, type Option } from "../../src/matcher/option.js";
+import {
+  equateBy,
+  equateEmpty,
+  equateNans,
+  type Option,
+} from "../../src/matcher/option.js";
 import { Mode } from "../../src/matcher/seat.js";
 import * as value from "../../src/matcher/value.js";
 import { verdictCases as cases, VERDICT_CONTRACT as MSG } from "../helpers.js";
+
+/** The option that compares a string by its lower case. */
+const LOWER = equateBy(
+  (v): v is string => typeof v === "string",
+  (t) => t.toLowerCase(),
+);
 
 describe("value", () => {
   describe("equal", () => {
@@ -43,6 +54,16 @@ describe("value", () => {
           name: "passes two NaNs under equateNans",
           give: [Number.NaN, Number.NaN, equateNans()],
         },
+        {
+          name: "reports the transforms of want and got under equateBy",
+          give: ["AB", "Ac", LOWER],
+          want: { want: "ac", got: "ab" },
+        },
+        {
+          name: "reports want and got that no transform accepts as they are",
+          give: ["A", 1, LOWER],
+          want: { want: 1, got: "a" },
+        },
       ],
     );
   });
@@ -50,10 +71,16 @@ describe("value", () => {
   describe("notEqual", () => {
     cases(
       "not-equal",
-      (seat, [got, want]) => value.notEqual(seat, Mode.Fatal, got, want, MSG),
+      (seat, [got, want, ...options]) =>
+        value.notEqual(seat, Mode.Fatal, got, want, MSG, ...(options as Option[])),
       [
         { name: "passes different values", give: [1, 2] },
         { name: "reports got for equal values", give: [1, 1], want: { got: 1 } },
+        {
+          name: "reports the transform of got under equateBy",
+          give: ["AB", "ab", LOWER],
+          want: { got: "ab" },
+        },
       ],
     );
   });

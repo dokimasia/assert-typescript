@@ -10,7 +10,7 @@
  * test asking whether a reply matches actually needs.
  */
 
-import type { Relaxations } from "./option.js";
+import { type Relaxations, transformed } from "./option.js";
 
 /** How deep a comparison walks before calling the value cyclic. */
 const MAX_DEPTH = 100;
@@ -117,8 +117,23 @@ function equalPrimitives(a: unknown, b: unknown, relax: Relaxations): boolean {
   return Object.is(a, b) || a === b;
 }
 
-/** Compare one level, then recurse. `seen` stops a cycle. */
+/**
+ * Compare one place, then recurse. A value that a transform of equateBy
+ * accepts compares by its result at the place, and the parts of the result
+ * compare under the transforms again.
+ */
 function walk(
+  a: unknown,
+  b: unknown,
+  relax: Relaxations,
+  depth: number,
+  seen: Set<unknown>,
+): boolean {
+  return walkPlace(transformed(a, relax), transformed(b, relax), relax, depth, seen);
+}
+
+/** Compare the values of one place after its transforms, then recurse. `seen` stops a cycle. */
+function walkPlace(
   a: unknown,
   b: unknown,
   relax: Relaxations,
@@ -294,7 +309,10 @@ function walkDeep(
  * `Date`, `RegExp`, `Error` and boxed primitives. Different shapes never
  * compare. A map's keys compare by these rules, so no NaN key matches
  * without `equateNans`, and -0 and +0 are one key. A cycle stops the walk
- * rather than overflowing the stack.
+ * rather than overflowing the stack. Under equateBy, a value that a guard
+ * accepts compares by the result of its transform. At one place at most
+ * one transform applies, and the parts of the result compare under the
+ * transforms again.
  *
  * @param got The value produced by the code under test.
  * @param want The value it is supposed to produce.
