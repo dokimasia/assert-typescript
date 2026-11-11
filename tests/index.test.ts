@@ -274,6 +274,10 @@ const DECLARED: Record<string, { file: string; text: string }> = {
     file: "stateful/machine.d.ts",
     text: "readonly drain?: boolean | undefined",
   },
+  "action.keep": {
+    file: "stateful/machine.d.ts",
+    text: "readonly keep?: boolean | undefined",
+  },
   "action.enabled": {
     file: "stateful/machine.d.ts",
     text: "enabled?(state: S): boolean",

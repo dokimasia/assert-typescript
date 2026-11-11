@@ -47,7 +47,7 @@
  * ticker and spins-until-a-flag. Such a subject spawns its tasks on a
  * scheduler of the case with the strategy and the most releases of the
  * setup, and the clients of its concurrent section run on the same
- * scheduler.
+ * scheduler. Each subject sets keep on the actions that the setup names.
  *
  * Each subject is built anew for every run, so a subject that counts over
  * the cases of a run starts each run at 0.
@@ -57,11 +57,11 @@ import { Failure } from "../../failure.js";
 import type { Spec } from "../../history/spec.js";
 import type { Case } from "../../prop/case.js";
 import { integer } from "../../prop/generators.js";
-import { type Option, tasks } from "../../stateful/option.js";
+import { tasks } from "../../stateful/option.js";
 import { steps } from "../../stateful/steps.js";
-import type { Strategy } from "../../stateful/strategy.js";
-import { flushedRegister, schedulerOf, spinner, ticker } from "./background.js";
+import { flushedRegister, spinner, ticker } from "./background.js";
 import { queue } from "./queue.js";
+import { marked, type Setup, schedulerOf } from "./setup.js";
 
 /** The largest key of store-loses-on-crash, and the draw of its keys. */
 const MAX_KEY = 3;
@@ -103,7 +103,7 @@ async function counterOverflows(c: Case, setup: Setup): Promise<void> {
     c,
     {
       spec: COUNTER,
-      actions: [
+      actions: marked(setup, [
         {
           name: "increment",
           run: (step, client) => {
@@ -120,7 +120,7 @@ async function counterOverflows(c: Case, setup: Setup): Promise<void> {
             call.ok(null);
           },
         },
-      ],
+      ]),
     },
     ...setup.steps,
   );
@@ -135,7 +135,7 @@ async function storeLosesOnCrash(c: Case, setup: Setup): Promise<void> {
   await steps(
     c,
     {
-      actions: [
+      actions: marked(setup, [
         {
           name: "put",
           input: (step) => {
@@ -163,7 +163,7 @@ async function storeLosesOnCrash(c: Case, setup: Setup): Promise<void> {
           },
         },
         { name: "crash", run: () => buffer.clear() },
-      ],
+      ]),
       settle: (after) => {
         for (const [key, stored] of acknowledged) {
           if (durable.get(key) !== stored) {
@@ -184,7 +184,7 @@ async function sharedCounter(c: Case, setup: Setup, racy: boolean): Promise<void
     c,
     {
       spec: COUNTER,
-      actions: [
+      actions: marked(setup, [
         {
           name: "increment",
           run: async (step, client) => {
@@ -197,7 +197,7 @@ async function sharedCounter(c: Case, setup: Setup, racy: boolean): Promise<void
             call.ok(count);
           },
         },
-      ],
+      ]),
     },
     ...setup.steps,
     ...setup.section,
@@ -214,7 +214,7 @@ function refusingCounter(): Subject {
       c,
       {
         spec: COUNTER,
-        actions: [
+        actions: marked<number>(setup, [
           {
             name: "increment",
             enabled: (state) => state < LIMIT,
@@ -233,24 +233,14 @@ function refusingCounter(): Subject {
             name: "read",
             run: (step, client) => step.history().invoke(client, "read", []).ok(count),
           },
-        ],
+        ]),
       },
       ...setup.steps,
     );
   };
 }
 
-/** The options of a subject's steps, those of a concurrent section, and the options of a subject's scheduler. */
-export interface Setup {
-  /** The options that every subject takes: mean, max and swarm. */
-  readonly steps: readonly Option[];
-  /** The options of a concurrent section: clients, concurrent and concurrentMean. */
-  readonly section: readonly Option[];
-  /** The strategy of the scheduler that a subject with a concurrent section or with tasks of its own makes in each case. */
-  readonly strategy: Strategy;
-  /** The most tasks that one run or one advance of that scheduler releases. */
-  readonly maxReleases: number;
-}
+export type { Setup } from "./setup.js";
 
 /** A subject: it builds its subject and runs its machine in a case. */
 export type Subject = (c: Case, setup: Setup) => Promise<void>;

@@ -32,9 +32,8 @@ import type { Spec } from "../../history/spec.js";
 import type { Case } from "../../prop/case.js";
 import { integer } from "../../prop/generators.js";
 import { tasks } from "../../stateful/option.js";
-import { maxReleases, Scheduler } from "../../stateful/scheduler.js";
 import { steps } from "../../stateful/steps.js";
-import type { Setup } from "./subjects.js";
+import { marked, type Setup, schedulerOf } from "./setup.js";
 
 /** The draw of the values of a write. */
 const VALUES = integer(0, 1000);
@@ -73,18 +72,6 @@ const TICKED: Spec<number> = {
 };
 
 /**
- * Returns a scheduler of c with the strategy and the most releases of
- * setup.
- *
- * @param c - The case whose choices decide the releases.
- * @param setup - The setup of the subject.
- * @returns The scheduler.
- */
-export function schedulerOf(c: Case, setup: Setup): Scheduler {
-  return new Scheduler(c, setup.strategy, maxReleases(setup.maxReleases));
-}
-
-/**
  * Runs the register machine on clients that run as tasks, over a buffer
  * that a flusher task moves into the durable value.
  *
@@ -117,7 +104,7 @@ export async function flushedRegister(
     c,
     {
       spec: REGISTER,
-      actions: [
+      actions: marked(setup, [
         {
           name: "write",
           input: (step) => step.draw(VALUES, "v"),
@@ -134,7 +121,7 @@ export async function flushedRegister(
             call.ok(buffer === null ? durable : buffer);
           },
         },
-      ],
+      ]),
     },
     ...setup.steps,
     ...setup.section,
@@ -170,7 +157,7 @@ export async function ticker(
     c,
     {
       spec: TICKED,
-      actions: [
+      actions: marked(setup, [
         {
           name: "advance",
           input: (step) => step.draw(MILLISECONDS, "ms"),
@@ -184,7 +171,7 @@ export async function ticker(
           name: "read",
           run: (step, client) => step.history().invoke(client, "read", []).ok(count),
         },
-      ],
+      ]),
     },
     ...setup.steps,
   );
@@ -203,7 +190,7 @@ export async function spinner(c: Case, setup: Setup): Promise<void> {
   await steps(
     c,
     {
-      actions: [
+      actions: marked(setup, [
         {
           name: "spin",
           run: async () => {
@@ -216,7 +203,7 @@ export async function spinner(c: Case, setup: Setup): Promise<void> {
             await scheduler.run();
           },
         },
-      ],
+      ]),
     },
     ...setup.steps,
   );

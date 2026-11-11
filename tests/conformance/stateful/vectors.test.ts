@@ -54,8 +54,8 @@ describe("vectors", () => {
       expect([...RUNNERS.keys()]).toEqual(["machines"]);
     });
 
-    it("runs the 21 machines vectors of the definition", () => {
-      expect(VECTORS.size).toBe(21);
+    it("runs the 22 machines vectors of the definition", () => {
+      expect(VECTORS.size).toBe(22);
     });
 
     for (const id of VECTORS.keys()) {
@@ -82,6 +82,15 @@ describe("vectors", () => {
       await expect(MACHINES(raw)).resolves.toBeUndefined();
     });
 
+    it("takes the actions that every case of a setup keeps", async () => {
+      const kept = vector("queue-loses-on-wrap/a-kept-put-takes-no-swarm-choice");
+
+      expect([
+        (await fault(kept))[0],
+        (await fault({ ...kept, setup: {} }))[0],
+      ]).toEqual(["", "detail"]);
+    });
+
     const tests: { name: string; give: Raw; want: [string, string] }[] = [
       {
         name: "a vector of no machine subject",
@@ -92,6 +101,16 @@ describe("vectors", () => {
         name: "a setup of no strategy",
         give: { ...vector(PASSING), setup: { strategy: "random" } },
         want: ["setup.strategy", '"random" is no strategy'],
+      },
+      {
+        name: "a keep that is no list",
+        give: { ...vector(PASSING), setup: { keep: "increment" } },
+        want: ["setup.keep", '"increment" is no list of names'],
+      },
+      {
+        name: "a keep of a name that is no string",
+        give: { ...vector(PASSING), setup: { keep: [1] } },
+        want: ["setup.keep", "[1] is no list of names"],
       },
       {
         name: "a setting that the runner takes no",

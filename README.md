@@ -996,6 +996,9 @@ scheduler.spawn(async () => {
 });
 ```
 
+The swarm of a case drops each action with the odds 1 in 2. An action with
+`keep: true`, such as the delivery of a message, runs in every case.
+
 A concurrent section averages 5 steps under the default maximum of 16.
 `stateful.concurrentMean(n)` sets another mean, and the maximum of
 `stateful.concurrent(n)` still stops a section.
@@ -1031,7 +1034,7 @@ definition and holds itself to it:
 - 195 corpus cases state what each assertion must report, run against
   both surfaces and the matchers of `expect`, with the call record of
   each call. They are the same cases every other implementation runs.
-- 445 property vectors, 112 history vectors, 21 machine vectors and 57
+- 445 property vectors, 112 history vectors, 22 machine vectors and 57
   file vectors pin the property engine, the history checks, machines and
   the assertions of files.
 - A completeness gate checks that every assertion is present under the

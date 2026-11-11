@@ -23,8 +23,11 @@ const FREE = new IntegerBounds(0n, 1n);
 
 /**
  * Returns the actions that the case c keeps, in order, with one choice per
- * action at the action's swarm position of e. A case that follows trace
- * keeps the actions that its step entries name.
+ * action without keep at the action's swarm position of e. The case keeps
+ * an action with keep set without a choice, and such an action counts as
+ * kept before the first choice, so the remaining actions of each choice are
+ * the actions without keep alone. A case that follows trace keeps the
+ * actions that its step entries name.
  *
  * @param c - The case.
  * @param e - The engine's record of the case, whose place each choice sets.
@@ -39,22 +42,29 @@ export function keptActions<S>(
   trace: Tracing | undefined,
 ): Action<S>[] {
   const named = trace?.actions() ?? new Set<string>();
+  const marked = actions.some((action) => action.keep === true);
+  let remaining = actions.filter((action) => action.keep !== true).length;
   const kept: Action<S>[] = [];
   actions.forEach((action, position) => {
+    if (action.keep === true) {
+      kept.push(action);
+      return;
+    }
     e.place = { part: "swarm", position, action: action.name };
     trace?.prepare(named.has(action.name) ? 1n : 0n);
-    const earlier = kept.length > 0;
-    const remaining = actions.length - position;
+    const earlier = marked || kept.length > 0;
+    const left = remaining;
     const value = onEngine(c, (engine) =>
       engine.choose({
-        bounds: !earlier && remaining === 1 ? FORCED : FREE,
-        draw: (source) => draw.keep(source, SWARM, earlier, remaining),
+        bounds: !earlier && left === 1 ? FORCED : FREE,
+        draw: (source) => draw.keep(source, SWARM, earlier, left),
         edge: 1n,
       }),
     );
     if (value === 1n) {
       kept.push(action);
     }
+    remaining -= 1;
   });
   return kept;
 }

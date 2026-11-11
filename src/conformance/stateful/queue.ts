@@ -10,7 +10,7 @@ import type { Operation, Spec } from "../../history/spec.js";
 import type { Case } from "../../prop/case.js";
 import { integer } from "../../prop/generators.js";
 import { steps } from "../../stateful/steps.js";
-import type { Setup } from "./subjects.js";
+import { marked, type Setup } from "./setup.js";
 
 /** The largest capacity of a queue, and the largest value that its put writes. */
 const MAX_CAPACITY = 8;
@@ -96,7 +96,7 @@ export async function queue(
     c,
     {
       spec: boundedQueue(capacity),
-      actions: [
+      actions: marked(setup, [
         {
           name: "put",
           input: (step) => step.draw(VALUES, "v"),
@@ -112,7 +112,7 @@ export async function queue(
             call.ok(ring.get());
           },
         },
-      ],
+      ]),
     },
     ...setup.steps,
   );

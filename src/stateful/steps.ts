@@ -271,9 +271,10 @@ class Run<S> {
  * Runs the steps of machine in the case c, in six parts, and records every
  * decision as a choice of the case:
  *
- * 1. Swarm: one choice per action, in order, whether the case keeps it, with
- *    odds of 1 in 2 conditioned on keeping one. A case keeps every action
- *    under `swarm(false)`.
+ * 1. Swarm: one choice per action without keep, in order, whether the case
+ *    keeps it, with odds of 1 in 2 conditioned on keeping one. The case
+ *    keeps an action with keep set without a choice. A case keeps every
+ *    action under `swarm(false)`.
  * 2. Setup: the check of the history, and the invariant.
  * 3. Sequential steps on client 0. Before each step, the kept actions that
  *    are enabled in every state that the last check left. With none, the
@@ -301,8 +302,8 @@ class Run<S> {
  * history of the machine's steps is linearizable.
  *
  * The case of prop.draws follows its trace: the swarm keeps the actions that
- * its step entries name, and each step entry becomes the choices of one
- * step. steps refuses a step entry that it cannot take at its position,
+ * its step entries name and every action with keep set, and each step entry
+ * becomes the choices of one step. steps refuses a step entry that it cannot take at its position,
  * which ends the run with a fault at the entry before any other case: an
  * action that the step's list lacks, a step past its part's most steps, a
  * client outside the clients, a concurrent step of a machine with one

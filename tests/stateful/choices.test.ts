@@ -46,6 +46,24 @@ describe("choices", () => {
       );
     });
 
+    it("keeps an action with keep set without a choice", ({ seat }) => {
+      const { c, engine } = bodyCase(replaying(0));
+      const listed: Action<unknown>[] = [
+        ...actions(["a"]),
+        { name: "b", run: () => undefined, keep: true },
+      ];
+
+      check.isEqualTo(
+        seat,
+        [
+          keptActions(c, engine, listed, undefined).map((action) => action.name),
+          engine.requests.map((request) => request.bounds.id),
+        ],
+        [["b"], ["integer 0 1"]],
+        "one free choice for a, and b kept",
+      );
+    });
+
     it("makes each choice at the swarm position of its action", ({ seat }) => {
       const { c, engine } = bodyCase(replaying(1, 1));
       keptActions(c, engine, actions(["a", "b"]), undefined);

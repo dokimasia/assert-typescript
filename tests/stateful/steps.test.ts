@@ -53,6 +53,7 @@ interface Shape {
   readonly enabled?: (state: unknown) => boolean;
   readonly drain?: boolean;
   readonly draws?: boolean;
+  readonly keep?: boolean;
 }
 
 /** The inputs and the runs of the actions of a case, in order. */
@@ -66,6 +67,7 @@ class Log {
       name,
       weight: shape.weight,
       drain: shape.drain,
+      keep: shape.keep,
       ...(enabled === undefined ? {} : { enabled }),
       input: (c, state) => {
         this.events.push(["input", name, state]);
@@ -243,6 +245,74 @@ describe("steps", () => {
         [engine.requests[2]?.bounds, engine.steps],
         [new IntegerBounds(1n, 1n), [[0, { action: "c" }]]],
         "c takes the step",
+      );
+    });
+
+    it("makes no swarm choice for an action with keep set", async ({ seat }) => {
+      const log = new Log();
+      const engine = await replayed(
+        {
+          actions: [log.action("a", { keep: true }), log.action("b"), log.action("c")],
+        },
+        [0, 0, 1, 0],
+        max(1),
+      );
+
+      check.isEqualTo(
+        seat,
+        [
+          engine.wheres.slice(0, 2).map((where) => where.place),
+          engine.requests.slice(0, 2).map((request) => request.bounds),
+          engine.steps,
+        ],
+        [
+          [
+            { part: "swarm", position: 1, action: "b" },
+            { part: "swarm", position: 2, action: "c" },
+          ],
+          [BINARY, BINARY],
+          [[0, { action: "a" }]],
+        ],
+        "the swarm makes choices for b and c alone",
+      );
+    });
+
+    it("counts an action with keep set as kept before the first choice", async ({
+      seat,
+    }) => {
+      const log = new Log();
+      const engine = await replayed(
+        {
+          actions: [log.action("a"), log.action("b"), log.action("c", { keep: true })],
+        },
+        [0, 0, 1, 0],
+        max(1),
+      );
+
+      check.isEqualTo(
+        seat,
+        [engine.requests[1]?.bounds, engine.steps],
+        [BINARY, [[0, { action: "c" }]]],
+        "the choice of b is free, and c takes the step",
+      );
+    });
+
+    it("makes no swarm choice for a machine whose actions all have keep set", async ({
+      seat,
+    }) => {
+      const log = new Log();
+      const engine = await replayed(
+        {
+          actions: [log.action("a", { keep: true }), log.action("b", { keep: true })],
+        },
+        [1, 1, 0],
+      );
+
+      check.isEqualTo(
+        seat,
+        [engine.wheres[0]?.place, engine.steps.map(([, step]) => step.action)],
+        [{ part: "sequential", position: 0 }, ["b"]],
+        "the flag of the first step comes first",
       );
     });
 
@@ -875,6 +945,23 @@ describe("steps", () => {
         [engine.choices.map((choice) => choice.value), engine.steps],
         [[0n, 1n, 0n, 1n, 0n, 0n], [[0, { action: "b" }]]],
         "the swarm disables a and c",
+      );
+    });
+
+    it("keeps an action with keep set that no step entry of a trace names", async ({
+      seat,
+    }) => {
+      const log = new Log();
+      const { c, engine } = bodyCase(new Tracing([{ action: "b" }]));
+      await steps(c, {
+        actions: [log.action("a", { keep: true }), log.action("b"), log.action("c")],
+      });
+
+      check.isEqualTo(
+        seat,
+        [engine.choices.map((choice) => choice.value), engine.steps],
+        [[1n, 0n, 1n, 1n, 0n], [[0, { action: "b" }]]],
+        "the swarm keeps a and b",
       );
     });
 

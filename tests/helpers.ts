@@ -317,6 +317,7 @@ export const MACHINE_SETUP: Setup = {
   section: [clients(2)],
   strategy: uniform(),
   maxReleases: MAX_RELEASES,
+  keep: [],
 };
 
 /**

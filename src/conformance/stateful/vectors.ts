@@ -59,6 +59,14 @@ function strategyOf(written: unknown): Strategy {
   throw new Fault("setup.strategy", `${JSON.stringify(written)} is no strategy`);
 }
 
+/** Returns the names of the actions that a setup keeps in every case. */
+function namesOf(written: unknown): readonly string[] {
+  if (!(Array.isArray(written) && written.every((name) => typeof name === "string"))) {
+    throw new Fault("setup.keep", `${JSON.stringify(written)} is no list of names`);
+  }
+  return written;
+}
+
 /** Returns the options that a vector's setup states, with the clients of the definition's setup for a setup that states none. */
 function setupOf(written: Raw): Setup {
   const steps: StepsOption[] = [];
@@ -83,6 +91,7 @@ function setupOf(written: Raw): Setup {
     section,
     strategy: strategyOf(written["strategy"] ?? "uniform"),
     maxReleases: Number(written["max-releases"] ?? MAX_RELEASES),
+    keep: namesOf(written["keep"] ?? []),
   };
 }
 

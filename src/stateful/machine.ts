@@ -57,6 +57,12 @@ export interface Action<S> {
   /** Whether the action takes the steps of the drain, whether the swarm kept it or not. */
   readonly drain?: boolean | undefined;
   /**
+   * Whether every case keeps the action, and the swarm makes no choice for
+   * it. An action that delivers a message or advances a clock to a due timer
+   * keeps its subject moving this way.
+   */
+  readonly keep?: boolean | undefined;
+  /**
    * Reports whether a sequential or a drain step may take the action in
    * state. An action without enabled is enabled in every state, and only
    * such an action takes the steps of a concurrent section. What enabled
