@@ -191,7 +191,7 @@ describe("linearizable", () => {
         ],
         [
           "violated",
-          9,
+          8,
           3,
           3,
           [

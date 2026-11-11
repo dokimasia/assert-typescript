@@ -539,6 +539,7 @@ prop.maxChoices(n: number): Option
 prop.store(dir: string): Option
 prop.explain(enabled: boolean): Option
 prop.workers(n: number): Option
+prop.confirm(every: number): Option
 prop.hermetic(): Option
 prop.around(wrapper: Wrapper): Option
 prop.onResult(f: (result: Result) => void): Option
@@ -787,6 +788,17 @@ await prop.forAll(seat, "a write is read back", writeRead, prop.onResult((result
 }));
 ```
 
+`prop.confirm(every)` makes a run replay each valid case whose count is a
+multiple of `every` right after the case, from its choices. A replay that
+requests other bounds, observes another fingerprint with `Case.observe` or
+fails ends the run as flaky. A simulation that iterates a set or reads the
+wall clock then fails while its cases pass. Each replay costs one more run
+of the body:
+
+```ts
+await prop.forAll(seat, "each step observes the checksum of the state", simulate, prop.confirm(16));
+```
+
 `prop.around` runs each run of the body inside a wrapper, so that every
 case, shrink candidate and replay starts in a fresh environment, such as
 vitest's fake timers:
@@ -943,7 +955,7 @@ definition and holds itself to it:
 - 195 corpus cases state what each assertion must report, run against
   both surfaces and the matchers of `expect`, with the call record of
   each call. They are the same cases every other implementation runs.
-- 437 property vectors, 108 history vectors, 14 machine vectors and 57
+- 441 property vectors, 110 history vectors, 14 machine vectors and 57
   file vectors pin the property engine, the history checks, machines and
   the assertions of files.
 - A completeness gate checks that every assertion is present under the

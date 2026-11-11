@@ -212,6 +212,7 @@ export function settingsOf(written: Raw): Settings {
     stored: ((written["stored"] ?? []) as unknown[]).map(parseChoices),
     shrink: Number(written["shrink"] ?? DEFAULT_BUDGET),
     replay: replayed === undefined ? undefined : token.decode(String(replayed)),
+    confirm: Number(written["confirm"] ?? 0),
   };
 }
 

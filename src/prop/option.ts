@@ -48,6 +48,8 @@ function apply(config: Config, option: Option): Config {
       return { ...config, explain: option.value };
     case "workers":
       return config;
+    case "confirm":
+      return { ...config, confirm: option.value };
     case "hermetic":
       return { ...config, hermetic: true };
     case "around":
@@ -117,6 +119,7 @@ export type Option =
   | { readonly kind: "store"; readonly value: string }
   | { readonly kind: "explain"; readonly value: boolean }
   | { readonly kind: "workers"; readonly value: number }
+  | { readonly kind: "confirm"; readonly value: number }
   | { readonly kind: "hermetic" }
   | { readonly kind: "around"; readonly value: Wrapper }
   | { readonly kind: "on-result"; readonly value: (result: Result) => void }
@@ -134,7 +137,8 @@ export type FormOption = Option | Relaxation | FormOnly;
 /**
  * What the options of one run state. A setting that no option states has
  * its default, and seed, replay, store, around, onResult and draws are
- * undefined.
+ * undefined. confirm is the interval of the replays of valid cases, and 0
+ * for none.
  */
 export interface Config {
   readonly cases: number;
@@ -150,12 +154,14 @@ export interface Config {
   readonly around: Wrapper | undefined;
   readonly onResult: ((result: Result) => void) | undefined;
   readonly draws: string | undefined;
+  readonly confirm: number;
 }
 
 /**
  * Returns what options state: the defaults, with each option applied in
  * order. The defaults are 100 cases, a shrink budget of 2,000 runs and 30
- * seconds, a cap of 8,192 choices, and an explanation.
+ * seconds, a cap of 8,192 choices, an explanation, and no replay of a valid
+ * case.
  *
  * @param options - The options of the run.
  * @returns The settings.
@@ -175,6 +181,7 @@ export function configure(options: readonly Option[]): Config {
     around: undefined,
     onResult: undefined,
     draws: undefined,
+    confirm: 0,
   };
   for (const option of options) {
     config = apply(config, option);
@@ -328,6 +335,23 @@ export function explain(enabled: boolean): Option {
 export function workers(n: number): Option {
   counted("workers", n, 1);
   return { kind: "workers", value: n };
+}
+
+/**
+ * Makes a run replay each valid case whose count is a multiple of every,
+ * right after the case, from its choices, as the replay of a failing case
+ * runs. A replay that requests other bounds, observes another fingerprint
+ * or fails ends the run as flaky. A replay that is rejected or skips does
+ * not differ. The replay counts as no case, and an example of values is not
+ * replayed. A run without the option replays no valid case.
+ *
+ * @param every - The interval of the replays, at least 1.
+ * @returns The option.
+ * @throws RangeError for an interval that is no whole number of 1 or more.
+ */
+export function confirm(every: number): Option {
+  counted("confirm", every, 1);
+  return { kind: "confirm", value: every };
 }
 
 /**

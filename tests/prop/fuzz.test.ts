@@ -13,7 +13,7 @@ import type { Result } from "../../src/prop/detail.js";
 import { forAll } from "../../src/prop/forall.js";
 import { fuzz } from "../../src/prop/fuzz.js";
 import { bytes } from "../../src/prop/generators/collections.js";
-import { hermetic, onResult, seed, store } from "../../src/prop/option.js";
+import { confirm, hermetic, onResult, seed, store } from "../../src/prop/option.js";
 import { AssertionFailed, Recorder } from "../../src/seat.js";
 import { test as it } from "../../src/vitest.js";
 import { enter, records, setVariable, temporary } from "../helpers.js";
@@ -167,6 +167,43 @@ describe("fuzz", () => {
           ["fail", "counterexample"],
         ],
         "the stored cases, then two seed files",
+      );
+    });
+
+    it("fails the call at a seed file whose replay differs", async ({ seat }) => {
+      const dir = temporary();
+      enter(dir);
+      const recorder = new Recorder();
+      nameTest(recorder, ["count.test.ts", "counts"]);
+      const seeds = join(dir, "testdata", "fuzz", "count.test.ts", "counts");
+      mkdirSync(seeds, { recursive: true });
+      writeFileSync(join(seeds, "a"), Uint8Array.of(1, 1));
+      let calls = 0n;
+      await fuzz(
+        recorder,
+        "counts its calls",
+        (c) => {
+          c.draw(bytes({ maxSize: 4 }), "data");
+          calls += 1n;
+          c.observe(calls);
+          check.isTrue(c, true, "the case runs");
+        },
+        hermetic(),
+        seed(1n),
+        store(""),
+        confirm(1),
+      );
+
+      check.isEqualTo(
+        seat,
+        [
+          recorder.failures[0]?.detail["outcome"],
+          records(recorder).flatMap((one) =>
+            one["phase"] === undefined ? [] : [one["phase"]],
+          ),
+        ],
+        ["flaky", ["fuzz", "confirm"]],
+        "the replay of the seed file differs from the seed file",
       );
     });
 

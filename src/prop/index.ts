@@ -116,6 +116,7 @@ export {
 export {
   around,
   cases,
+  confirm,
   draws,
   example,
   examples,

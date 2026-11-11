@@ -298,6 +298,34 @@ describe("detail", () => {
       );
     });
 
+    it("writes null as the failure of a valid case whose replay differs", async ({
+      seat,
+    }) => {
+      let calls = 0n;
+      const flaky = await drive(
+        run(
+          body((c) => {
+            c.draw(WIDE, "n");
+            calls += 1n;
+            c.observe(calls);
+          }),
+          { seed: SEED, confirm: 1 },
+        ),
+      );
+      const written = detail(flaky);
+
+      check.isEqualTo(
+        seat,
+        [
+          written["outcome"],
+          written["failure"],
+          (written["counterexample"] as unknown[]).length,
+        ],
+        ["flaky", null, 1],
+        "the valid case without a failure",
+      );
+    });
+
     it("writes the shortfall of a coverage-unmet run", ({ seat }) => {
       const unmet = new Tally(SEED).outcome("coverage-unmet", {
         shortfall: {

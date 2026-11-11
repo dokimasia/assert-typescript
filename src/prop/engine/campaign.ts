@@ -34,6 +34,7 @@ import {
 import { type Member, Mutating, mutation } from "./mutation.js";
 import { conclude } from "./runner.js";
 import { knownCases, type Resolved, resolve, type Settings } from "./settings.js";
+import { confirmValid } from "./shrink/confirm.js";
 import { caseSource, type Source } from "./source.js";
 import { type Outcome, shortfallOf, Tally } from "./tally.js";
 import type { Work } from "./work.js";
@@ -101,9 +102,10 @@ class Exploration {
   /**
    * Counts an execution, concludes a failure, admits a valid case to the
    * pool, and returns the outcome that ends the campaign: a skip before the
-   * first failure, with the runs of the stored cases, or the flaky outcome
-   * of a failure whose replay differs. valued states a case of an example of
-   * values.
+   * first failure, with the runs of the stored cases, the flaky outcome of a
+   * failure whose replay differs, or the flaky outcome of a valid case whose
+   * replay under the setting confirm differs. valued states a case of an
+   * example of values, which no replay confirms.
    */
   *#take(execution: Execution, valued: boolean): Work<Outcome | undefined> {
     const ended = this.#tally.take(execution);
@@ -111,6 +113,18 @@ class Exploration {
       return yield* this.#fail(execution, valued);
     }
     if (execution.status === "passed") {
+      if (!valued) {
+        const flaky = yield* confirmValid(
+          this.#body,
+          this.#settings,
+          this.#tally,
+          execution,
+          this.#observer,
+        );
+        if (flaky !== undefined) {
+          return { ...flaky, stored: this.#stored };
+        }
+      }
       this.#admit(execution);
     }
     if (ended?.kind === "skipped" && this.#found === undefined) {
@@ -232,9 +246,12 @@ export interface CampaignSettings extends Settings {
  * A failing case whose identity no earlier failure had is replayed, shrunk
  * and explained as a run concludes its failure, settings.concluded receives
  * the outcome, and the campaign goes on. A replay that differs ends the
- * campaign as flaky. A case that skips before the first failure ends the
- * campaign as skipped. After the first failure, a case that skips counts as
- * neither a valid nor a rejected case, and the campaign goes on.
+ * campaign as flaky. Under the setting confirm, the campaign replays each
+ * valid case whose count is a multiple of confirm as a run does, and a
+ * replay of a valid case that differs ends the campaign as flaky too. A case
+ * that skips before the first failure ends the campaign as skipped. After
+ * the first failure, a case that skips counts as neither a valid nor a
+ * rejected case, and the campaign goes on.
  *
  * When the budget has passed, the campaign returns a counterexample of the
  * first failure that it concluded, with every later one among its others,

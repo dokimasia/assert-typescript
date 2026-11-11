@@ -25,6 +25,7 @@ import {
   around,
   cases,
   configure,
+  confirm,
   draws,
   hermetic,
   type Option,
@@ -463,6 +464,33 @@ describe("property", () => {
         ],
         ["counterexample", 0, token],
         "the token's case fails as found",
+      );
+    });
+
+    it("records the calls of the replay of a valid case under the phase confirm", async ({
+      seat,
+    }) => {
+      const recorder = new Recorder();
+      await runOn(
+        recorder,
+        (c) => {
+          c.draw(integer(0, 9), "x");
+          check.isTrue(c, true, "the value is true");
+        },
+        replay(encode([{ kind: "integer", value: 3n }])),
+        confirm(1),
+      );
+
+      check.isEqualTo(
+        seat,
+        records(recorder)
+          .slice(1)
+          .map((one) => [one["run"], one["phase"]]),
+        [
+          [1, "token"],
+          [2, "confirm"],
+        ],
+        "the replay of the case makes a run of its own",
       );
     });
 

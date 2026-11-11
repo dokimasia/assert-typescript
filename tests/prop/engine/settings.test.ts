@@ -48,6 +48,7 @@ describe("settings", () => {
           shrinkTime: 0,
           explain: true,
           replay: undefined,
+          confirm: 0,
         },
         "the defaults",
       );

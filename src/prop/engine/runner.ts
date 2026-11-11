@@ -28,6 +28,13 @@
  * A valid case is one that passed and repeated no earlier case. Every
  * earlier phase's valid cases count towards `cases`.
  *
+ * Under the setting `confirm`, a run replays each valid case whose count is
+ * a multiple of `confirm` right after the case, from its choices, as it
+ * replays a failing case. A replay that requests other bounds, observes
+ * another fingerprint or fails ends the run as flaky, with the valid case as
+ * its failing case. A replay that is rejected or skips does not differ. The
+ * replay counts as no case, and an example of values is not replayed.
+ *
  * A failing case is replayed, shrunk and explained, and the run ends as a
  * counterexample, or as flaky when the replay differs. A diverging body
  * ends the run as flaky. A shrink budget of 0 reports the first failing
@@ -61,7 +68,7 @@ import {
 } from "./execution.js";
 import { checks, Phases } from "./phases.js";
 import { knownCases, type Resolved, resolve, type Settings } from "./settings.js";
-import { confirm } from "./shrink/confirm.js";
+import { confirm, confirmValid } from "./shrink/confirm.js";
 import { explain } from "./shrink/explain.js";
 import { type Failure, Shrinker } from "./shrink.js";
 import { type Outcome, Tally } from "./tally.js";
@@ -71,7 +78,9 @@ import type { Work } from "./work.js";
 /**
  * Runs the known cases of settings outside the case tree, counted by tally,
  * and returns the outcome that one of them ends the run with. stored
- * receives the run of each stored case.
+ * receives the run of each stored case. A known case runs outside the tree,
+ * so it cannot diverge: the outcome is a counterexample, a skip, or the
+ * flaky outcome of a replay under the setting confirm.
  */
 function* tryKnown(
   body: Body,
@@ -86,13 +95,16 @@ function* tryKnown(
     if (phase === "stored") {
       stored.push(execution);
     }
+    const valued = provider instanceof Valuing;
     const outcome = tally.take(execution);
     if (outcome !== undefined) {
-      return {
-        ...outcome,
-        valued: provider instanceof Valuing && outcome.failing !== undefined,
-        stored,
-      };
+      return { ...outcome, valued: valued && outcome.failing !== undefined, stored };
+    }
+    if (!valued) {
+      const flaky = yield* confirmValid(body, settings, tally, execution, observer);
+      if (flaky !== undefined) {
+        return { ...flaky, stored };
+      }
     }
   }
   return undefined;
@@ -117,7 +129,8 @@ function* explore(body: Body, settings: Resolved, observer: Observer): Work<Outc
 /**
  * Runs the one case that choices record, and reports it as found. The case
  * runs outside a case tree, so it cannot diverge: an outcome that it ends
- * the run with is a counterexample, or skipped.
+ * the run with is a counterexample, a skip, or the flaky outcome of a
+ * replay under the setting confirm.
  */
 function* replayOnly(
   body: Body,
@@ -128,17 +141,19 @@ function* replayOnly(
   const tally = new Tally(settings.seed);
   const execution = yield* execute(body, new Replaying(choices), settings.maxChoices);
   observer("token", execution);
-  const outcome = tally.take(execution);
+  const outcome =
+    tally.take(execution) ??
+    (yield* confirmValid(body, settings, tally, execution, observer));
   if (outcome === undefined) {
     return tally.failureWithoutCounterexample() ?? tally.outcome("passed");
   }
   return withToken(outcome);
 }
 
-/** Returns outcome with the replay token of its failing case, and an outcome without one unchanged. */
+/** Returns a counterexample with the replay token of its failing case, and any other outcome unchanged. */
 function withToken(outcome: Outcome): Outcome {
   const { failing } = outcome;
-  return failing === undefined
+  return outcome.kind !== "counterexample" || failing === undefined
     ? outcome
     : { ...outcome, token: encode(failing.case.choices) };
 }
@@ -231,9 +246,11 @@ export function* run(
  * its other cases, and returns how they ended: a pass that counts them, or
  * the outcome of the first of them that does not pass. A failing stored
  * case is reported as found, with its token, and is neither shrunk nor
- * explained. A stored case that skips ends the run as skipped. The outcome states the runs of the stored cases up to the one
- * that ended it. The settings' traces and examples do not run. A stored case
- * runs outside a case tree, so it cannot diverge.
+ * explained. A stored case that skips ends the run as skipped. The run
+ * replays each valid case under the setting confirm as run replays it. The
+ * outcome states the runs of the stored cases up to the one that ended it.
+ * The settings' traces and examples do not run. A stored case runs outside a
+ * case tree, so it cannot diverge.
  *
  * @param body - The body.
  * @param settings - What the run is asked to do.

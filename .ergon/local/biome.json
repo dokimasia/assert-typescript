@@ -15,6 +15,7 @@
     {
       "includes": [
         "src/files/**",
+        "src/history/memo.ts",
         "src/history/search.ts",
         "src/prop/**",
         "tests/files/**",

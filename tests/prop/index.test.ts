@@ -39,6 +39,7 @@ describe("index", () => {
         "bytes",
         "cases",
         "composite",
+        "confirm",
         "containsInOrder",
         "dict",
         "doesContain",

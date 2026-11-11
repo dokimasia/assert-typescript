@@ -187,6 +187,7 @@ describe("vectors", () => {
         stored: [],
         shrink: 2000,
         replay: undefined,
+        confirm: 0,
       });
     });
 
@@ -201,6 +202,7 @@ describe("vectors", () => {
           stored: [[{ sequence: [2] }]],
           shrink: 0,
           replay: "prop1:AAc",
+          confirm: 5,
         }),
       ).toEqual({
         seed: 1n,
@@ -211,6 +213,7 @@ describe("vectors", () => {
         stored: [[{ kind: "sequence", value: [2] }]],
         shrink: 0,
         replay: [{ kind: "integer", value: 7n }],
+        confirm: 5,
       });
     });
   });

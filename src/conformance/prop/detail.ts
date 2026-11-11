@@ -105,7 +105,8 @@ export function stepLiteral(step: Step): Record<string, unknown> {
 
 /**
  * Returns the detail fields of a run's outcome, each field that the outcome
- * does not use null.
+ * does not use null. The failing case of a flaky run can be a valid case
+ * that the setting confirm replayed, and its failure is null.
  *
  * @param outcome - The outcome.
  * @returns The detail, a JSON object.
@@ -122,7 +123,7 @@ export function detail(outcome: Outcome): Record<string, unknown> {
     rejected: outcome.rejected,
     seed: String(outcome.seed),
     counterexample: concluded ? counterexampleOf(failing, outcome.explanation) : null,
-    failure: concluded ? identityOf(failing) : null,
+    failure: concluded ? (identityOf(failing) ?? null) : null,
     choices: counterexample ? (outcome.token ?? null) : null,
     others: counterexample ? outcome.others.map(otherOf) : null,
     divergence:

@@ -37,7 +37,8 @@ import { campaign } from "./engine/campaign.js";
 import type { Choice } from "./engine/choice.js";
 import { execute } from "./engine/execution.js";
 import { concludeCase, run, runStored } from "./engine/runner.js";
-import type { Settings } from "./engine/settings.js";
+import { resolve, type Settings } from "./engine/settings.js";
+import { confirmValid } from "./engine/shrink/confirm.js";
 import { type Outcome, Tally } from "./engine/tally.js";
 import { type Entry, TraceError } from "./engine/trace.js";
 import { drive, type Work } from "./engine/work.js";
@@ -153,6 +154,7 @@ export class Property {
       shrink: config.shrink,
       shrinkTime: config.shrinkTime,
       explain: config.explain,
+      confirm: config.confirm,
     };
     return new Property(
       call,
@@ -275,8 +277,10 @@ export class Property {
    * Runs the case that the fuzz bridge decodes from data as a call of the
    * property on seat, as the call running, and reports it. A passing case
    * counts one valid or one rejected case, and a case that skips counts
-   * none. A failing case is replayed, shrunk and explained as a run
-   * concludes it, and the store keeps each failure of the counterexample.
+   * none. A case that passes is the first valid case of its input, so the
+   * setting confirm of 1 replays it. A failing case is replayed, shrunk and
+   * explained as a run concludes it, and the store keeps each failure of the
+   * counterexample.
    *
    * @param seat - The seat of the input's call.
    * @param running - The call.
@@ -297,7 +301,9 @@ export class Property {
       const execution = yield* execute(cases, new Bridging(data), settings.maxChoices);
       observer("fuzz", execution);
       const tally = new Tally(settings.seed);
-      const ended = tally.take(execution);
+      const ended =
+        tally.take(execution) ??
+        (yield* confirmValid(cases, resolve(settings), tally, execution, observer));
       if (ended?.kind !== "counterexample") {
         return ended ?? tally.outcome("passed");
       }

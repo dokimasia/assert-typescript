@@ -250,13 +250,78 @@ describe("search", () => {
         searched(history, REGISTER),
         {
           outcome: "violated",
-          steps: 9,
+          steps: 8,
           linearized: [0, 1],
           states: [2],
           candidates: [2],
           limit: undefined,
         },
         "no order of the writes outputs 9",
+      );
+    });
+
+    it("skips a configuration that a configuration of the memo covers", ({ seat }) => {
+      const history = new History();
+      history.invoke(0, "write", [1], "x").unknown("crashed");
+      history.invoke(1, "write", [1], "x").unknown("crashed");
+      history.invoke(2, "read", [], "x").ok(7);
+
+      check.isEqualTo(
+        seat,
+        searched(history, REGISTER),
+        {
+          outcome: "violated",
+          steps: 7,
+          linearized: [0],
+          states: [1],
+          candidates: [2],
+          limit: undefined,
+        },
+        "the frontier has one of the two writes",
+      );
+    });
+
+    it("passes unknown writes that no read needs within the budget", ({ seat }) => {
+      const history = new History();
+      for (let i = 0; i < 12; i += 1) {
+        history.invoke(i % 3, "write", [(i % 3) + 1], "x").unknown("crashed");
+      }
+      history.invoke(0, "read", [], "x").ok(null);
+
+      check.isEqualTo(
+        seat,
+        searched(history, REGISTER, budget(10_000)),
+        {
+          outcome: "passed",
+          steps: 1325,
+          linearized: [],
+          states: [null],
+          candidates: [],
+          limit: undefined,
+        },
+        "the search passes after 1,325 steps",
+      );
+    });
+
+    it("passes pending writes that no read needs within the budget", ({ seat }) => {
+      const history = new History();
+      for (let i = 0; i < 12; i += 1) {
+        history.invoke(i, "write", [(i % 3) + 1], "x");
+      }
+      history.invoke(12, "read", [], "x").ok(null);
+
+      check.isEqualTo(
+        seat,
+        searched(history, REGISTER, budget(10_000)),
+        {
+          outcome: "passed",
+          steps: 1325,
+          linearized: [],
+          states: [null],
+          candidates: [],
+          limit: undefined,
+        },
+        "the search passes after 1,325 steps",
       );
     });
 

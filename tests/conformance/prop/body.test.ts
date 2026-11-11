@@ -73,6 +73,32 @@ describe("body", () => {
       );
     });
 
+    it("returns a body that observes the number of its calls for observes-its-calls", async ({
+      seat,
+    }) => {
+      const body = buildBody({ kind: "observes-its-calls" });
+      const runs = [
+        await executed(body, 4n),
+        await executed(body, 4n),
+        await executed(body, 4n),
+      ];
+
+      check.isEqualTo(
+        seat,
+        runs.map((run) => [
+          run.status,
+          run.case.draws[0]?.label,
+          run.case.fingerprints,
+        ]),
+        [
+          ["passed", DRAWN, [1n]],
+          ["passed", DRAWN, [2n]],
+          ["passed", DRAWN, [3n]],
+        ],
+        "each call observes the number of its calls",
+      );
+    });
+
     it("returns a body that fails once above 1000 for fails-once", async ({ seat }) => {
       const body = buildBody({ kind: "fails-once" });
       const runs = [

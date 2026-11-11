@@ -18,6 +18,7 @@ import {
   type Phase,
 } from "./execution.js";
 import type { Resolved } from "./settings.js";
+import { confirmValid } from "./shrink/confirm.js";
 import { caseSource } from "./source.js";
 import { type Outcome, shortfallOf, type Tally } from "./tally.js";
 import { Tree } from "./tree.js";
@@ -82,9 +83,27 @@ export class Phases {
     return execution;
   }
 
-  /** Runs one case of phase, counts it, and returns the outcome that it ends the run with. */
+  /**
+   * Runs one case of phase, counts it, replays it under the setting
+   * confirm, and returns the outcome that the case or its replay ends the
+   * run with.
+   */
   *attempt(provider: Provider, phase: Phase): Work<Outcome | undefined> {
-    return this.tally.take(yield* this.call(provider, phase));
+    return yield* this.#seen(yield* this.call(provider, phase));
+  }
+
+  /** Counts one case, replays it under the setting confirm, and returns the outcome that the case or its replay ends the run with. */
+  *#seen(execution: Execution): Work<Outcome | undefined> {
+    return (
+      this.tally.take(execution) ??
+      (yield* confirmValid(
+        this.#body,
+        this.settings,
+        this.tally,
+        execution,
+        this.#observer,
+      ))
+    );
   }
 
   /** Runs the next random case, then its prefix case and the next edge case. */
@@ -92,7 +111,7 @@ export class Phases {
     const source = caseSource(this.settings.seed, BigInt(this.#index));
     this.#index += 1;
     const execution = yield* this.call(new Generating(source), this.phase);
-    const outcome = this.tally.take(execution);
+    const outcome = yield* this.#seen(execution);
     if (outcome !== undefined) {
       return outcome;
     }

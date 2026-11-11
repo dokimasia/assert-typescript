@@ -48,7 +48,9 @@ export class Values {
  * shrinking and explaining every failure may spend, and 0 turns both off.
  * shrinkTime is the milliseconds that they may take on the platform clock,
  * and 0 sets no limit. replay, when set, is the one case that the run
- * tries.
+ * tries. confirm is the interval of the replays of valid cases: the run
+ * replays each valid case whose count is a multiple of confirm, and 0
+ * replays none.
  */
 export interface Settings {
   readonly seed: bigint;
@@ -62,6 +64,7 @@ export interface Settings {
   readonly shrinkTime?: number;
   readonly explain?: boolean;
   readonly replay?: readonly Choice[] | undefined;
+  readonly confirm?: number;
 }
 
 /** The settings with every default filled in. */
@@ -70,7 +73,8 @@ export type Resolved = Required<Omit<Settings, "replay">> & Pick<Settings, "repl
 /**
  * Returns settings with every default filled in: 100 cases, the cap of
  * 8,192 choices, no requirement, trace, example or stored case, a shrink
- * budget of 2,000 runs without a time limit, and an explanation.
+ * budget of 2,000 runs without a time limit, an explanation, and no replay
+ * of a valid case.
  *
  * @param settings - What a run is asked to do.
  * @returns The settings with the defaults.
@@ -93,6 +97,7 @@ export function resolve(settings: Settings): Resolved {
     shrinkTime: settings.shrinkTime ?? 0,
     explain: settings.explain ?? true,
     replay: settings.replay,
+    confirm: settings.confirm ?? 0,
   };
 }
 

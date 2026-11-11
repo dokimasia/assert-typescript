@@ -220,7 +220,9 @@ export interface Result {
 
 /**
  * Returns the detail of a run's record, each field with its value, and null
- * for a field that the outcome does not use.
+ * for a field that the outcome does not use. The failing case of a flaky run
+ * can be a valid case that the setting confirm replayed, and its failure is
+ * null.
  *
  * @param outcome - The run's outcome.
  * @returns The detail.
@@ -235,7 +237,7 @@ export function detailOf(outcome: Outcome): Record<string, unknown> {
     rejected: outcome.rejected,
     seed: String(outcome.seed),
     counterexample: concluded ? entriesOf(failing, outcome.explanation) : null,
-    failure: concluded ? failingOf(failing).failure : null,
+    failure: failing?.failure === undefined ? null : failingOf(failing).failure,
     choices: counterexample ? (outcome.token ?? null) : null,
     others: counterexample
       ? outcome.others.map(

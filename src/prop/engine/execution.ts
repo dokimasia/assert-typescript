@@ -75,8 +75,10 @@ export type Body = (c: Case) => Work<void> | undefined;
 
 /**
  * The part of a run that called the body: the kind of a property's case.
- * `example` is a case whose values the caller states, and `fuzz` is the
- * case that the fuzz bridge decodes from a fuzzer's input.
+ * `example` is a case whose values the caller states. `replay` is the
+ * replay of a failing case before its shrink, and `confirm` the replay of a
+ * valid case under the setting confirm. `fuzz` is the case that the fuzz
+ * bridge decodes from a fuzzer's input.
  */
 export type Phase =
   | "example"
@@ -87,6 +89,7 @@ export type Phase =
   | "edge"
   | "coverage"
   | "replay"
+  | "confirm"
   | "shrink"
   | "explain"
   | "token"

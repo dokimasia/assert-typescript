@@ -175,6 +175,37 @@ describe("detail", () => {
       );
     });
 
+    it("returns the case of a valid case whose replay differs", ({ seat }) => {
+      const c = new Case(new Replaying([{ kind: "integer", value: 5n }]));
+      c.draw(integer(0, 9), "x");
+      const valid: Execution = { case: c, status: "passed" };
+      const d = detailOf(
+        outcome("flaky", {
+          failing: valid,
+          divergence: { what: "fingerprint", index: 0, recorded: 1n, replayed: 2n },
+        }),
+      );
+
+      check.isEqualTo(
+        seat,
+        [d["counterexample"], d["failure"], d["choices"], d["divergence"]],
+        [
+          [{ label: "x", value: 5, anyValueFails: null }],
+          null,
+          null,
+          {
+            what: "fingerprint",
+            index: 0,
+            recorded: 1n,
+            replayed: 2n,
+            label: null,
+            step: null,
+          },
+        ],
+        "the valid case without a failure",
+      );
+    });
+
     {
       const tests = [
         {

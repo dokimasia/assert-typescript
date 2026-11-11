@@ -11,7 +11,11 @@ import { describe } from "vitest";
 import { check } from "../../../src/index.js";
 import { Generating, Replaying } from "../../../src/prop/engine/case/providers.js";
 import { Case, DECODE, MAX_CHOICES } from "../../../src/prop/engine/case.js";
-import { FloatBounds, IntegerBounds } from "../../../src/prop/engine/choice.js";
+import {
+  type Choice,
+  FloatBounds,
+  IntegerBounds,
+} from "../../../src/prop/engine/choice.js";
 import { Sizes } from "../../../src/prop/engine/collection.js";
 import {
   type Body,
@@ -81,6 +85,23 @@ const tenths = body((c) => {
     c.classify("tenth");
   }
 });
+
+/** A body that draws a wide integer and passes. */
+const wide = body((c) => {
+  c.draw(WIDE, "n");
+});
+
+/** Returns a body that draws a wide integer and fails on its second call. */
+function failingOnItsSecondCall(): Body {
+  let calls = 0;
+  return body((c) => {
+    calls += 1;
+    c.draw(WIDE, "n");
+    if (calls === 2) {
+      c.fail("second");
+    }
+  });
+}
 
 describe("runner", () => {
   describe("run", () => {
@@ -984,9 +1005,284 @@ describe("runner", () => {
         "both identities, shrunk",
       );
     });
+
+    it("replays every fifth valid case right after the case", async ({ seat }) => {
+      const calls: [Phase, Status, readonly Choice[]][] = [];
+      const outcome = await drive(
+        run(wide, { seed: SEED, cases: 10, confirm: 5 }, (phase, execution) => {
+          calls.push([phase, execution.status, execution.case.choices]);
+        }),
+      );
+      const confirms = calls.flatMap(([phase], i) => (phase === "confirm" ? [i] : []));
+      const validBefore = (i: number): number =>
+        calls
+          .slice(0, i)
+          .filter(([phase, status]) => phase !== "confirm" && status === "passed")
+          .length;
+
+      check.isEqualTo(
+        seat,
+        [
+          outcome.kind,
+          outcome.cases,
+          confirms.map(validBefore),
+          confirms.map((i) => calls[i]?.[2]),
+        ],
+        ["passed", 10, [5, 10], confirms.map((i) => calls[i - 1]?.[2])],
+        "the run replays the choices of the fifth and the tenth valid case",
+      );
+    });
+
+    it("returns flaky for a valid case whose replay observes another fingerprint", async ({
+      seat,
+    }) => {
+      let calls = 0n;
+      const seen = new Seen();
+      const outcome = await ran(
+        body((c) => {
+          c.draw(DIGIT, "n");
+          calls += 1n;
+          c.observe(calls);
+        }),
+        { seed: SEED, confirm: 1 },
+        seen,
+      );
+      const { divergence } = outcome;
+
+      check.isEqualTo(
+        seat,
+        [
+          outcome.kind,
+          outcome.cases,
+          [
+            divergence?.what,
+            divergence?.index,
+            divergence?.recorded,
+            divergence?.replayed,
+          ],
+          outcome.failing?.case.choices,
+          seen.calls,
+        ],
+        [
+          "flaky",
+          1,
+          ["fingerprint", 0, 1n, 2n],
+          integers(0n),
+          [
+            ["simplest", "passed"],
+            ["confirm", "passed"],
+          ],
+        ],
+        "the valid case is the failing case of the flaky run",
+      );
+    });
+
+    it("returns flaky for a valid case whose replay fails", async ({ seat }) => {
+      const outcome = await ran(failingOnItsSecondCall(), { seed: SEED, confirm: 1 });
+      const { divergence } = outcome;
+
+      check.isEqualTo(
+        seat,
+        [
+          outcome.kind,
+          [
+            divergence?.what,
+            divergence?.index,
+            divergence?.recorded,
+            divergence?.replayed,
+          ],
+          outcome.token,
+        ],
+        ["flaky", ["verdict", 1, undefined, "second"], undefined],
+        "the replay fails where the case passed",
+      );
+    });
+
+    it("returns flaky for a valid case whose replay requests other bounds", async ({
+      seat,
+    }) => {
+      let calls = 0;
+      const seen = new Seen();
+      const outcome = await ran(
+        body((c) => {
+          calls += 1;
+          if (calls === 1) {
+            c.draw(DIGIT, "n");
+          } else {
+            c.draw(BOOLEAN, "n");
+          }
+        }),
+        { seed: SEED, confirm: 1 },
+        seen,
+      );
+
+      check.isEqualTo(
+        seat,
+        [
+          outcome.kind,
+          outcome.divergence?.what,
+          outcome.divergence?.label,
+          seen.phases,
+        ],
+        ["flaky", "request", "n", ["simplest", "confirm"]],
+        "the replay requests other bounds",
+      );
+    });
+
+    it("does not replay an example of values", async ({ seat }) => {
+      const seen = new Seen();
+      await ran(
+        body((c) => {
+          c.draw(BOOLEAN, "flag");
+        }),
+        { seed: SEED, examples: [new Values([true])], confirm: 1 },
+        seen,
+      );
+
+      check.isEqualTo(
+        seat,
+        seen.phases.slice(0, 3),
+        ["example", "simplest", "confirm"],
+        "the example of values has no replay",
+      );
+    });
+
+    it("replays an example of choices and a stored case", async ({ seat }) => {
+      const seen = new Seen();
+      await ran(
+        wide,
+        {
+          seed: SEED,
+          cases: 1,
+          examples: [integers(5n)],
+          stored: [integers(3n)],
+          confirm: 1,
+        },
+        seen,
+      );
+
+      check.isEqualTo(
+        seat,
+        seen.phases.slice(0, 4),
+        ["example", "confirm", "stored", "confirm"],
+        "each known case has a replay",
+      );
+    });
+
+    it("returns flaky for a known case whose replay fails", async ({ seat }) => {
+      const outcome = await ran(failingOnItsSecondCall(), {
+        seed: SEED,
+        stored: [integers(3n)],
+        confirm: 1,
+      });
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.stored.length, outcome.token],
+        ["flaky", 1, undefined],
+        "the flaky run has the stored case",
+      );
+    });
+
+    it("replays the case of a replay token", async ({ seat }) => {
+      const seen = new Seen();
+      const outcome = await ran(
+        wide,
+        { seed: SEED, replay: integers(3n), confirm: 1 },
+        seen,
+      );
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, seen.calls],
+        [
+          "passed",
+          [
+            ["token", "passed"],
+            ["confirm", "passed"],
+          ],
+        ],
+        "the token case has a replay",
+      );
+    });
+
+    it("returns flaky without a token for a token case whose replay fails", async ({
+      seat,
+    }) => {
+      const outcome = await ran(failingOnItsSecondCall(), {
+        seed: SEED,
+        replay: integers(3n),
+        confirm: 1,
+      });
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.token],
+        ["flaky", undefined],
+        "the flaky run has no token",
+      );
+    });
+
+    const replays = [
+      { name: "passes a token case whose replay skips", status: "skipped" },
+      { name: "passes a token case whose replay is rejected", status: "rejected" },
+    ] as const;
+    for (const tt of replays) {
+      it(tt.name, async ({ seat }) => {
+        let calls = 0;
+        const seen = new Seen();
+        const outcome = await ran(
+          body((c) => {
+            calls += 1;
+            c.draw(WIDE, "n");
+            if (calls > 1 && tt.status === "skipped") {
+              c.skip("after");
+            }
+            c.assume(calls === 1 || tt.status !== "rejected");
+          }),
+          { seed: SEED, replay: integers(3n), confirm: 1 },
+          seen,
+        );
+
+        check.isEqualTo(
+          seat,
+          [outcome.kind, outcome.cases, outcome.rejected, seen.calls],
+          [
+            "passed",
+            1,
+            0,
+            [
+              ["token", "passed"],
+              ["confirm", tt.status],
+            ],
+          ],
+          "the replay counts as no case",
+        );
+      });
+    }
   });
 
   describe("runStored", () => {
+    it("returns flaky without a token for a stored case whose replay fails", async ({
+      seat,
+    }) => {
+      const seen = new Seen();
+      const outcome = await drive(
+        runStored(
+          failingOnItsSecondCall(),
+          { seed: SEED, stored: [integers(1n), integers(2n)], confirm: 1 },
+          seen.observer,
+        ),
+      );
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.stored.length, outcome.token, seen.phases],
+        ["flaky", 1, undefined, ["stored", "confirm"]],
+        "the run ends at the replay of the first stored case",
+      );
+    });
+
     it("counts the stored cases that pass", async ({ seat }) => {
       const outcome = await drive(
         runStored(aboveMillion, { seed: SEED, stored: [integers(1n), integers(2n)] }),

@@ -10,6 +10,7 @@ import {
   around,
   cases,
   configure,
+  confirm,
   draws,
   example,
   examples,
@@ -266,6 +267,31 @@ describe("option", () => {
     });
   });
 
+  describe("confirm", () => {
+    it("returns the option of the interval of the replays", ({ seat }) => {
+      check.isEqualTo(seat, confirm(5), { kind: "confirm", value: 5 }, "every fifth");
+    });
+
+    const refusals = [
+      { name: "throws a RangeError for an interval of 0", give: 0 },
+      { name: "throws a RangeError for a negative interval", give: -1 },
+      {
+        name: "throws a RangeError for an interval that is no whole number",
+        give: 2.5,
+      },
+    ];
+    for (const tt of refusals) {
+      it(tt.name, ({ seat }) => {
+        check.isEqualTo(
+          seat,
+          thrown(() => confirm(tt.give)),
+          `prop: confirm(${tt.give}) states no whole number of 1 or more`,
+          "confirm refuses the interval",
+        );
+      });
+    }
+  });
+
   describe("hermetic", () => {
     it("returns the option that reads none of the variables", ({ seat }) => {
       check.isEqualTo(seat, hermetic(), { kind: "hermetic" }, "the hermetic option");
@@ -363,6 +389,7 @@ describe("option", () => {
           around: undefined,
           onResult: undefined,
           draws: undefined,
+          confirm: 0,
         },
         "the defaults",
       );
@@ -387,6 +414,7 @@ describe("option", () => {
           around(PLAIN),
           onResult(RECEIVE),
           draws("[]"),
+          confirm(3),
         ]),
         {
           cases: 5,
@@ -405,6 +433,7 @@ describe("option", () => {
           around: PLAIN,
           onResult: RECEIVE,
           draws: "[]",
+          confirm: 3,
         },
         "each setting, with the requirements in order and the workers ignored",
       );

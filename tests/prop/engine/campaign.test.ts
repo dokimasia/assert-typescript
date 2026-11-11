@@ -383,6 +383,76 @@ describe("campaign", () => {
       );
     });
 
+    it("replays every third valid case under the phase confirm", async ({ seat }) => {
+      const [outcome, calls] = await explored(plain, ticks(6, { confirm: 3 }));
+
+      check.isEqualTo(
+        seat,
+        [outcome.kind, outcome.cases, calls.map(([phase]) => phase)],
+        [
+          "passed",
+          6,
+          [
+            "random",
+            "random",
+            "random",
+            "confirm",
+            "random",
+            "random",
+            "random",
+            "confirm",
+          ],
+        ],
+        "the replays follow the third and the sixth valid case",
+      );
+    });
+
+    it("returns flaky for a valid case whose replay fails", async ({ seat }) => {
+      let calls = 0;
+      const [outcome, phases] = await explored(
+        body((c) => {
+          calls += 1;
+          c.draw(WIDE, "n");
+          if (calls === 2) {
+            c.fail("second");
+          }
+        }),
+        ticks(10, { stored: [integers(5n)], confirm: 1 }),
+      );
+      const { divergence } = outcome;
+
+      check.isEqualTo(
+        seat,
+        [
+          outcome.kind,
+          [
+            divergence?.what,
+            divergence?.index,
+            divergence?.recorded,
+            divergence?.replayed,
+          ],
+          outcome.stored.length,
+          phases.map(([phase]) => phase),
+        ],
+        ["flaky", ["verdict", 1, undefined, "second"], 1, ["stored", "confirm"]],
+        "the campaign ends at the replay of the stored case",
+      );
+    });
+
+    it("does not replay an example of values", async ({ seat }) => {
+      const [, calls] = await explored(
+        plain,
+        ticks(1, { examples: [new Values([1n, 2n])], confirm: 1 }),
+      );
+
+      check.isEqualTo(
+        seat,
+        calls.map(([phase]) => phase),
+        ["example", "random", "confirm"],
+        "the random case has a replay, and the example has none",
+      );
+    });
+
     it("reports a failing example of values as found", async ({ seat }) => {
       const [outcome] = await explored(
         body((c) => {

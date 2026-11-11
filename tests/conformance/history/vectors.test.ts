@@ -74,8 +74,8 @@ describe("vectors", () => {
       ]);
     });
 
-    it("runs the 108 history vectors of the definition", () => {
-      expect(VECTORS.size).toBe(108);
+    it("runs the 110 history vectors of the definition", () => {
+      expect(VECTORS.size).toBe(110);
     });
 
     for (const [id, v] of VECTORS) {

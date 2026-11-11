@@ -11,11 +11,13 @@
  * it with the identity of the first `fails` entry whose predicate is true,
  * in that order.
  *
- * Four named bodies state what no predicate can:
+ * Five named bodies state what no predicate can:
  *
  * - `draws-nothing` requests no input.
  * - `diverges` draws an integer in [0, 9] on its first call and a boolean on
  *   every later call.
+ * - `observes-its-calls` draws an integer in [0, 9] and observes the number
+ *   of its calls so far: 1 on its first call.
  * - `fails-once` draws an integer in [0, 10^9] and fails with identity
  *   `once` the first time that it draws a value above 1,000.
  * - `fails-then-skips` draws an integer in [0, 10^9] and fails with
@@ -60,6 +62,17 @@ function diverging(): Body {
   return (c: Case) => {
     c.draw(calls > 0 ? coin : digit, DRAWN);
     calls += 1;
+  };
+}
+
+/** Returns a body that observes the number of its calls so far. */
+function observingCalls(): Body {
+  let calls = 0n;
+  const digit = build({ gen: "integer", min: 0, max: 9 });
+  return (c: Case) => {
+    c.draw(digit, DRAWN);
+    calls += 1n;
+    c.observe(calls);
   };
 }
 
@@ -163,6 +176,8 @@ export function buildBody(spec: Spec): Body {
       return nothing();
     case "diverges":
       return diverging();
+    case "observes-its-calls":
+      return observingCalls();
     case "fails-once":
       return failingOnce();
     case "fails-then-skips":

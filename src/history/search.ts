@@ -15,12 +15,11 @@
  * The search passes when every known call is linearized.
  *
  * A configuration is a set of linearized calls and the states they leave,
- * no two of them equal. Two configurations are the same when their sets are
- * equal and their states are the same states in any order. The search stops
- * as undecided before a step that would take it past its budget, before it
- * stores a configuration that would take the memo past its limit, which
- * counts one bit per call of the partition for each configuration, and once
- * its time has passed.
+ * no two of them equal. The search skips each configuration that its memo
+ * covers. The search stops as undecided before a step that would take it
+ * past its budget, before it stores a configuration that would take the
+ * memo past its limit, which counts one bit per call of the partition for
+ * each configuration, and once its time has passed.
  *
  * The frontier of a search is its first configuration, in search order,
  * with the most linearized calls. The search states the frontier's order,
@@ -29,6 +28,7 @@
 
 import { compareText } from "../order.js";
 import { type Ending, type Limit, SpecError, type Verdict } from "./ending.js";
+import { Memo } from "./memo.js";
 import type { Config } from "./option.js";
 import type { Checked } from "./partition.js";
 import {
@@ -42,9 +42,6 @@ import {
 
 /** The number of steps between two readings of the clock. */
 const CLOCK_STEPS = 1024;
-
-/** The radix of the set of linearized calls in the name of a configuration. */
-const HEX_RADIX = 16;
 
 /** A limit that stopped the search. */
 class Stopped {
@@ -63,7 +60,6 @@ export class Search<S> {
   readonly #key: (state: S) => string;
   readonly #cost: (state: S) => number;
   readonly #budget: number;
-  readonly #memoLimit: number;
   /** When the check's time passes, on the platform clock, and Infinity for no limit. */
   readonly #deadline: number;
   /** The steps at which the search reads the clock next. */
@@ -85,8 +81,7 @@ export class Search<S> {
   #done = 0n;
   #states: S[] = [];
   readonly #stack: [position: number, states: S[]][] = [];
-  readonly #memo = new Map<string, S[][]>();
-  #configurations = 0;
+  readonly #memo: Memo<S>;
   #linearized: number[] = [];
   #frontier: S[] = [];
   #candidates: number[] = [];
@@ -118,15 +113,18 @@ export class Search<S> {
       spec.key === undefined ? stateKey : (state) => String(spec.key?.(state));
     this.#cost = (spec as Partial<Costed<S>>)[COST] ?? (() => 1);
     this.#budget = config.budget;
-    this.#memoLimit = config.memoLimit;
     this.#deadline = deadline;
     const entries: [event: number, position: number, invokes: boolean][] = [];
+    let optional = 0n;
     calls.forEach(({ span }, position) => {
       entries.push([span.call, position, true]);
       if (span.operation.known) {
         entries.push([span.completion as number, position, false]);
+      } else {
+        optional |= 1n << BigInt(position);
       }
     });
+    this.#memo = new Memo(optional, calls.length, config.memoLimit);
     entries.sort(([a], [b]) => a - b);
     const n = entries.length;
     this.#head = n;
@@ -260,28 +258,16 @@ export class Search<S> {
     return following;
   }
 
-  /** Stores a configuration, and reports whether the memo lacked it. */
+  /** Stores a configuration in the memo, and reports whether the memo did not cover it. */
   #remember(done: bigint, states: S[]): boolean {
     this.#calling = "key";
     const keys = [...new Set(states.map(this.#key))].sort(compareText);
-    const name = `${done.toString(HEX_RADIX)}|${JSON.stringify(keys)}`;
-    const bucket = this.#memo.get(name) ?? [];
     this.#calling = "equal";
-    for (const seen of bucket) {
-      if (
-        seen.length === states.length &&
-        states.every((state) => seen.some((other) => this.#equal(state, other)))
-      ) {
-        return false;
-      }
-    }
-    if ((this.#configurations + 1) * this.#calls.length > this.#memoLimit) {
+    const visit = this.#memo.visit(done, keys, states, this.#equal);
+    if (visit === "full") {
       throw new Stopped("memo");
     }
-    bucket.push(states);
-    this.#memo.set(name, bucket);
-    this.#configurations += 1;
-    return true;
+    return visit === "stored";
   }
 
   /** Undoes the last linearized call, and returns the entry after its invocation. */

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * The spec of the replay of a failing case before its shrink. Each
- * divergence is the result of the definition's reference implementation on
- * the same body and choices.
+ * The spec of the replay of a case: a failing case before its shrink, and a
+ * valid case under the setting confirm. Each divergence is the result of the
+ * definition's reference implementation on the same body and choices.
  */
 
 import { describe } from "vitest";
@@ -208,6 +208,72 @@ describe("confirm", () => {
       );
 
       check.isEqualTo(seat, phases, ["replay"], "one replay");
+    });
+
+    it("passes the replay to the observer under the phase of the caller", async ({
+      seat,
+    }) => {
+      const phases: string[] = [];
+      const divergence = await drive(
+        confirm(
+          above,
+          await executed(above, integers(5n)),
+          MAX_CHOICES,
+          (phase) => phases.push(phase),
+          "confirm",
+        ),
+      );
+
+      check.isEqualTo(
+        seat,
+        [divergence, phases],
+        [undefined, ["confirm"]],
+        "one replay under the phase confirm",
+      );
+    });
+
+    it("returns undefined for a replay of a valid case that skips", async ({
+      seat,
+    }) => {
+      let calls = 0;
+      const skipsLater = body((c) => {
+        calls += 1;
+        c.draw(WIDE, "n");
+        if (calls > 1) {
+          c.skip("after");
+        }
+      });
+
+      check.isNil(
+        seat,
+        await drive(
+          confirm(skipsLater, await executed(skipsLater, integers(5n)), MAX_CHOICES),
+        ),
+        "a skip does not differ from a pass",
+      );
+    });
+
+    it("returns undefined for a replay of a valid case that is rejected", async ({
+      seat,
+    }) => {
+      let calls = 0;
+      const rejectsLater = body((c) => {
+        calls += 1;
+        c.draw(WIDE, "n");
+        c.assume(calls === 1);
+      });
+
+      check.isNil(
+        seat,
+        await drive(
+          confirm(
+            rejectsLater,
+            await executed(rejectsLater, integers(5n)),
+            MAX_CHOICES,
+          ),
+        ),
+        "a rejection does not differ from a pass",
+      );
     });
   });
 });

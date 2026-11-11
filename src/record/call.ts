@@ -39,6 +39,7 @@ export type Phase =
   | "edge"
   | "coverage"
   | "replay"
+  | "confirm"
   | "shrink"
   | "explain"
   | "token"

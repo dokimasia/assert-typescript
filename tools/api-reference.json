@@ -196,6 +196,7 @@
         "store",
         "explain",
         "workers",
+        "confirm",
         "hermetic",
         "around",
         "onResult",
