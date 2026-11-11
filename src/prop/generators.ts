@@ -283,7 +283,9 @@ export function recursive<T>(
 /**
  * Returns the generator of the values that f returns. f draws from other
  * generators through the case that it receives, in one span around them all.
- * It has no inverse, so an example of it runs on its value.
+ * It has no inverse, so an example of it runs on its value. A trace replays
+ * the draws of f in place of the composite. The composite then takes its own
+ * entry after theirs.
  *
  * @param f - The function, which draws from its case.
  * @returns The generator.

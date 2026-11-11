@@ -36,6 +36,8 @@ export interface Provider {
   value: (request: Request, index: number) => Value;
   /** Prepares the values of the draw of generator under label, for a provider that serves a trace. */
   drawing?: (generator: Decoder, label: string) => void;
+  /** Takes the entry of the draw of generator under label once it decodes, for a provider that serves a trace. */
+  drawn?: (generator: Decoder, label: string) => void;
   /** Returns the value of the next draw, for a provider that states the values of the draws. */
   valued?: () => { readonly value: unknown } | undefined;
 }

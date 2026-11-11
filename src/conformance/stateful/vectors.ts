@@ -21,7 +21,15 @@ import { Fault } from "../../matcher/fault.js";
 import { save } from "../../prop/directory.js";
 import * as entries from "../../prop/engine/store.js";
 import { forAll } from "../../prop/forall.js";
-import { cases, draws, hermetic, type Option, seed, store } from "../../prop/option.js";
+import {
+  cases,
+  draws,
+  hermetic,
+  type Option,
+  seed,
+  shrink,
+  store,
+} from "../../prop/option.js";
 import { DEFINITION } from "../../record/call.js";
 import { Recorder } from "../../seat.js";
 import {
@@ -129,8 +137,9 @@ function writeStored(stored: unknown, dir: string): void {
 
 /**
  * Returns the options of the run that a vector's settings state: its seed,
- * its cases and the store dir of its stored cases, without the profile, the
- * variables and a store of a vector without stored cases.
+ * its cases, its shrink budget and the store dir of its stored cases,
+ * without the profile, the variables and a store of a vector without stored
+ * cases.
  */
 function settingsOf(written: Raw, dir: string): Option[] {
   const options: Option[] = [hermetic()];
@@ -140,6 +149,8 @@ function settingsOf(written: Raw, dir: string): Option[] {
       options.push(seed(BigInt(String(value))));
     } else if (name === "cases") {
       options.push(cases(Number(value)));
+    } else if (name === "shrink") {
+      options.push(shrink(Number(value)));
     } else if (name === "stored") {
       writeStored(value, dir);
       directory = dir;

@@ -15,6 +15,7 @@ import {
 } from "../../../src/conformance/stateful/subjects.js";
 import { check } from "../../../src/index.js";
 import { compareText } from "../../../src/order.js";
+import { draws } from "../../../src/prop/option.js";
 import { swarm } from "../../../src/stateful/option.js";
 import { pct } from "../../../src/stateful/strategy.js";
 import { test as it } from "../../../src/vitest.js";
@@ -27,7 +28,7 @@ function outcomeOf(name: string, setup: Setup): Promise<[unknown, unknown]> {
 
 describe("subjects", () => {
   describe("SUBJECTS", () => {
-    it("states the twelve machine subjects of the definition", ({ seat }) => {
+    it("states the thirteen machine subjects of the definition", ({ seat }) => {
       check.isEqualTo(
         seat,
         [...SUBJECTS.keys()].sort(compareText),
@@ -36,6 +37,7 @@ describe("subjects", () => {
           "correct-queue",
           "counter-overflows",
           "counter-refuses-every-third",
+          "pair-fails-at-7-and-3",
           "queue-loses-on-wrap",
           "racy-counter",
           "register-flushes",
@@ -118,5 +120,28 @@ describe("subjects", () => {
         check.isEqualTo(seat, await outcomeOf(...tt.give), tt.want, "the outcome");
       });
     }
+
+    it("maps pair-fails-at-7-and-3 to a machine whose put fails for a composite pair", async ({
+      seat,
+    }) => {
+      const trace = [
+        { step: "put" },
+        { label: "a", value: { type: "int", value: 7 } },
+        { label: "b", value: { type: "int", value: 3 } },
+        { label: "pair", value: { type: "list", of: "int", value: [7, 3] } },
+      ];
+      const subject = (SUBJECTS.get("pair-fails-at-7-and-3") as () => Subject)();
+
+      check.isEqualTo(
+        seat,
+        await machineOutcome(
+          subject,
+          { ...DEFAULT, steps: [swarm(false)] },
+          draws(JSON.stringify(trace)),
+        ),
+        ["counterexample", "pair"],
+        "the trace puts the pair 7 and 3 through the composite",
+      );
+    });
   });
 });

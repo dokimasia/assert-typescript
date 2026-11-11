@@ -35,7 +35,12 @@ import { DEFAULT_BUDGET, Shrinker } from "../src/prop/engine/shrink.js";
 import { Stored } from "../src/prop/engine/stored.js";
 import { drive } from "../src/prop/engine/work.js";
 import { forAll } from "../src/prop/forall.js";
-import { hermetic, seed, store } from "../src/prop/option.js";
+import {
+  hermetic,
+  type Option as PropOption,
+  seed,
+  store,
+} from "../src/prop/option.js";
 import { VARIABLE } from "../src/record/switch.js";
 import { Recorder, type Seat } from "../src/seat.js";
 import { clients } from "../src/stateful/option.js";
@@ -322,12 +327,13 @@ export const MACHINE_SETUP: Setup = {
 };
 
 /**
- * Returns the outcome of a run of a machine subject under setup and seed 1,
- * and the assertion of its failure.
+ * Returns the outcome of a run of a machine subject under setup, seed 1 and
+ * options, and the assertion of its failure.
  */
 export async function machineOutcome(
   subject: Subject,
   setup: Setup,
+  ...options: PropOption[]
 ): Promise<[unknown, unknown]> {
   const recorder = new Recorder();
   await forAll(
@@ -337,6 +343,7 @@ export async function machineOutcome(
     seed(1n),
     hermetic(),
     store(""),
+    ...options,
   );
   const detail = records(recorder)[0]?.["detail"] as Record<string, unknown>;
   const failure = detail["failure"] as Record<string, unknown> | null;

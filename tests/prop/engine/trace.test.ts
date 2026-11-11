@@ -8,8 +8,10 @@ import { check } from "../../../src/index.js";
 import { Replaying } from "../../../src/prop/engine/case/providers.js";
 import { Case } from "../../../src/prop/engine/case.js";
 import { IntegerBounds } from "../../../src/prop/engine/choice.js";
+import { Composite } from "../../../src/prop/engine/generator/collections.js";
 import { Integer, Mapped, Optional } from "../../../src/prop/engine/generator.js";
 import {
+  type Entry,
   entries,
   isStep,
   TraceError,
@@ -20,6 +22,9 @@ import { test as it } from "../../../src/vitest.js";
 
 /** The generator that most draws use. */
 const DIGIT = new Integer(new IntegerBounds(0n, 9n));
+
+/** A composite of two digits drawn under a and b, whose value is their list. */
+const PAIR = new Composite((c) => [c.draw(DIGIT, "a"), c.draw(DIGIT, "b")]);
 
 /** Returns the fields of the TraceError that fn throws. */
 function refusal(
@@ -194,6 +199,85 @@ describe("trace", () => {
         "the map's error",
       );
     });
+  });
+
+  describe("Tracing.drawn", () => {
+    it("takes the entry of a composite after the entries of its draws", ({ seat }) => {
+      const trace = new Tracing([
+        { label: "a", value: 7n },
+        { label: "b", value: 3n },
+        { label: "pair", value: UNSTATED },
+      ]);
+      const c = new Case(trace);
+
+      check.isEqualTo(
+        seat,
+        [c.draw(PAIR, "pair"), trace.taken, c.choices.map((choice) => choice.value)],
+        [[7n, 3n], 3, [7n, 3n]],
+        "the pair takes the three entries",
+      );
+    });
+
+    it("takes the entry of an inner composite before the outer one", ({ seat }) => {
+      const outer = new Composite((c) => [c.draw(PAIR, "pair"), c.draw(DIGIT, "c")]);
+      const trace = new Tracing([
+        { label: "a", value: 1n },
+        { label: "b", value: 2n },
+        { label: "pair", value: [1n, 2n] },
+        { label: "c", value: 5n },
+        { label: "outer", value: UNSTATED },
+      ]);
+
+      check.isEqualTo(
+        seat,
+        [new Case(trace).draw(outer, "outer"), trace.taken],
+        [[[1n, 2n], 5n], 5],
+        "the composites take every entry",
+      );
+    });
+
+    it("takes no entry for a composite past the last entry", ({ seat }) => {
+      const trace = new Tracing([{ label: "a", value: 7n }]);
+
+      check.isEqualTo(
+        seat,
+        [new Case(trace).draw(PAIR, "pair"), trace.taken],
+        [[7n, 0n], 1],
+        "the second draw of the pair takes its target",
+      );
+    });
+
+    it("takes no entry after a draw that is no composite", ({ seat }) => {
+      const trace = new Tracing([
+        { label: "x", value: 7n },
+        { label: "y", value: 1n },
+      ]);
+      new Case(trace).draw(DIGIT, "x");
+
+      check.isEqualTo(seat, trace.taken, 1, "the digit takes one entry");
+    });
+
+    const ends: { name: string; give: Entry }[] = [
+      {
+        name: "an entry of another label after the draws",
+        give: { label: "other", value: [7n, 3n] },
+      },
+      { name: "a step entry after the draws", give: { action: "put" } },
+    ];
+    for (const tt of ends) {
+      it(`throws a TraceError for ${tt.name} of a composite`, ({ seat }) => {
+        const c = new Case(
+          new Tracing([{ label: "a", value: 7n }, { label: "b", value: 3n }, tt.give]),
+        );
+
+        check.isEqualTo(
+          seat,
+          refusal(seat, () => c.draw(PAIR, "pair")),
+          [2, "pair", "label"],
+          "the error is at entry 2 for the label",
+        );
+      });
+    }
   });
 
   describe("Tracing.value", () => {

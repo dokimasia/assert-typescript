@@ -414,7 +414,7 @@ describe("case", () => {
   });
 
   describe("Case.draw", () => {
-    it("tells a provider that serves a trace the label of each draw before it decodes", ({
+    it("tells a provider that serves a trace the label of each draw before and after it decodes", ({
       seat,
     }) => {
       const heard: [string, number][] = [];
@@ -426,6 +426,7 @@ describe("case", () => {
           return replay.value(request, index);
         },
         drawing: (_generator, label) => heard.push([label, served]),
+        drawn: (_generator, label) => heard.push([`${label} drawn`, served]),
       };
       const c = new Case(provider);
 
@@ -436,10 +437,12 @@ describe("case", () => {
           [4n, 5n],
           [
             ["a", 0],
+            ["a drawn", 1],
             ["b", 1],
+            ["b drawn", 2],
           ],
         ],
-        "the labels before the values",
+        "the labels before and after the values",
       );
     });
 

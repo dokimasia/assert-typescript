@@ -54,8 +54,8 @@ describe("vectors", () => {
       expect([...RUNNERS.keys()]).toEqual(["machines"]);
     });
 
-    it("runs the 25 machines vectors of the definition", () => {
-      expect(VECTORS.size).toBe(25);
+    it("runs the 29 machines vectors of the definition", () => {
+      expect(VECTORS.size).toBe(29);
     });
 
     for (const id of VECTORS.keys()) {
@@ -80,6 +80,17 @@ describe("vectors", () => {
       const raw = { ...vector(PASSING), setup: { "concurrent-mean": 1 } };
 
       await expect(MACHINES(raw)).resolves.toBeUndefined();
+    });
+
+    it("takes the shrink budget of the settings", async () => {
+      const traced = vector(
+        "pair-fails-at-7-and-3/a-trace-of-a-composite-replays-its-draws",
+      );
+
+      expect([
+        (await fault(traced))[0],
+        (await fault({ ...traced, settings: { seed: "1" } }))[0],
+      ]).toEqual(["", "detail"]);
     });
 
     it("takes the actions that every case of a setup keeps", async () => {
@@ -114,8 +125,8 @@ describe("vectors", () => {
       },
       {
         name: "a setting that the runner takes no",
-        give: { ...vector(PASSING), settings: { seed: "1", shrink: 5 } },
-        want: ["settings.shrink", "the runner takes no such setting"],
+        give: { ...vector(PASSING), settings: { seed: "1", examples: [[1]] } },
+        want: ["settings.examples", "the runner takes no such setting"],
       },
       {
         name: "stored cases that are no list",

@@ -17,6 +17,9 @@
  *   label. Its value runs backwards through the draw's generator, and the
  *   draw decodes the choices that result. A draw past the last entry takes
  *   its targets.
+ * - A draw of a composite takes no entry when it starts, and its own draws
+ *   take theirs. Once it decodes, it takes the next entry by its label and
+ *   does not read the value. A case records a composite after its draws.
  * - A machine turns each step entry into the choices of one step, which
  *   Tracing serves as they are requested.
  * - Every other request takes its target.
@@ -26,18 +29,19 @@
  * case runs.
  *
  * The counterexample of a stored case is a trace too. Its draw entry has the
- * value UNSTATED where the entry of the store records no typed literal of the
- * value, and the body refuses such an entry.
+ * value UNSTATED where the entry of the store does not record a typed literal
+ * of the value. A draw of a generator other than a composite refuses such an
+ * entry.
  */
 
 import type { Provider, Request } from "./case/providers.js";
 import type { Step } from "./case/record.js";
 import type { Case, Decoder } from "./case.js";
 import type { Choice, Value } from "./choice.js";
-import type { Generator } from "./generator.js";
+import { Composite, type Generator } from "./generator.js";
 import { inverseOf } from "./inverse.js";
 
-/** The value of a draw entry that records no value. */
+/** The value of a draw entry that does not record a value. */
 export const UNSTATED: unique symbol = Symbol("UNSTATED");
 
 /** A draw entry: the label of a draw and the value that it decoded. */
@@ -135,30 +139,59 @@ export class Tracing implements Provider {
   }
 
   /**
-   * Prepares the choices of the next entry for a draw under label.
+   * Prepares the choices of the next entry for a draw under label. A
+   * composite takes no entry here. Its draws take theirs, and it takes its
+   * own entry once it decodes.
    *
    * @param generator - The draw's generator.
    * @param label - The draw's label.
-   * @throws TraceError when the next entry is no draw entry with label,
-   *   records no value, or has a value that the generator cannot produce.
+   * @throws TraceError when the next entry is not a draw entry with label,
+   *   does not record a value, or has a value that the generator cannot
+   *   produce.
    */
   drawing(generator: Decoder, label: string): void {
-    const entry = this.#entries[this.#at];
-    if (entry === undefined) {
+    if (generator instanceof Composite || this.#at >= this.#entries.length) {
       return;
     }
-    if (isStep(entry) || entry.label !== label) {
-      throw new TraceError(this.#at, label, "label");
-    }
+    const entry = this.#take(label);
     if (entry.value === UNSTATED) {
-      throw new TraceError(this.#at, label, "value");
+      throw new TraceError(this.#at - 1, label, "value");
     }
     const choices = inverseOf(generator as Generator<unknown>, entry.value);
     if (choices === undefined) {
-      throw new TraceError(this.#at, label, "value");
+      throw new TraceError(this.#at - 1, label, "value");
     }
     this.#queue.push(...choices);
+  }
+
+  /**
+   * Takes the next entry for a composite under label, by its label alone.
+   * A draw of another generator takes its entry before it decodes.
+   *
+   * @param generator - The draw's generator.
+   * @param label - The draw's label.
+   * @throws TraceError when the next entry is not a draw entry with label.
+   */
+  drawn(generator: Decoder, label: string): void {
+    if (generator instanceof Composite && this.#at < this.#entries.length) {
+      this.#take(label);
+    }
+  }
+
+  /**
+   * Takes the next entry, a draw entry with label.
+   *
+   * @param label - The draw's label.
+   * @returns The entry.
+   * @throws TraceError when the next entry is not a draw entry with label.
+   */
+  #take(label: string): Draw {
+    const entry = this.#entries[this.#at] as Entry;
+    if (isStep(entry) || entry.label !== label) {
+      throw new TraceError(this.#at, label, "label");
+    }
     this.#at += 1;
+    return entry;
   }
 
   /** The number of entries that the draws and the steps took, which is the position of the next entry. */

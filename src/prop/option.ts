@@ -462,10 +462,12 @@ export function onResult(f: (result: Result) => void): Option {
  * from entries: a JSON array of the entries of a counterexample, in request
  * order. A draw entry states a label and a typed literal, as a store entry
  * records a draw. A step entry states the action of a step, with its client
- * in a concurrent section and the drain mark in the drain. A draw whose
- * label differs from its entry's, and a draw whose generator does not
- * produce the entry's value, end the call with a fault before any other
- * case runs.
+ * in a concurrent section and the drain mark in the drain. A draw of a
+ * composite takes no entry when it starts. Its draws take theirs, and the
+ * composite then takes its own entry by its label, as a store entry records
+ * a composite after its draws. A draw whose label differs from its entry's,
+ * and a draw whose generator does not produce the entry's value, end the
+ * call with a fault before any other case runs.
  *
  * @param entries - The JSON text of the entries.
  * @returns The option.

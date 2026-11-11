@@ -90,8 +90,8 @@ describe("vector", () => {
       expect(VECTORS.filter((v) => PROP_KINDS.includes(v.kind))).toHaveLength(452);
     });
 
-    it("returns the 25 machines vectors of the definition", () => {
-      expect(VECTORS.filter((v) => STATEFUL_KINDS.includes(v.kind))).toHaveLength(25);
+    it("returns the 29 machines vectors of the definition", () => {
+      expect(VECTORS.filter((v) => STATEFUL_KINDS.includes(v.kind))).toHaveLength(29);
     });
 
     it("returns files vectors whose ids name their kinds first", () => {

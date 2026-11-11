@@ -251,10 +251,11 @@ export class Case {
   /**
    * Returns a value of generator and records it under label. The draw's
    * span is the first span that the generator opens. Two draws may share a
-   * label. A provider that serves a trace prepares the draw's values first,
-   * and a provider that states the values of the draws gives the draw its
-   * value, which makes no choice and opens no span. Every request of the
-   * draw is made under its label.
+   * label. A provider that serves a trace prepares the draw's values first
+   * and takes what the draw takes once it decodes. A provider that states
+   * the values of the draws gives the draw its value. Such a draw does not
+   * make a choice or open a span. Every request of the draw is made under
+   * its label.
    *
    * @param generator - The generator.
    * @param label - The draw's label.
@@ -280,6 +281,7 @@ export class Case {
     } finally {
       this.#drawing.pop();
     }
+    this.#provider.drawn?.(generator, label);
     this.draws.push({ label, value, span, generator });
     return value;
   }
