@@ -285,7 +285,9 @@ export function recursive<T>(
  * generators through the case that it receives, in one span around them all.
  * It has no inverse, so an example of it runs on its value. A trace replays
  * the draws of f in place of the composite. The composite then takes its own
- * entry after theirs.
+ * entry after theirs. A one-of, an optional, a list or another generator
+ * with the composite inside runs backwards around it in a trace, and its
+ * draw takes its own entry after the entries of the draws of f.
  *
  * @param f - The function, which draws from its case.
  * @returns The generator.

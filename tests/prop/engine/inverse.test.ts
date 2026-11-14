@@ -22,6 +22,7 @@ import {
 import { Sizes } from "../../../src/prop/engine/collection.js";
 import {
   Bool,
+  Bound,
   Bytes,
   Composite,
   Dict,
@@ -41,7 +42,15 @@ import {
   Text,
 } from "../../../src/prop/engine/generator.js";
 import { CannotInvert, NoInverse } from "../../../src/prop/engine/inverse/refusal.js";
-import { emit, inverseOf, invert } from "../../../src/prop/engine/inverse.js";
+import { madeChoices, PLACEHOLDER } from "../../../src/prop/engine/inverse/steps.js";
+import {
+  emit,
+  inverseOf,
+  inverseThrough,
+  invert,
+  invertThrough,
+  throughComposite,
+} from "../../../src/prop/engine/inverse.js";
 import { piece } from "../../../src/prop/engine/pattern.js";
 import { read } from "../../../src/prop/engine/shape.js";
 import { caseSource } from "../../../src/prop/engine/source.js";
@@ -60,6 +69,9 @@ const UINT8 = { shape: "int", width: 8, signed: false };
 
 /** A map of a digit without an inverse. */
 const IDENTITY = new Mapped(DIGIT, (value: bigint) => value);
+
+/** A composite of two digits drawn under a and b, whose value is their list. */
+const PAIR = new Composite((c) => [c.draw(DIGIT, "a"), c.draw(DIGIT, "b")]);
 
 /** Returns a tree of digits: a digit, or a list of at most three trees. */
 function tree(base: Generator<unknown> = DIGIT): Recursive<unknown> {
@@ -813,11 +825,26 @@ describe("inverse", () => {
     it("throws a NoInverse for a generator without an emitter", ({ seat }) => {
       check.isEqualTo(
         seat,
-        refusal(new Composite(() => 1n), 1n),
-        ["prop: a Composite does not run backwards", true],
+        refusal(new Bound(DIGIT, () => DIGIT), 1n),
+        ["prop: a Bound does not run backwards", true],
         "no emitter",
       );
     });
+
+    const composites: [string, Generator<unknown>, unknown][] = [
+      ["a composite", new Composite(() => 1n), 1n],
+      ["a composite inside a one-of", new OneOf<unknown>([DIGIT, PAIR]), [7n, 3n]],
+    ];
+    for (const [name, generator, value] of composites) {
+      it(`throws a NoInverse for a value through ${name}`, ({ seat }) => {
+        check.isEqualTo(
+          seat,
+          refusal(generator, value),
+          ["prop: a Composite does not run backwards", true],
+          "only a trace serves the draws of a composite",
+        );
+      });
+    }
 
     const around: [string, Generator<unknown>, unknown][] = [
       ["a list", new List(IDENTITY, new Sizes()), [1n]],
@@ -971,6 +998,175 @@ describe("inverse", () => {
     });
   });
 
+  describe("invertThrough", () => {
+    it("returns the choices of invert for a value without a composite", ({ seat }) => {
+      const [choices, through] = invertThrough(DIGIT, 7n);
+
+      check.isEqualTo(seat, [valuesOf(choices), through], [[7n], false], "the digit");
+    });
+
+    const arounds: [string, Generator<unknown>, unknown, unknown[]][] = [
+      [
+        "makes no choice for a composite inside a one-of",
+        new OneOf<unknown>([DIGIT, PAIR]),
+        [7n, 3n],
+        [1n],
+      ],
+      [
+        "makes no choice for a composite inside an optional",
+        new Optional(PAIR),
+        [7n, 3n],
+        [1n],
+      ],
+      [
+        "does not compare the composites of a unique list",
+        new List(PAIR, new Sizes(0, 3), true),
+        [
+          [1n, 2n],
+          [1n, 2n],
+        ],
+        [1n, 1n, 0n],
+      ],
+      [
+        "makes no choice for a composite inside a map with an inverse",
+        new Mapped(
+          PAIR,
+          (value: bigint[]) => value.join(" "),
+          (text: string) => text.split(" ").map(BigInt),
+        ),
+        "7 3",
+        [],
+      ],
+      [
+        "makes no choice for a composite at the base of a recursive",
+        new Recursive<unknown>(PAIR, 2, (self) => new List(self, new Sizes(0, 2))),
+        [7n, 3n],
+        [0n],
+      ],
+    ];
+    for (const [name, generator, value, want] of arounds) {
+      it(name, ({ seat }) => {
+        const [choices, through] = invertThrough(generator, value);
+
+        check.isEqualTo(
+          seat,
+          [valuesOf(choices), through],
+          [want, true],
+          "the choices around the composites",
+        );
+      });
+    }
+
+    it("takes a branch without a composite first", ({ seat }) => {
+      const [choices, through] = invertThrough(new OneOf<unknown>([PAIR, DIGIT]), 7n);
+
+      check.isEqualTo(
+        seat,
+        [valuesOf(choices), through],
+        [[1n, 7n], false],
+        "the one-of takes the digit",
+      );
+    });
+
+    it("throws a NoInverse for a dict through a composite", ({ seat }) => {
+      const pairs = new Dict(DIGIT, PAIR, new Sizes(0, 2));
+      const err = check.doesThrow(
+        seat,
+        () => invertThrough(pairs, new Pairs([[5n, [1n, 2n]]])),
+        "the call throws",
+      );
+
+      check.errorIs(seat, err, NoInverse, "the error is a NoInverse");
+      check.isEqualTo(
+        seat,
+        (err as Error).message,
+        "prop: a map does not state the order in which its composites drew",
+        "the error states the order",
+      );
+    });
+  });
+
+  describe("inverseThrough", () => {
+    it("returns the choices around a composite and that the value runs through one", ({
+      seat,
+    }) => {
+      check.isEqualTo(
+        seat,
+        inverseThrough(new OneOf<unknown>([DIGIT, PAIR]), [7n, 3n]),
+        [[{ kind: "integer", value: 1n }], true],
+        "the index of the pair",
+      );
+    });
+
+    it("returns undefined for a value that the generator cannot produce", ({
+      seat,
+    }) => {
+      check.isNil(seat, inverseThrough(DIGIT, 10n), "10 is no digit");
+    });
+
+    it("throws an error of the generator that is no refusal", ({ seat }) => {
+      const broken = new Mapped(
+        DIGIT,
+        (): bigint => {
+          throw new TypeError("the map broke");
+        },
+        (value: bigint) => value,
+      );
+
+      check.errorIs(
+        seat,
+        check.doesThrow(seat, () => inverseThrough(broken, 1n), "the map throws"),
+        TypeError,
+        "the map's error",
+      );
+    });
+  });
+
+  describe("throughComposite", () => {
+    const tests: [string, Generator<unknown>, boolean][] = [
+      ["reports a composite inside a one-of", new OneOf<unknown>([DIGIT, PAIR]), true],
+      ["reports a composite inside an optional", new Optional(PAIR), true],
+      ["reports a composite inside a list", new List(PAIR, new Sizes(0, 3)), true],
+      [
+        "reports a composite as the value of a dict",
+        new Dict(DIGIT, PAIR, new Sizes()),
+        true,
+      ],
+      ["reports a composite inside a filter", new Filter(PAIR, () => true), true],
+      [
+        "reports a composite inside a map with an inverse",
+        new Mapped(
+          PAIR,
+          (value: bigint[]) => value,
+          (value: bigint[]) => value,
+        ),
+        true,
+      ],
+      [
+        "reports a composite inside the extension of a recursive",
+        new Recursive<unknown>(DIGIT, 2, (self) => new OneOf<unknown>([self, PAIR])),
+        true,
+      ],
+      ["does not report a composite on its own", PAIR, false],
+      [
+        "does not report a composite inside a map without an inverse",
+        new Mapped(PAIR, (value: bigint[]) => value),
+        false,
+      ],
+      [
+        "does not report a composite inside a bind",
+        new Bound(DIGIT, () => PAIR),
+        false,
+      ],
+      ["does not report a recursive without a composite", tree(), false],
+    ];
+    for (const [name, generator, want] of tests) {
+      it(name, ({ seat }) => {
+        check.isEqualTo(seat, throughComposite(generator), want, "the composite");
+      });
+    }
+  });
+
   describe("emit", () => {
     it("returns the steps of a value with the value that they decode to", ({
       seat,
@@ -979,12 +1175,21 @@ describe("inverse", () => {
 
       check.isEqualTo(
         seat,
-        [steps.map((step) => step.value), normal],
+        [madeChoices(steps).map((step) => step.value), normal],
         [
           [1n, 2n, 1n, 5n, 0n],
           [2n, 5n],
         ],
         "the elements in shortlex order",
+      );
+    });
+
+    it("returns a placeholder for a composite", ({ seat }) => {
+      check.isEqualTo(
+        seat,
+        emit(PAIR, [7n, 3n]),
+        [[PLACEHOLDER], [7n, 3n]],
+        "the composite has one placeholder",
       );
     });
   });

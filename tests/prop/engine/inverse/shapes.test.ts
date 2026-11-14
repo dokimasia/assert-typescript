@@ -8,6 +8,7 @@
 import { describe } from "vitest";
 import { check } from "../../../../src/index.js";
 import { SHAPES } from "../../../../src/prop/engine/inverse/shapes.js";
+import { madeChoices } from "../../../../src/prop/engine/inverse/steps.js";
 import { read } from "../../../../src/prop/engine/shape.js";
 import { Fields, Variant } from "../../../../src/prop/engine/value.js";
 import { test as it } from "../../../../src/vitest.js";
@@ -46,7 +47,7 @@ describe("shapes", () => {
 
       check.isEqualTo(
         seat,
-        [steps.map((s) => s.value), normal],
+        [madeChoices(steps).map((s) => s.value), normal],
         [[7n], new Fields([["id", 7n]])],
         "the step of the id",
       );
@@ -72,7 +73,9 @@ describe("shapes", () => {
 
       check.isEqualTo(
         seat,
-        emittedBy(SHAPES, read(variants), new Variant("b"))[0].map((s) => s.value),
+        madeChoices(emittedBy(SHAPES, read(variants), new Variant("b"))[0]).map(
+          (s) => s.value,
+        ),
         [1n],
         "the index 1",
       );

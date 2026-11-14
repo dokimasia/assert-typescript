@@ -54,8 +54,8 @@ describe("vectors", () => {
       expect([...RUNNERS.keys()]).toEqual(["machines"]);
     });
 
-    it("runs the 29 machines vectors of the definition", () => {
-      expect(VECTORS.size).toBe(29);
+    it("runs the 36 machines vectors of the definition", () => {
+      expect(VECTORS.size).toBe(36);
     });
 
     for (const id of VECTORS.keys()) {

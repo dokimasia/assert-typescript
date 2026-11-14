@@ -49,8 +49,10 @@
  * setup, and the clients of its concurrent section run on the same
  * scheduler. Each subject sets keep on the actions that the setup names.
  *
- * SUBJECTS also maps pair-fails-at-7-and-3, a machine without a spec whose
- * put takes a composite input. Its actions do not record calls.
+ * SUBJECTS also maps the three subjects of the pair, machines without a spec
+ * whose put draws its input through a composite pair:
+ * pair-fails-at-7-and-3, one-of-pair-fails-at-7-and-3 and
+ * pairs-fail-at-7-and-3. Their actions do not record calls.
  *
  * Each subject is built anew for every run, so a subject that counts over
  * the cases of a run starts each run at 0.
@@ -63,7 +65,7 @@ import { integer } from "../../prop/generators.js";
 import { tasks } from "../../stateful/option.js";
 import { steps } from "../../stateful/steps.js";
 import { flushedRegister, spinner, ticker } from "./background.js";
-import { pairFails } from "./pair.js";
+import { oneOfPairFails, pairFails, pairsFail } from "./pair.js";
 import { queue } from "./queue.js";
 import { marked, type Setup, schedulerOf } from "./setup.js";
 
@@ -270,4 +272,6 @@ export const SUBJECTS: ReadonlyMap<string, () => Subject> = new Map<
   ["ticker", () => (c, setup) => ticker(c, setup, false)],
   ["spins-until-a-flag", () => spinner],
   ["pair-fails-at-7-and-3", () => pairFails],
+  ["one-of-pair-fails-at-7-and-3", () => oneOfPairFails],
+  ["pairs-fail-at-7-and-3", () => pairsFail],
 ]);

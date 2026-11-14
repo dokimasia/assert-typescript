@@ -21,6 +21,7 @@ import {
   Text,
 } from "../../../../src/prop/engine/generator.js";
 import { SCALARS } from "../../../../src/prop/engine/inverse/scalars.js";
+import { madeChoices } from "../../../../src/prop/engine/inverse/steps.js";
 import { piece } from "../../../../src/prop/engine/pattern.js";
 import { test as it } from "../../../../src/vitest.js";
 import { emittedBy, refusedBy } from "../../../helpers.js";
@@ -33,7 +34,7 @@ const COIN = new Bool({ num: 1n, den: 2n });
 
 /** Returns the values of the steps that the emitter of generator emits for value. */
 function valuesOf(generator: Generator<unknown>, value: unknown): unknown[] {
-  return emittedBy(SCALARS, generator, value)[0].map((s) => s.value);
+  return madeChoices(emittedBy(SCALARS, generator, value)[0]).map((s) => s.value);
 }
 
 describe("scalars", () => {
@@ -64,7 +65,7 @@ describe("scalars", () => {
 
       check.isEqualTo(
         seat,
-        [steps.map((s) => [s.bounds, s.value]), normal],
+        [madeChoices(steps).map((s) => [s.bounds, s.value]), normal],
         [[[DIGIT.bounds, 4n]], 4n],
         "one step of 4 within the bounds of the digit",
       );

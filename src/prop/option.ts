@@ -465,9 +465,14 @@ export function onResult(f: (result: Result) => void): Option {
  * in a concurrent section and the drain mark in the drain. A draw of a
  * composite takes no entry when it starts. Its draws take theirs, and the
  * composite then takes its own entry by its label, as a store entry records
- * a composite after its draws. A draw whose label differs from its entry's,
- * and a draw whose generator does not produce the entry's value, end the
- * call with a fault before any other case runs.
+ * a composite after its draws. A draw of a one-of, an optional, a list, a
+ * dict, a filter or a recursive with a composite inside takes the first
+ * entry with its label up to the next step entry. When the value of the
+ * entry runs backwards through the composite, the draws of the composite
+ * take the entries before it, and the draw takes it once it decodes. A draw
+ * whose label differs from its entry's, and a draw whose generator does not
+ * produce the entry's value, end the call with a fault before any other case
+ * runs.
  *
  * @param entries - The JSON text of the entries.
  * @returns The option.

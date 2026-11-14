@@ -3,8 +3,16 @@
 
 /**
  * The inverses of the generators that contain other generators: one-of,
- * optional, list, dict, filter, map and recursive, and the optional, list
- * and map shapes.
+ * optional, list, dict, filter, map, composite and recursive, and the
+ * optional, list and map shapes.
+ *
+ * A composite runs backwards to a placeholder, which makes no choice, so the
+ * generator around it emits its own steps alone. A filter does not test the
+ * value of a composite, and a unique list does not compare the values of its
+ * composites, because the record of a composite may not state the parts
+ * that they read. A dict through a composite does not run backwards: the
+ * value of a map does not state the order in which the case drew its
+ * entries, and the draws of the composites follow that order.
  */
 
 import { IntegerBounds } from "../choice.js";
@@ -12,6 +20,7 @@ import type { Sizes } from "../collection.js";
 import { flagBounds } from "../draw.js";
 import type { Key } from "../float.js";
 import {
+  Composite,
   Dict,
   Filter,
   type Generator,
@@ -26,12 +35,49 @@ import { choiceKey, compareSequences } from "../order.js";
 import { ListShape, MapShape, OptionalShape } from "../shape/structure.js";
 import { canonical, Pairs } from "../value.js";
 import { CannotInvert, NoInverse, shown } from "./refusal.js";
-import { BIT, type Emit, type Emitted, type Emitter, type Step } from "./steps.js";
+import {
+  BIT,
+  chosen,
+  type Emit,
+  type Emitted,
+  type Emitter,
+  hasPlaceholder,
+  PLACEHOLDER,
+  type Placeholder,
+  type Step,
+} from "./steps.js";
+
+/**
+ * Returns the steps of branch for value, and the refusal of a branch that
+ * cannot produce value.
+ *
+ * @throws What the branch throws other than a refusal.
+ */
+function attempt(
+  branch: Generator<unknown>,
+  value: unknown,
+  emit: Emit,
+): Emitted | CannotInvert {
+  try {
+    return emit(branch, value);
+  } catch (err) {
+    if (err instanceof CannotInvert) {
+      return err;
+    }
+    throw err;
+  }
+}
+
+/** Returns the steps of a branch after the step of its index under bounds. */
+function indexed(bounds: IntegerBounds, index: bigint, emitted: Emitted): Emitted {
+  return [[{ bounds, value: index }, ...emitted[0]], emitted[1]];
+}
 
 /**
  * Returns the index of the first branch that produces value, then its
- * steps. refusal is the reason of the refusal when no branch produces
- * value.
+ * steps. A branch through a composite produces every value, so it counts
+ * only when no branch produces value without one. refusal is the reason of
+ * the refusal when no branch produces value.
  */
 function firstBranch(
   branches: readonly (readonly [bigint, Generator<unknown>])[],
@@ -41,20 +87,19 @@ function firstBranch(
   emit: Emit,
 ): Emitted {
   let unknown = false;
+  let through: Emitted | undefined;
   for (const [index, branch] of branches) {
-    let emitted: Emitted | undefined;
-    try {
-      emitted = emit(branch, value);
-    } catch (err) {
-      if (err instanceof NoInverse) {
-        unknown = true;
-      } else if (!(err instanceof CannotInvert)) {
-        throw err;
-      }
+    const emitted = attempt(branch, value, emit);
+    if (emitted instanceof CannotInvert) {
+      unknown ||= emitted instanceof NoInverse;
+    } else if (hasPlaceholder(emitted[0])) {
+      through ??= indexed(bounds, index, emitted);
+    } else {
+      return indexed(bounds, index, emitted);
     }
-    if (emitted !== undefined) {
-      return [[{ bounds, value: index }, ...emitted[0]], emitted[1]];
-    }
+  }
+  if (through !== undefined) {
+    return through;
   }
   if (unknown) {
     throw new NoInverse(`prop: ${refusal}, and one of them has no inverse`);
@@ -68,12 +113,15 @@ function shortlex(steps: readonly Step[]): Key[] {
 }
 
 /** Returns a collection's steps: per item a continue flag and its steps, then a stop. */
-function collection(sizes: Sizes, items: readonly (readonly Step[])[]): Step[] {
+function collection(
+  sizes: Sizes,
+  items: readonly (readonly (Step | Placeholder)[])[],
+): (Step | Placeholder)[] {
   const count = items.length;
   if (count < sizes.minSize || (sizes.maxSize !== undefined && count > sizes.maxSize)) {
     throw new CannotInvert(`prop: ${count} items are outside the collection's sizes`);
   }
-  const steps: Step[] = [];
+  const steps: (Step | Placeholder)[] = [];
   items.forEach((item, index) => {
     steps.push({ bounds: flagBounds(index, sizes.minSize, sizes.maxSize), value: 1n });
     steps.push(...item);
@@ -89,7 +137,11 @@ function distinct(values: readonly unknown[]): void {
   }
 }
 
-/** Returns each element's steps and the value that they decode to. */
+/**
+ * Returns each element's steps and the value that they decode to. A unique
+ * list compares the elements without a composite alone, because the record
+ * of a composite may not state its value.
+ */
 function elements(
   of: Generator<unknown>,
   value: unknown,
@@ -99,13 +151,20 @@ function elements(
   if (!Array.isArray(value)) {
     throw new CannotInvert(`prop: ${shown(value)} is no list`);
   }
+  const emitted = value.map((element) => emit(of, element));
   if (unique) {
-    distinct(value);
+    distinct(value.filter((_, i) => !hasPlaceholder((emitted[i] as Emitted)[0])));
   }
-  return value.map((element) => emit(of, element));
+  return emitted;
 }
 
-/** Returns a map's flags and entries, each its key's steps then its value's, in shortlex order. */
+/**
+ * Returns a map's flags and entries, each its key's steps then its value's, in shortlex order.
+ *
+ * @throws NoInverse when a key or a value runs backwards through a
+ *   composite. The value of a map does not state the order in which the case
+ *   drew its entries, and the draws of the composites follow that order.
+ */
 function entries(
   sizes: Sizes,
   key: Generator<unknown>,
@@ -120,7 +179,13 @@ function entries(
   const emitted = value.items.map(([k, v]) => {
     const [keySteps, keyNormal] = emit(key, k);
     const [valueSteps, valueNormal] = emit(of, v);
-    return [[...keySteps, ...valueSteps], [keyNormal, valueNormal] as const] as const;
+    const steps = [...keySteps, ...valueSteps];
+    if (hasPlaceholder(steps)) {
+      throw new NoInverse(
+        "prop: a map does not state the order in which its composites drew",
+      );
+    }
+    return [chosen(steps), [keyNormal, valueNormal] as const] as const;
   });
   emitted.sort((a, b) => compareSequences(shortlex(a[0]), shortlex(b[0])));
   return [
@@ -188,7 +253,9 @@ export const COLLECTIONS: readonly (readonly [unknown, Emitter])[] = [
     (g: ListShape, value, emit) => {
       const emitted = elements(g.of, value, g.unique, emit);
       if (g.unique) {
-        emitted.sort((a, b) => compareSequences(shortlex(a[0]), shortlex(b[0])));
+        emitted.sort((a, b) =>
+          compareSequences(shortlex(chosen(a[0])), shortlex(chosen(b[0]))),
+        );
       }
       return [
         collection(
@@ -208,12 +275,17 @@ export const COLLECTIONS: readonly (readonly [unknown, Emitter])[] = [
   [
     Filter,
     (g: Filter<unknown>, value, emit) => {
+      const emitted = emit(g.of, value);
+      if (hasPlaceholder(emitted[0])) {
+        return emitted;
+      }
       if (!g.keep(value)) {
         throw new CannotInvert(`prop: the filter rejects ${shown(value)}`);
       }
-      return emit(g.of, value);
+      return emitted;
     },
   ],
+  [Composite, (_g: Composite<unknown>, value) => [[PLACEHOLDER], value]],
   [
     Mapped,
     (g: Mapped<unknown, unknown>, value, emit) => {
@@ -233,6 +305,9 @@ export const COLLECTIONS: readonly (readonly [unknown, Emitter])[] = [
         );
       }
       const [steps, normal] = emit(g.of, inner);
+      if (hasPlaceholder(steps)) {
+        return [steps, value];
+      }
       return [steps, g.f(normal)];
     },
   ],

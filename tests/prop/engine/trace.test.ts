@@ -8,8 +8,18 @@ import { check } from "../../../src/index.js";
 import { Replaying } from "../../../src/prop/engine/case/providers.js";
 import { Case } from "../../../src/prop/engine/case.js";
 import { IntegerBounds } from "../../../src/prop/engine/choice.js";
+import { Sizes } from "../../../src/prop/engine/collection.js";
 import { Composite } from "../../../src/prop/engine/generator/collections.js";
-import { Integer, Mapped, Optional } from "../../../src/prop/engine/generator.js";
+import {
+  Dict,
+  Filter,
+  type Generator,
+  Integer,
+  List,
+  Mapped,
+  OneOf,
+  Optional,
+} from "../../../src/prop/engine/generator.js";
 import {
   type Entry,
   entries,
@@ -18,6 +28,7 @@ import {
   Tracing,
   UNSTATED,
 } from "../../../src/prop/engine/trace.js";
+import { Pairs } from "../../../src/prop/engine/value.js";
 import { test as it } from "../../../src/vitest.js";
 
 /** The generator that most draws use. */
@@ -199,6 +210,75 @@ describe("trace", () => {
         "the map's error",
       );
     });
+
+    const refusals: {
+      name: string;
+      give: Entry[];
+      generator: Generator<unknown>;
+      want: unknown[];
+    }[] = [
+      {
+        name: "an entry of a draw through a composite after a step entry",
+        give: [
+          { label: "a", value: 7n },
+          { label: "b", value: 3n },
+          { action: "put" },
+          { label: "pair", value: [7n, 3n] },
+        ],
+        generator: new OneOf<unknown>([DIGIT, PAIR]),
+        want: [0, "pair", "label"],
+      },
+      {
+        name: "a draw through a composite without an entry of its label",
+        give: [
+          { label: "a", value: 7n },
+          { label: "b", value: 3n },
+        ],
+        generator: new OneOf<unknown>([DIGIT, PAIR]),
+        want: [0, "pair", "label"],
+      },
+      {
+        name: "a later entry whose value has no composite",
+        give: [
+          { label: "a", value: 7n },
+          { label: "pair", value: 5n },
+        ],
+        generator: new OneOf<unknown>([DIGIT, PAIR]),
+        want: [0, "pair", "label"],
+      },
+      {
+        name: "an entry of a draw through a composite that records no value",
+        give: [
+          { label: "a", value: 7n },
+          { label: "b", value: 3n },
+          { label: "pair", value: UNSTATED },
+        ],
+        generator: new OneOf<unknown>([DIGIT, PAIR]),
+        want: [2, "pair", "value"],
+      },
+      {
+        name: "the entry of a dict through a composite",
+        give: [
+          { label: "a", value: 1n },
+          { label: "b", value: 2n },
+          { label: "pair", value: new Pairs([[5n, [1n, 2n]]]) },
+        ],
+        generator: new Dict(DIGIT, PAIR, new Sizes(0, 2)),
+        want: [2, "pair", "value"],
+      },
+    ];
+    for (const tt of refusals) {
+      it(`throws a TraceError for ${tt.name}`, ({ seat }) => {
+        const c = new Case(new Tracing(tt.give));
+
+        check.isEqualTo(
+          seat,
+          refusal(seat, () => c.draw(tt.generator, "pair")),
+          tt.want,
+          "the entry, the label and the reason",
+        );
+      });
+    }
   });
 
   describe("Tracing.drawn", () => {
@@ -278,6 +358,191 @@ describe("trace", () => {
         );
       });
     }
+
+    it("takes the entry of a one-of through a composite after its draws", ({
+      seat,
+    }) => {
+      const trace = new Tracing([
+        { label: "a", value: 7n },
+        { label: "b", value: 3n },
+        { label: "pair", value: [7n, 3n] },
+      ]);
+      const c = new Case(trace);
+
+      check.isEqualTo(
+        seat,
+        [
+          c.draw(new OneOf<unknown>([DIGIT, PAIR]), "pair"),
+          trace.taken,
+          c.choices.map((choice) => choice.value),
+        ],
+        [[7n, 3n], 3, [1n, 7n, 3n]],
+        "the one-of takes the three entries",
+      );
+    });
+
+    it("takes the entry of an alternative without a composite at once", ({ seat }) => {
+      const c = new Case(
+        new Tracing([
+          { label: "pair", value: 7n },
+          { label: "x", value: 5n },
+        ]),
+      );
+
+      check.isEqualTo(
+        seat,
+        [
+          c.draw(new OneOf<unknown>([PAIR, DIGIT]), "pair"),
+          c.draw(DIGIT, "x"),
+          c.choices.map((choice) => choice.value),
+        ],
+        [7n, 5n, [1n, 7n, 5n]],
+        "the one-of takes its entry before the draw of x",
+      );
+    });
+
+    it("serves the flags of a list of composites around their draws", ({ seat }) => {
+      const trace = new Tracing([
+        { label: "a", value: 1n },
+        { label: "b", value: 2n },
+        { label: "a", value: 7n },
+        { label: "b", value: 3n },
+        {
+          label: "pairs",
+          value: [
+            [1n, 2n],
+            [7n, 3n],
+          ],
+        },
+      ]);
+      const c = new Case(trace);
+
+      check.isEqualTo(
+        seat,
+        [
+          c.draw(new List(PAIR, new Sizes(0, 3)), "pairs"),
+          trace.taken,
+          c.choices.map((choice) => choice.value),
+        ],
+        [
+          [
+            [1n, 2n],
+            [7n, 3n],
+          ],
+          5,
+          [1n, 1n, 2n, 1n, 7n, 3n, 0n],
+        ],
+        "the list takes the five entries",
+      );
+    });
+
+    const optionals: { name: string; give: Entry[]; want: bigint[] | undefined }[] = [
+      {
+        name: "takes the entry of a present composite after its draws",
+        give: [
+          { label: "a", value: 7n },
+          { label: "b", value: 3n },
+          { label: "maybe", value: [7n, 3n] },
+        ],
+        want: [7n, 3n],
+      },
+      {
+        name: "takes the entry of an absent composite at once",
+        give: [{ label: "maybe", value: undefined }],
+        want: undefined,
+      },
+    ];
+    for (const tt of optionals) {
+      it(`${tt.name} of an optional`, ({ seat }) => {
+        const trace = new Tracing(tt.give);
+
+        check.isEqualTo(
+          seat,
+          [new Case(trace).draw(new Optional(PAIR), "maybe"), trace.taken],
+          [tt.want, tt.give.length],
+          "the optional takes every entry",
+        );
+      });
+    }
+
+    const throughs: {
+      name: string;
+      generator: Generator<unknown>;
+      recorded: unknown;
+      want: unknown;
+    }[] = [
+      {
+        name: "does not test the recorded value of a filter of a composite",
+        generator: new Filter(PAIR, (value: bigint[]) => value.length >= 2),
+        recorded: [7n],
+        want: [7n, 3n],
+      },
+      {
+        name: "takes the entry of a map with an inverse after the draws of its composite",
+        generator: new Mapped(
+          PAIR,
+          (value: bigint[]) => value.join(" "),
+          (text: string) => text.split(" ").map(BigInt),
+        ),
+        recorded: "7 3",
+        want: "7 3",
+      },
+    ];
+    for (const tt of throughs) {
+      it(tt.name, ({ seat }) => {
+        const trace = new Tracing([
+          { label: "a", value: 7n },
+          { label: "b", value: 3n },
+          { label: "pair", value: tt.recorded },
+        ]);
+
+        check.isEqualTo(
+          seat,
+          [new Case(trace).draw(tt.generator, "pair"), trace.taken],
+          [tt.want, 3],
+          "the draw takes the three entries",
+        );
+      });
+    }
+
+    it("throws a TraceError for an entry that a draw through a composite leaves", ({
+      seat,
+    }) => {
+      const c = new Case(
+        new Tracing([
+          { label: "a", value: 7n },
+          { label: "b", value: 3n },
+          { label: "b", value: 4n },
+          { label: "pair", value: [7n, 3n] },
+        ]),
+      );
+
+      check.isEqualTo(
+        seat,
+        refusal(seat, () => c.draw(new OneOf<unknown>([DIGIT, PAIR]), "pair")),
+        [2, "pair", "label"],
+        "the error is at entry 2 for the label",
+      );
+    });
+
+    it("throws a TraceError at the entry of a draw that a draw inside takes", ({
+      seat,
+    }) => {
+      const inner = new Composite((drawing) => [drawing.draw(DIGIT, "pair")]);
+      const c = new Case(
+        new Tracing([
+          { label: "pair", value: 5n },
+          { label: "pair", value: [5n] },
+        ]),
+      );
+
+      check.isEqualTo(
+        seat,
+        refusal(seat, () => c.draw(new OneOf<unknown>([inner]), "pair")),
+        [0, "pair", "label"],
+        "the error is at entry 0 for the label",
+      );
+    });
   });
 
   describe("Tracing.value", () => {

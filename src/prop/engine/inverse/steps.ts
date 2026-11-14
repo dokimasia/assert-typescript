@@ -9,7 +9,7 @@
 import { type Bounds, IntegerBounds, type Value } from "../choice.js";
 import type { Generator } from "../generator.js";
 import { canonical } from "../value.js";
-import { CannotInvert, shown } from "./refusal.js";
+import { CannotInvert, NoInverse, shown } from "./refusal.js";
 
 /** One emitted choice: the bounds that its request states, and its value. */
 export interface Step {
@@ -18,11 +18,55 @@ export interface Step {
 }
 
 /**
+ * The place of a composite among the steps of a value. The composite makes
+ * no choice of its own. In a trace its draws take their own entries, and the
+ * steps after the placeholder serve the generator around the composite.
+ */
+export const PLACEHOLDER: unique symbol = Symbol("PLACEHOLDER");
+
+/** The type of the placeholder of a composite. */
+export type Placeholder = typeof PLACEHOLDER;
+
+/**
  * The steps that a generator emits for a value, and the value that they
  * decode to, which differs from the given value only in the order of a
  * set's elements and a map's entries.
  */
-export type Emitted = readonly [steps: Step[], normal: unknown];
+export type Emitted = readonly [steps: (Step | Placeholder)[], normal: unknown];
+
+/**
+ * Reports whether steps run backwards through a composite.
+ *
+ * @param steps - The steps.
+ * @returns True when a step is the placeholder of a composite.
+ */
+export function hasPlaceholder(steps: readonly (Step | Placeholder)[]): boolean {
+  return steps.includes(PLACEHOLDER);
+}
+
+/**
+ * Returns the steps that make a choice each.
+ *
+ * @param steps - The steps.
+ * @returns The steps without a placeholder.
+ */
+export function madeChoices(steps: readonly (Step | Placeholder)[]): Step[] {
+  return steps.filter((s): s is Step => s !== PLACEHOLDER);
+}
+
+/**
+ * Returns steps that make a choice each.
+ *
+ * @param steps - The steps.
+ * @returns The steps.
+ * @throws NoInverse when a step is the placeholder of a composite.
+ */
+export function chosen(steps: readonly (Step | Placeholder)[]): Step[] {
+  if (hasPlaceholder(steps)) {
+    throw new NoInverse("prop: a Composite does not run backwards");
+  }
+  return madeChoices(steps);
+}
 
 /** Returns the steps that a generator emits for a value. */
 export type Emit = (generator: Generator<unknown>, value: unknown) => Emitted;

@@ -22,7 +22,14 @@ import { WallShape, ZonedShape } from "../shape/zoned.js";
 import { Fields, Variant } from "../value.js";
 import { ZONES } from "../zone.js";
 import { CannotInvert, shown } from "./refusal.js";
-import { BIT, type Emitter, indexOf, type Step, step } from "./steps.js";
+import {
+  BIT,
+  type Emitter,
+  indexOf,
+  type Placeholder,
+  type Step,
+  step,
+} from "./steps.js";
 
 /** The bounds of the index of a zone of the list. */
 const ZONE_INDEX = new IntegerBounds(0n, BigInt(ZONES.length - 1));
@@ -89,7 +96,7 @@ export const SHAPES: readonly (readonly [unknown, Emitter])[] = [
           `prop: ${shown(value)} is no record of ${names.join(", ")}`,
         );
       }
-      const steps: Step[] = [];
+      const steps: (Step | Placeholder)[] = [];
       const normal = g.fields.map(([name, of], i) => {
         const [fieldSteps, fieldNormal] = emit(
           of,

@@ -20,6 +20,14 @@
  * - A draw of a composite takes no entry when it starts, and its own draws
  *   take theirs. Once it decodes, it takes the next entry by its label and
  *   does not read the value. A case records a composite after its draws.
+ * - A draw through a composite, whose generator has a composite inside a
+ *   one-of, an optional, a list, a dict, a filter, a map with an inverse or a
+ *   recursive, takes the first draw entry with its label up to the next step
+ *   entry. When the value runs backwards through a composite, the draws of
+ *   the composite take the entries before it, and the draw takes it once it
+ *   decodes.
+ * - The choices of a draw serve the requests of its own generator. A draw
+ *   inside it serves its own, and the outer requests continue after it.
  * - A machine turns each step entry into the choices of one step, which
  *   Tracing serves as they are requested.
  * - Every other request takes its target.
@@ -39,7 +47,20 @@ import type { Step } from "./case/record.js";
 import type { Case, Decoder } from "./case.js";
 import type { Choice, Value } from "./choice.js";
 import { Composite, type Generator } from "./generator.js";
-import { inverseOf } from "./inverse.js";
+import { inverseThrough, throughComposite } from "./inverse.js";
+
+/** A draw in progress: the choices of its requests, and how it ends. */
+interface Open {
+  /** The choices of the draw that no request has taken. */
+  readonly queue: Choice[];
+  /**
+   * The position of the entry that a draw through a composite takes once it
+   * decodes, and undefined for every other draw.
+   */
+  readonly end?: number;
+  /** True for a composite, which takes the next entry by its label alone once it decodes. */
+  readonly byLabel?: boolean;
+}
 
 /** The value of a draw entry that does not record a value. */
 export const UNSTATED: unique symbol = Symbol("UNSTATED");
@@ -114,7 +135,11 @@ export function entries(c: Case): Entry[] {
 export class Tracing implements Provider {
   readonly #entries: readonly Entry[];
   #at = 0;
-  readonly #queue: Choice[] = [];
+  /**
+   * The draws in progress, the innermost last. The first stands for the
+   * requests outside every draw, such as the steps of a machine.
+   */
+  readonly #open: Open[] = [{ queue: [] }];
 
   /**
    * Returns the provider of the entries of trace, from the first.
@@ -126,56 +151,107 @@ export class Tracing implements Provider {
   }
 
   /**
-   * Returns the next prepared value fitted to the request, or its target.
+   * Returns the next value of the innermost open draw fitted to the request,
+   * or its target.
    *
    * @param request - The request.
    * @returns The value.
    */
   value(request: Request): Value {
-    const prepared = this.#queue.shift();
+    const prepared = (this.#open.at(-1) as Open).queue.shift();
     return prepared === undefined
       ? request.bounds.target
       : request.bounds.coerce(prepared);
   }
 
   /**
-   * Prepares the choices of the next entry for a draw under label. A
-   * composite takes no entry here. Its draws take theirs, and it takes its
-   * own entry once it decodes.
+   * Prepares the choices of the entry of a draw under label. A composite
+   * takes no entry here. Its draws take theirs, and it takes its own entry
+   * once it decodes. A draw through a composite takes the first entry with
+   * its label up to the next step entry. Every other draw takes the next
+   * entry.
    *
    * @param generator - The draw's generator.
    * @param label - The draw's label.
-   * @throws TraceError when the next entry is not a draw entry with label,
-   *   does not record a value, or has a value that the generator cannot
-   *   produce.
+   * @throws TraceError when the entry is not a draw entry with label, does
+   *   not record a value, or has a value that the generator cannot produce.
    */
   drawing(generator: Decoder, label: string): void {
-    if (generator instanceof Composite || this.#at >= this.#entries.length) {
+    if (generator instanceof Composite) {
+      this.#open.push({ queue: [], byLabel: true });
       return;
     }
-    const entry = this.#take(label);
+    if (this.#at >= this.#entries.length) {
+      this.#open.push({ queue: [] });
+      return;
+    }
+    const drawn = generator as Generator<unknown>;
+    const at = throughComposite(drawn) ? this.#find(label) : this.#at;
+    const entry = this.#entries[at] as Entry;
+    if (isStep(entry) || entry.label !== label) {
+      throw new TraceError(this.#at, label, "label");
+    }
     if (entry.value === UNSTATED) {
-      throw new TraceError(this.#at - 1, label, "value");
+      throw new TraceError(at, label, "value");
     }
-    const choices = inverseOf(generator as Generator<unknown>, entry.value);
-    if (choices === undefined) {
-      throw new TraceError(this.#at - 1, label, "value");
+    const inverted = inverseThrough(drawn, entry.value);
+    if (inverted === undefined) {
+      throw new TraceError(at, label, "value");
     }
-    this.#queue.push(...choices);
+    const [choices, composite] = inverted;
+    if (composite) {
+      this.#open.push({ queue: choices, end: at });
+      return;
+    }
+    if (at !== this.#at) {
+      throw new TraceError(this.#at, label, "label");
+    }
+    this.#at += 1;
+    this.#open.push({ queue: choices });
   }
 
   /**
-   * Takes the next entry for a composite under label, by its label alone.
-   * A draw of another generator takes its entry before it decodes.
+   * Ends the draw under label, and takes its entry once it decodes. A
+   * composite takes the next entry by its label alone. A draw through a
+   * composite takes its entry, which must be the next one, once the draws of
+   * its composites have taken the entries before it. Every other draw took
+   * its entry before it decoded.
    *
-   * @param generator - The draw's generator.
+   * @param _generator - The draw's generator.
    * @param label - The draw's label.
-   * @throws TraceError when the next entry is not a draw entry with label.
+   * @throws TraceError when the next entry is not a draw entry with label, or
+   *   is not the entry of the draw. When a draw inside took the entry of the
+   *   draw, the error is at that entry.
    */
-  drawn(generator: Decoder, label: string): void {
-    if (generator instanceof Composite && this.#at < this.#entries.length) {
+  drawn(_generator: Decoder, label: string): void {
+    const ended = this.#open.pop() as Open;
+    if (ended.byLabel === true && this.#at < this.#entries.length) {
       this.#take(label);
     }
+    if (ended.end !== undefined) {
+      if (this.#at !== ended.end) {
+        throw new TraceError(Math.min(this.#at, ended.end), label, "label");
+      }
+      this.#take(label);
+    }
+  }
+
+  /**
+   * Returns the position of the first draw entry with label before a step
+   * entry, and the position of the next entry when there is none, so the
+   * draw refuses that entry.
+   */
+  #find(label: string): number {
+    for (let at = this.#at; at < this.#entries.length; at += 1) {
+      const entry = this.#entries[at] as Entry;
+      if (isStep(entry)) {
+        break;
+      }
+      if (entry.label === label) {
+        return at;
+      }
+    }
+    return this.#at;
   }
 
   /**
@@ -221,7 +297,9 @@ export class Tracing implements Provider {
    * @param values - The values.
    */
   prepare(...values: bigint[]): void {
-    this.#queue.push(...values.map((value) => ({ kind: "integer", value }) as const));
+    (this.#open.at(-1) as Open).queue.push(
+      ...values.map((value) => ({ kind: "integer", value }) as const),
+    );
   }
 
   /**

@@ -28,7 +28,7 @@ function outcomeOf(name: string, setup: Setup): Promise<[unknown, unknown]> {
 
 describe("subjects", () => {
   describe("SUBJECTS", () => {
-    it("states the thirteen machine subjects of the definition", ({ seat }) => {
+    it("states the fifteen machine subjects of the definition", ({ seat }) => {
       check.isEqualTo(
         seat,
         [...SUBJECTS.keys()].sort(compareText),
@@ -37,7 +37,9 @@ describe("subjects", () => {
           "correct-queue",
           "counter-overflows",
           "counter-refuses-every-third",
+          "one-of-pair-fails-at-7-and-3",
           "pair-fails-at-7-and-3",
+          "pairs-fail-at-7-and-3",
           "queue-loses-on-wrap",
           "racy-counter",
           "register-flushes",

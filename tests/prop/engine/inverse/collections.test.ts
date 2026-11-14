@@ -12,6 +12,7 @@ import { IntegerBounds } from "../../../../src/prop/engine/choice.js";
 import { Sizes } from "../../../../src/prop/engine/collection.js";
 import {
   Bool,
+  Composite,
   Dict,
   Filter,
   type Generator,
@@ -27,6 +28,7 @@ import {
   CannotInvert,
   NoInverse,
 } from "../../../../src/prop/engine/inverse/refusal.js";
+import { PLACEHOLDER } from "../../../../src/prop/engine/inverse/steps.js";
 import { Pairs } from "../../../../src/prop/engine/value.js";
 import { test as it } from "../../../../src/vitest.js";
 import { emittedBy, refusedBy } from "../../../helpers.js";
@@ -40,9 +42,17 @@ const TEEN = new Integer(new IntegerBounds(10n, 20n));
 /** A list of at most three digits. */
 const DIGITS = new List(DIGIT, new Sizes(0, 3));
 
-/** Returns the values of the steps that the emitter of generator emits for value. */
+/** A composite of two digits drawn under a and b, whose value is their list. */
+const PAIR = new Composite((c) => [c.draw(DIGIT, "a"), c.draw(DIGIT, "b")]);
+
+/**
+ * Returns the values of the steps that the emitter of generator emits for
+ * value, with each placeholder of a composite as the placeholder.
+ */
 function valuesOf(generator: Generator<unknown>, value: unknown): unknown[] {
-  return emittedBy(COLLECTIONS, generator, value)[0].map((s) => s.value);
+  return emittedBy(COLLECTIONS, generator, value)[0].map((s) =>
+    s === PLACEHOLDER ? s : s.value,
+  );
 }
 
 describe("collections", () => {
@@ -62,6 +72,7 @@ describe("collections", () => {
           "Dict",
           "MapShape",
           "Filter",
+          "Composite",
           "Mapped",
           "Recursive",
           "Position",
@@ -217,6 +228,85 @@ describe("collections", () => {
       );
 
       check.isEqualTo(seat, valuesOf(tree, 5n), [0n, 5n], "the base, then 5");
+    });
+
+    it("emits the placeholder of a composite", ({ seat }) => {
+      check.isEqualTo(seat, valuesOf(PAIR, [7n, 3n]), [PLACEHOLDER], "the placeholder");
+    });
+
+    it("emits the first alternative without a composite before one through a composite", ({
+      seat,
+    }) => {
+      check.isEqualTo(
+        seat,
+        [
+          valuesOf(new OneOf<unknown>([PAIR, DIGIT]), 7n),
+          valuesOf(new OneOf([PAIR]), 7n),
+        ],
+        [
+          [1n, 7n],
+          [0n, PLACEHOLDER],
+        ],
+        "the digit first, and the pair when no other alternative produces 7",
+      );
+    });
+
+    it("does not compare the composites of a unique list", ({ seat }) => {
+      check.isEqualTo(
+        seat,
+        valuesOf(new List(PAIR, new Sizes(0, 3), true), [
+          [1n, 2n],
+          [1n, 2n],
+        ]),
+        [1n, PLACEHOLDER, 1n, PLACEHOLDER, 0n],
+        "the flags around the pairs",
+      );
+    });
+
+    it("refuses with a NoInverse a dict through a composite", ({ seat }) => {
+      const err = check.errorAs(
+        seat,
+        check.doesThrow(
+          seat,
+          () =>
+            emittedBy(
+              COLLECTIONS,
+              new Dict(DIGIT, PAIR, new Sizes(0, 2)),
+              new Pairs([[5n, [1n, 2n]]]),
+            ),
+          "the value is refused",
+        ),
+        NoInverse,
+        "a NoInverse",
+      );
+
+      check.isEqualTo(
+        seat,
+        err?.message,
+        "prop: a map does not state the order in which its composites drew",
+        "the refusal states the order",
+      );
+    });
+
+    it("does not test the value of a composite of a filter", ({ seat }) => {
+      const longer = new Filter(PAIR, (value: bigint[]) => value.length >= 2);
+
+      check.isEqualTo(seat, valuesOf(longer, [7n]), [PLACEHOLDER], "the placeholder");
+    });
+
+    it("emits the given value of a map with an inverse of a composite", ({ seat }) => {
+      const joined = new Mapped(
+        PAIR,
+        (value: bigint[]) => value.join(" "),
+        (text: string) => text.split(" ").map(BigInt),
+      );
+
+      check.isEqualTo(
+        seat,
+        emittedBy(COLLECTIONS, joined, "7 3"),
+        [[PLACEHOLDER], "7 3"],
+        "the placeholder and the given value",
+      );
     });
   });
 });
