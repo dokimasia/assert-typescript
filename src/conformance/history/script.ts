@@ -84,6 +84,101 @@ function intervalOf(raw: Raw, member: string): Interval {
 }
 
 /**
+ * The recording of a script through a history, entry by entry. A resume
+ * vector records its script up to the events of each check in turn.
+ */
+export class Recording {
+  /** The history of the recorded entries. */
+  readonly history = new History();
+  /** The entries of the script. */
+  readonly entries: readonly Raw[];
+  /** The member of the vector that states the script. */
+  readonly #member: string;
+  /** The call of the number of each entry that invokes. */
+  readonly #calls = new Map<unknown, Call>();
+  /** The number of recorded entries. */
+  #recorded = 0;
+
+  /**
+   * Returns the recording of script, which has recorded no entry.
+   *
+   * @param script - The script.
+   * @param member - The member of the vector that states the script.
+   * @throws Fault at member for a script that is no list.
+   */
+  constructor(script: unknown, member: string) {
+    if (!Array.isArray(script)) {
+      throw new Fault(member, "the script is no list");
+    }
+    this.entries = script as Raw[];
+    this.#member = member;
+  }
+
+  /**
+   * Records the entries up to end, and returns the entry whose call of the
+   * seam throws, or undefined when the seam refuses none. It records no entry
+   * after the refused one.
+   *
+   * @param end - The index after the last entry to record.
+   * @returns The refused entry, or undefined.
+   * @throws Fault at an entry that does not read.
+   */
+  through(end: number): number | undefined {
+    for (; this.#recorded < end; this.#recorded += 1) {
+      if (refuses(this.#apply(this.#recorded))) {
+        return this.#recorded;
+      }
+    }
+    return undefined;
+  }
+
+  /** Returns the call of the seam that the entry i states, and a fault at the entry for one that does not read. */
+  #apply(i: number): () => void {
+    const raw = this.entries[i] as Raw;
+    const at = `${this.#member}[${i}]`;
+    const completing = (
+      number: unknown,
+      complete: (call: Call) => void,
+    ): (() => void) => {
+      const call = this.#calls.get(number);
+      if (call === undefined) {
+        throw new Fault(
+          at,
+          `the entry completes call ${String(number)}, which the script does not open`,
+        );
+      }
+      return () => complete(call);
+    };
+    if ("invoke" in raw) {
+      const args = values(raw["args"], `${at}.args`);
+      const keys = values(raw["keys"], `${at}.keys`);
+      return () => {
+        this.#calls.set(
+          raw["invoke"],
+          this.history.invoke(
+            Number(raw["client"]),
+            String(raw["operation"]),
+            args,
+            ...keys,
+          ),
+        );
+      };
+    }
+    if ("ok" in raw) {
+      const output = value(raw["output"], `${at}.output`);
+      return completing(raw["ok"], (call) => call.ok(output));
+    }
+    if ("fail" in raw) {
+      return completing(raw["fail"], (call) => call.fail(raw["error"]));
+    }
+    if ("unknown" in raw) {
+      return completing(raw["unknown"], (call) => call.unknown(raw["error"]));
+    }
+    throw new Fault(at, "the entry states no call of the seam");
+  }
+}
+
+/**
  * Records script through a history, and returns the history and the entry
  * whose call of the seam throws, or undefined when the seam refuses none.
  * It records no entry after the refused one.
@@ -95,56 +190,9 @@ export function record(
   readonly history: History;
   readonly refused: number | undefined;
 } {
-  if (!Array.isArray(script)) {
-    throw new Fault(member, "the script is no list");
-  }
-  const history = new History();
-  const calls = new Map<unknown, Call>();
-  for (const [i, raw] of (script as Raw[]).entries()) {
-    const at = `${member}[${i}]`;
-    const completing = (
-      number: unknown,
-      complete: (call: Call) => void,
-    ): (() => void) => {
-      const call = calls.get(number);
-      if (call === undefined) {
-        throw new Fault(
-          at,
-          `the entry completes call ${String(number)}, which the script does not open`,
-        );
-      }
-      return () => complete(call);
-    };
-    let apply: () => void;
-    if ("invoke" in raw) {
-      const args = values(raw["args"], `${at}.args`);
-      const keys = values(raw["keys"], `${at}.keys`);
-      apply = () => {
-        calls.set(
-          raw["invoke"],
-          history.invoke(
-            Number(raw["client"]),
-            String(raw["operation"]),
-            args,
-            ...keys,
-          ),
-        );
-      };
-    } else if ("ok" in raw) {
-      const output = value(raw["output"], `${at}.output`);
-      apply = completing(raw["ok"], (call) => call.ok(output));
-    } else if ("fail" in raw) {
-      apply = completing(raw["fail"], (call) => call.fail(raw["error"]));
-    } else if ("unknown" in raw) {
-      apply = completing(raw["unknown"], (call) => call.unknown(raw["error"]));
-    } else {
-      throw new Fault(at, "the entry states no call of the seam");
-    }
-    if (refuses(apply)) {
-      return { history, refused: i };
-    }
-  }
-  return { history, refused: undefined };
+  const recording = new Recording(script, member);
+  const refused = recording.through(recording.entries.length);
+  return { history: recording.history, refused };
 }
 
 /** Returns the history of a seam vector's intervals and the entry that fromIntervals refuses, or undefined. */

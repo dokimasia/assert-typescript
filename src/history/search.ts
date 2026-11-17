@@ -24,10 +24,15 @@
  * The frontier of a search is its first configuration, in search order,
  * with the most linearized calls. The search states the frontier's order,
  * its states and the candidates that the spec rejected there.
+ *
+ * A search that passed grows by the calls that follow every event that it
+ * read, and continues from the order that it found. It takes the steps that
+ * a search of every call takes after that order.
  */
 
 import { compareText } from "../order.js";
 import { type Ending, type Limit, SpecError, type Verdict } from "./ending.js";
+import { Entries } from "./entries.js";
 import { Memo } from "./memo.js";
 import type { Config } from "./option.js";
 import type { Checked } from "./partition.js";
@@ -52,31 +57,42 @@ class Stopped {
   }
 }
 
+/** The spec of a search, with the functions that the search calls. */
+interface Functions<S> {
+  /** The spec. */
+  readonly spec: Spec<S>;
+  /** The equal of the spec, or the equality of states without one. */
+  readonly equal: (a: S, b: S) => boolean;
+  /** The key of the spec, or the key of a state without one. */
+  readonly key: (state: S) => string;
+  /** The steps of a call of next in a state. */
+  readonly cost: (state: S) => number;
+}
+
+/** Returns the spec with the functions that a search calls. */
+function functionsOf<S>(spec: Spec<S>): Functions<S> {
+  return {
+    spec,
+    equal: spec.equal === undefined ? sameState : (a, b) => spec.equal?.(a, b) === true,
+    key: spec.key === undefined ? stateKey : (state) => String(spec.key?.(state)),
+    cost: (spec as Partial<Costed<S>>)[COST] ?? (() => 1),
+  };
+}
+
 /** The search of one partition. */
 export class Search<S> {
-  readonly #calls: readonly Checked[];
-  readonly #spec: Spec<S>;
-  readonly #equal: (a: S, b: S) => boolean;
-  readonly #key: (state: S) => string;
-  readonly #cost: (state: S) => number;
+  readonly #calls: Checked[] = [];
+  #functions: Functions<S>;
   readonly #budget: number;
+  readonly #memoLimit: number;
   /** When the check's time passes, on the platform clock, and Infinity for no limit. */
-  readonly #deadline: number;
+  #deadline: number;
   /** The steps at which the search reads the clock next. */
   #clockAt = 0;
-  /** The next and the previous entry of each entry, with the head and the tail after the entries. */
-  readonly #next: number[];
-  readonly #prev: number[];
-  readonly #head: number;
-  /** The position of the call of each entry, and whether the entry is an invocation. */
-  readonly #position: number[];
-  readonly #invokes: boolean[];
-  /** The entry of each call's invocation, and of a known call's completion. */
-  readonly #invocation: number[];
-  readonly #completion: (number | undefined)[];
-  /** The number of known calls that are not linearized. */
-  #open: number;
+  readonly #entries = new Entries();
   #steps = 0;
+  /** Whether the search has taken the initial state of its spec. */
+  #started: boolean;
   /** The set of linearized calls, a bit per position. */
   #done = 0n;
   #states: S[] = [];
@@ -105,61 +121,73 @@ export class Search<S> {
     config: Config,
     deadline: number,
   ) {
-    this.#calls = calls;
-    this.#spec = spec;
-    this.#equal =
-      spec.equal === undefined ? sameState : (a, b) => spec.equal?.(a, b) === true;
-    this.#key =
-      spec.key === undefined ? stateKey : (state) => String(spec.key?.(state));
-    this.#cost = (spec as Partial<Costed<S>>)[COST] ?? (() => 1);
-    this.#budget = config.budget;
+    this.#functions = functionsOf(spec);
     this.#deadline = deadline;
-    const entries: [event: number, position: number, invokes: boolean][] = [];
-    let optional = 0n;
-    calls.forEach(({ span }, position) => {
-      entries.push([span.call, position, true]);
-      if (span.operation.known) {
-        entries.push([span.completion as number, position, false]);
-      } else {
-        optional |= 1n << BigInt(position);
-      }
-    });
-    this.#memo = new Memo(optional, calls.length, config.memoLimit);
-    entries.sort(([a], [b]) => a - b);
-    const n = entries.length;
-    this.#head = n;
-    const chain = [n, ...entries.keys(), n + 1];
-    this.#next = new Array<number>(n + 2).fill(0);
-    this.#prev = new Array<number>(n + 2).fill(0);
-    for (let i = 0; i + 1 < chain.length; i += 1) {
-      this.#next[chain[i] as number] = chain[i + 1] as number;
-      this.#prev[chain[i + 1] as number] = chain[i] as number;
-    }
-    this.#position = entries.map(([, position]) => position);
-    this.#invokes = entries.map(([, , invokes]) => invokes);
-    this.#invocation = new Array<number>(calls.length).fill(0);
-    this.#completion = new Array<number | undefined>(calls.length).fill(undefined);
-    entries.forEach(([, position, invokes], entry) => {
-      if (invokes) {
-        this.#invocation[position] = entry;
-      } else {
-        this.#completion[position] = entry;
-      }
-    });
-    this.#open = calls.filter(({ span }) => span.operation.known).length;
+    this.#budget = config.budget;
+    this.#memoLimit = config.memoLimit;
+    this.#memo = new Memo(0n, 0, config.memoLimit);
+    this.#started = false;
     this.#atFrontier = true;
+    this.#add(calls);
+  }
+
+  /** The calls of the search, in event order. */
+  get calls(): readonly Checked[] {
+    return this.#calls;
   }
 
   /**
-   * Searches the partition, and returns how the search ended.
+   * Reports whether the search continues as a new search when it grows to
+   * calls. A new search of the calls takes the steps of this search up to
+   * the order that it found when config states the budget and the memo limit
+   * of this search, and when the memo stores no more configurations than the
+   * memo limit lets a search of the calls store.
+   *
+   * @param calls - The number of calls of the grown search.
+   * @param config - The limits of the check.
+   * @returns True when the grown search continues as a new search of its calls.
+   */
+  fits(calls: number, config: Config): boolean {
+    return (
+      config.budget === this.#budget &&
+      config.memoLimit === this.#memoLimit &&
+      this.#memo.stored * calls <= config.memoLimit
+    );
+  }
+
+  /**
+   * Adds calls that follow every event that a search that passed read. The
+   * entries of the calls join the scan before the tail, in event order. The
+   * search then steps through spec, and reads deadline before its next step.
+   * A search of every call takes the same steps from the order that this
+   * search found.
+   *
+   * @param calls - The new calls of the partition, in event order.
+   * @param spec - The spec of the check that grows the search.
+   * @param deadline - When the time of the check that grows the search
+   *   passes, and Infinity for no limit.
+   */
+  grow(calls: readonly Checked[], spec: Spec<S>, deadline: number): void {
+    this.#functions = functionsOf(spec);
+    this.#deadline = deadline;
+    this.#clockAt = this.#steps;
+    this.#add(calls);
+  }
+
+  /**
+   * Searches the partition, and returns how the search ended. A search that
+   * grew continues from the order that it found.
    *
    * @returns The ending.
    * @throws SpecError when a function of the spec throws.
    */
   run(): Ending<S> {
     try {
-      this.#states = [this.#spec.initial()];
-      this.#frontier = this.#states;
+      if (!this.#started) {
+        this.#states = [this.#functions.spec.initial()];
+        this.#frontier = this.#states;
+        this.#started = true;
+      }
       if (this.#search()) {
         return { ...this.#ending("passed", undefined), states: this.#states };
       }
@@ -172,6 +200,15 @@ export class Search<S> {
         this.#stepped === undefined ? undefined : this.#calls[this.#stepped]?.span;
       throw new SpecError(this.#calling, stepped, err);
     }
+  }
+
+  /** Adds calls after the calls of the search, and grows the memo to them. */
+  #add(calls: readonly Checked[]): void {
+    this.#entries.add(calls, this.#calls.length);
+    for (const call of calls) {
+      this.#calls.push(call);
+    }
+    this.#memo.grow(this.#entries.optional, this.#calls.length);
   }
 
   /** Returns an ending that states the frontier. */
@@ -188,17 +225,18 @@ export class Search<S> {
 
   /** Scans the entries until every known call is linearized, and reports whether one order passes. */
   #search(): boolean {
-    let entry = this.#next[this.#head] as number;
-    while (this.#open > 0) {
-      if (!this.#invokes[entry]) {
+    const entries = this.#entries;
+    let entry = entries.first;
+    while (entries.open > 0) {
+      if (!entries.invokes(entry)) {
         if (this.#stack.length === 0) {
           return false;
         }
         entry = this.#backtrack();
-      } else if (this.#linearize(this.#position[entry] as number)) {
-        entry = this.#next[this.#head] as number;
+      } else if (this.#linearize(entries.position(entry))) {
+        entry = entries.first;
       } else {
-        entry = this.#next[entry] as number;
+        entry = entries.next(entry);
       }
     }
     return true;
@@ -221,7 +259,7 @@ export class Search<S> {
     this.#stack.push([position, this.#states]);
     this.#done = done;
     this.#states = following;
-    this.#lift(position);
+    this.#entries.lift(position);
     this.#atFrontier = this.#stack.length > this.#linearized.length;
     if (this.#atFrontier) {
       this.#linearized = this.#stack.map(([at]) => at);
@@ -236,7 +274,7 @@ export class Search<S> {
     const following: S[] = [];
     for (const state of this.#states) {
       this.#calling = "next";
-      const cost = this.#cost(state);
+      const cost = this.#functions.cost(state);
       if (this.#steps + cost > this.#budget) {
         throw new Stopped("steps");
       }
@@ -247,9 +285,9 @@ export class Search<S> {
         this.#clockAt = this.#steps + CLOCK_STEPS;
       }
       this.#steps += cost;
-      for (const after of this.#spec.next(state, op)) {
+      for (const after of this.#functions.spec.next(state, op)) {
         this.#calling = "equal";
-        if (!following.some((kept) => this.#equal(after, kept))) {
+        if (!following.some((kept) => this.#functions.equal(after, kept))) {
           following.push(after);
         }
         this.#calling = "next";
@@ -261,9 +299,9 @@ export class Search<S> {
   /** Stores a configuration in the memo, and reports whether the memo did not cover it. */
   #remember(done: bigint, states: S[]): boolean {
     this.#calling = "key";
-    const keys = [...new Set(states.map(this.#key))].sort(compareText);
+    const keys = [...new Set(states.map(this.#functions.key))].sort(compareText);
     this.#calling = "equal";
-    const visit = this.#memo.visit(done, keys, states, this.#equal);
+    const visit = this.#memo.visit(done, keys, states, this.#functions.equal);
     if (visit === "full") {
       throw new Stopped("memo");
     }
@@ -275,42 +313,8 @@ export class Search<S> {
     const [position, states] = this.#stack.pop() as [number, S[]];
     this.#states = states;
     this.#done &= ~(1n << BigInt(position));
-    this.#unlift(position);
+    this.#entries.unlift(position);
     this.#atFrontier = false;
-    return this.#next[this.#invocation[position] as number] as number;
-  }
-
-  /** Takes a call's entries out of the scan. */
-  #lift(position: number): void {
-    this.#unlink(this.#invocation[position] as number);
-    const completion = this.#completion[position];
-    if (completion !== undefined) {
-      this.#unlink(completion);
-      this.#open -= 1;
-    }
-  }
-
-  /** Puts a call's entries back, in the reverse order of lift. */
-  #unlift(position: number): void {
-    const completion = this.#completion[position];
-    if (completion !== undefined) {
-      this.#relink(completion);
-      this.#open += 1;
-    }
-    this.#relink(this.#invocation[position] as number);
-  }
-
-  /** Takes one entry out of the list. */
-  #unlink(entry: number): void {
-    const before = this.#prev[entry] as number;
-    const after = this.#next[entry] as number;
-    this.#next[before] = after;
-    this.#prev[after] = before;
-  }
-
-  /** Puts back an entry that unlink took out, between its old neighbours. */
-  #relink(entry: number): void {
-    this.#next[this.#prev[entry] as number] = entry;
-    this.#prev[this.#next[entry] as number] = entry;
+    return this.#entries.afterInvocation(position);
   }
 }

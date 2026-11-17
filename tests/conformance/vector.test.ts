@@ -34,7 +34,13 @@ const FILE_KINDS = [
 ];
 
 /** The kinds of the history vectors. */
-const HISTORY_KINDS = ["linearizable", "seam", "serializable", "snapshot-isolation"];
+const HISTORY_KINDS = [
+  "linearizable",
+  "resume",
+  "seam",
+  "serializable",
+  "snapshot-isolation",
+];
 
 /** The kinds of the machines vectors. */
 const STATEFUL_KINDS = ["machines"];
@@ -82,8 +88,8 @@ describe("vector", () => {
       expect(VECTORS.filter((v) => FILE_KINDS.includes(v.kind))).toHaveLength(57);
     });
 
-    it("returns the 112 history vectors of the definition", () => {
-      expect(VECTORS.filter((v) => HISTORY_KINDS.includes(v.kind))).toHaveLength(112);
+    it("returns the 119 history vectors of the definition", () => {
+      expect(VECTORS.filter((v) => HISTORY_KINDS.includes(v.kind))).toHaveLength(119);
     });
 
     it("returns the 452 property vectors of the definition", () => {

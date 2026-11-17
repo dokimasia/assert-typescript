@@ -18,6 +18,7 @@ describe("index", () => {
       Object.keys(history).sort(compareText),
       [
         "Call",
+        "Checkpoint",
         "History",
         "budget",
         "concurrently",
@@ -26,6 +27,7 @@ describe("index", () => {
         "isLinearizable",
         "isSerializable",
         "memoLimit",
+        "resume",
         "specFrom",
         "timeLimit",
         "workers",

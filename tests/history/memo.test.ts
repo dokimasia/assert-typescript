@@ -78,4 +78,40 @@ describe("memo", () => {
       );
     });
   });
+
+  describe("Memo.grow", () => {
+    it("counts the bits of the calls of a grown partition", ({ seat }) => {
+      const memo = new Memo<number>(0n, 1, 4);
+      const first = memo.visit(0b1n, ["1"], [1], same);
+      memo.grow(0n, 3);
+
+      check.isEqualTo(
+        seat,
+        [first, memo.visit(0b11n, ["1"], [1], same)],
+        ["stored", "full"],
+        "two configurations of three calls take the memo past four bits",
+      );
+    });
+
+    it("leaves out a new call without a completion entry from the name of a configuration", ({
+      seat,
+    }) => {
+      const memo = new Memo<number>(0n, 1, 100);
+      memo.visit(0b01n, ["1"], [1], same);
+      memo.grow(0b10n, 2);
+
+      check.isEqualTo(seat, memo.visit(0b11n, ["1"], [1], same), "covered", "covered");
+    });
+  });
+
+  describe("Memo.stored", () => {
+    it("returns the number of configurations that the memo stores", ({ seat }) => {
+      const memo = new Memo<number>(0n, 2, 100);
+      memo.visit(0b01n, ["1"], [1], same);
+      memo.visit(0b01n, ["1"], [1], same);
+      memo.visit(0b10n, ["1"], [1], same);
+
+      check.isEqualTo(seat, memo.stored, 2, "two configurations");
+    });
+  });
 });

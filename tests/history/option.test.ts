@@ -4,6 +4,7 @@
 /** The spec of the options of a check of linearizability. */
 
 import { describe } from "vitest";
+import { Checkpoint } from "../../src/history/checkpoint.js";
 import {
   BUDGET,
   budget,
@@ -11,15 +12,21 @@ import {
   MEMO_LIMIT,
   memoLimit,
   type Option,
+  resume,
   timeLimit,
   workers,
 } from "../../src/history/option.js";
 import { check } from "../../src/index.js";
 import { test as it } from "../../src/vitest.js";
-import { thrown } from "../helpers.js";
+import { thrown, thrownBy } from "../helpers.js";
 
 /** The settings without an option. */
-const DEFAULTS = { budget: 10_000_000, memoLimit: 2 ** 33, timeLimit: 0 };
+const DEFAULTS = {
+  budget: 10_000_000,
+  memoLimit: 2 ** 33,
+  timeLimit: 0,
+  checkpoint: undefined as Checkpoint<unknown> | undefined,
+};
 
 /** An option: its export, a call that it accepts with the settings it states, and the calls that it refuses. */
 interface Row {
@@ -121,6 +128,30 @@ describe("option", () => {
       }
     });
   }
+
+  describe("resume", () => {
+    it("returns an option that sets the checkpoint alone", ({ seat }) => {
+      const checkpoint = new Checkpoint<unknown>();
+
+      check.isEqualTo(
+        seat,
+        configure([resume(checkpoint)]),
+        { ...DEFAULTS, checkpoint },
+        "the settings",
+      );
+    });
+
+    it("throws a TypeError for a value that is no checkpoint", ({ seat }) => {
+      const give = () => resume("cp" as never);
+
+      check.isEqualTo(
+        seat,
+        [thrownBy(give) instanceof TypeError, thrown(give)],
+        [true, 'history: resume("cp") is no Checkpoint'],
+        "the refusal",
+      );
+    });
+  });
 
   describe("configure", () => {
     it("returns the defaults without an option", ({ seat }) => {

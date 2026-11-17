@@ -150,6 +150,7 @@
     {
       "includes": [
         "src/files/**",
+        "src/history/entries.ts",
         "src/history/memo.ts",
         "src/history/search.ts",
         "src/prop/**",

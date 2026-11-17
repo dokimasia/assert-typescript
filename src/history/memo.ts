@@ -23,9 +23,9 @@ export type Visit = "covered" | "stored" | "full";
 /** The memo of one search. */
 export class Memo<S> {
   /** The set of calls without a completion entry, a bit per position. */
-  readonly #optional: bigint;
+  #optional: bigint;
   /** The number of calls of the partition, the bits of one configuration. */
-  readonly #calls: number;
+  #calls: number;
   /** The most bits that the memo stores. */
   readonly #limit: number;
   /** The stored configurations by their calls with a completion entry and their keys, each with its calls and its states. */
@@ -44,6 +44,25 @@ export class Memo<S> {
     this.#optional = optional;
     this.#calls = calls;
     this.#limit = limit;
+  }
+
+  /** The number of configurations that the memo stores. */
+  get stored(): number {
+    return this.#stored;
+  }
+
+  /**
+   * Grows the memo to the calls of a grown partition. Each configuration then
+   * counts one bit for each of the calls, and the stored configurations keep
+   * their names, because a new call is in none of them.
+   *
+   * @param optional - The set of calls without a completion entry of the
+   *   grown partition, a bit per position.
+   * @param calls - The number of calls of the grown partition.
+   */
+  grow(optional: bigint, calls: number): void {
+    this.#optional = optional;
+    this.#calls = calls;
   }
 
   /**

@@ -68,14 +68,15 @@ describe("vectors", () => {
     it("states a runner of each kind of history vector", () => {
       expect([...RUNNERS.keys()].sort(compareText)).toEqual([
         "linearizable",
+        "resume",
         "seam",
         "serializable",
         "snapshot-isolation",
       ]);
     });
 
-    it("runs the 112 history vectors of the definition", () => {
-      expect(VECTORS.size).toBe(112);
+    it("runs the 119 history vectors of the definition", () => {
+      expect(VECTORS.size).toBe(119);
     });
 
     for (const [id, v] of VECTORS) {

@@ -244,15 +244,21 @@ export class History {
 
 /**
  * Returns the events of a history and the identities of each event's keys,
- * each a copy, for a check of the history.
+ * each a copy, for a check of the history. A check that continues the
+ * searches of a checkpoint reads the events since the last check alone.
  *
  * @param history - The history.
- * @returns The events, and the identities of the keys of each.
+ * @param start - The index of the first event to return.
+ * @returns The events from the index start on, and the identities of the
+ *   keys of each.
  */
-export function recorded(history: History): {
+export function recorded(
+  history: History,
+  start = 0,
+): {
   readonly events: readonly Event[];
   readonly ids: readonly (readonly string[])[];
 } {
   const state = STATES.get(history) as State;
-  return { events: [...state.events], ids: [...state.ids] };
+  return { events: state.events.slice(start), ids: state.ids.slice(start) };
 }

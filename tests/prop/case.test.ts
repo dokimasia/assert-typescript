@@ -567,6 +567,60 @@ describe("case", () => {
     });
   });
 
+  describe("Case.failed", () => {
+    it("returns true after a recorded failure", async ({ seat }) => {
+      const { c } = caseOn();
+      const seen: boolean[] = [];
+      await ending(c, (one) => {
+        seen.push(one.failed);
+        one.record("it broke");
+        seen.push(one.failed);
+      });
+
+      check.isEqualTo(seat, seen, [false, true], "the case fails at the record");
+    });
+
+    it("returns true after a fault that ends a call", async ({ seat }) => {
+      const { c } = caseOn();
+      let seen: boolean | undefined;
+      await ending(c, (one) => {
+        try {
+          one.reportFault(new Error("the seed is no number"), true);
+        } catch {
+          seen = one.failed;
+        }
+      });
+
+      check.isEqualTo(seat, seen, true, "the fault fails the case");
+    });
+
+    it("returns true in a cleanup of a body that throws", async ({ seat }) => {
+      const { c } = caseOn();
+      let seen: boolean | undefined;
+      await ending(c, (one) => {
+        one.cleanup(() => {
+          seen = one.failed;
+        });
+        throw new RangeError("the port is busy");
+      });
+
+      check.isEqualTo(seat, seen, true, "the cleanup reads the end of the body");
+    });
+
+    it("returns false in a cleanup of a case that skips", async ({ seat }) => {
+      const { c } = caseOn();
+      let seen: boolean | undefined;
+      await ending(c, (one) => {
+        one.cleanup(() => {
+          seen = one.failed;
+        });
+        one.skip("the file system refuses direct I/O");
+      });
+
+      check.isEqualTo(seat, seen, false, "a skip does not fail the case");
+    });
+  });
+
   describe("caseOf", () => {
     it("returns the case of an engine case that a body runs on", ({ seat }) => {
       const { c, engine } = caseOn();

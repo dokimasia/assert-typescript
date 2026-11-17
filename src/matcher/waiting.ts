@@ -46,6 +46,11 @@ class Attempt extends Body {
     this.#message ??= message;
   }
 
+  /** Reports whether the attempt received a failure, or a fault that ends its call. */
+  protected received(): boolean {
+    return this.#failed;
+  }
+
   /** Whether the attempt failed, and its first failure's message. */
   get outcome(): { readonly failed: boolean; readonly message: string } {
     return { failed: this.#failed, message: this.#message ?? "" };

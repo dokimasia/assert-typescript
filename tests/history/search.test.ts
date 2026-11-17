@@ -8,7 +8,7 @@
  */
 
 import { describe, onTestFinished, vi } from "vitest";
-import type { Ending, SpecError } from "../../src/history/ending.js";
+import type { Ending, SpecError, Verdict } from "../../src/history/ending.js";
 import { History, recorded } from "../../src/history/history.js";
 import {
   budget,
@@ -562,5 +562,278 @@ describe("search", () => {
         );
       });
     }
+  });
+
+  describe("Search.calls", () => {
+    it("returns the calls of the partition", ({ seat }) => {
+      const { events, ids } = recorded(writeThenRead());
+      const calls = callsOf(events, ids);
+      const search = new Search(
+        calls,
+        REGISTER,
+        configure([]),
+        Number.POSITIVE_INFINITY,
+      );
+
+      check.isEqualTo(seat, search.calls, calls, "both calls");
+    });
+  });
+
+  describe("Search.fits", () => {
+    const tests: {
+      name: string;
+      giveCalls: number;
+      giveOptions: Option[];
+      want: boolean;
+    }[] = [
+      {
+        name: "fits under the limits of the search",
+        giveCalls: 3,
+        giveOptions: [budget(100), memoLimit(64)],
+        want: true,
+      },
+      {
+        name: "does not fit under another budget",
+        giveCalls: 3,
+        giveOptions: [budget(99), memoLimit(64)],
+        want: false,
+      },
+      {
+        name: "does not fit under another memo limit",
+        giveCalls: 3,
+        giveOptions: [budget(100), memoLimit(63)],
+        want: false,
+      },
+      {
+        name: "fits a memo that fills the grown capacity",
+        giveCalls: 32,
+        giveOptions: [budget(100), memoLimit(64)],
+        want: true,
+      },
+      {
+        name: "does not fit a memo past the grown capacity",
+        giveCalls: 33,
+        giveOptions: [budget(100), memoLimit(64)],
+        want: false,
+      },
+    ];
+    for (const tt of tests) {
+      it(tt.name, ({ seat }) => {
+        const { events, ids } = recorded(writeThenRead());
+        const config = configure([budget(100), memoLimit(64)]);
+        const search = new Search(
+          callsOf(events, ids),
+          REGISTER,
+          config,
+          Number.POSITIVE_INFINITY,
+        );
+        search.run();
+
+        check.isEqualTo(
+          seat,
+          search.fits(tt.giveCalls, configure(tt.giveOptions)),
+          tt.want,
+          "whether the search fits",
+        );
+      });
+    }
+  });
+
+  describe("Search.grow", () => {
+    /** Records a write of 1 that returns. */
+    const writeOne = (history: History) => {
+      history.invoke(0, "write", [1], "x").ok(null);
+    };
+
+    /**
+     * Returns how a grown search ends, and how a search of every call ends.
+     * The search runs over the calls that first records, grows by the calls
+     * that more records after them, and runs again.
+     */
+    function grown(
+      first: (history: History) => void,
+      more: (history: History) => void,
+    ): [Ending<unknown>, Ending<unknown>] {
+      const history = new History();
+      first(history);
+      const before = recorded(history);
+      const config = configure([]);
+      const search = new Search(
+        callsOf(before.events, before.ids),
+        REGISTER,
+        config,
+        Number.POSITIVE_INFINITY,
+      );
+      search.run();
+      more(history);
+      const after = recorded(history);
+      const every = callsOf(after.events, after.ids);
+      search.grow(
+        every.filter(({ span }) => span.call >= before.events.length),
+        REGISTER,
+        Number.POSITIVE_INFINITY,
+      );
+      return [
+        search.run(),
+        new Search(every, REGISTER, config, Number.POSITIVE_INFINITY).run(),
+      ];
+    }
+
+    /** Returns an ending without a limit, whose frontier has no calls unless frontier states them. */
+    function ending(
+      outcome: Verdict,
+      steps: number,
+      states: unknown[],
+      frontier: { linearized: number[]; candidates: number[] } = {
+        linearized: [],
+        candidates: [],
+      },
+    ): Ending<unknown> {
+      return { outcome, steps, states, ...frontier, limit: undefined };
+    }
+
+    it("continues the search over the new calls", ({ seat }) => {
+      const want = ending("passed", 4, [2]);
+
+      check.isEqualTo(
+        seat,
+        grown(writeOne, (history) => {
+          history.invoke(1, "read", [], "x").ok(1);
+          history.invoke(0, "write", [2], "x").ok(null);
+          history.invoke(1, "read", [], "x").ok(2);
+        }),
+        [want, want],
+        "the grown search passes as a search of every call",
+      );
+    });
+
+    it("returns the frontier of a violation of a new call", ({ seat }) => {
+      const want = ending("violated", 2, [1], { linearized: [0], candidates: [1] });
+
+      check.isEqualTo(
+        seat,
+        grown(writeOne, (history) => {
+          history.invoke(1, "read", [], "x").ok(2);
+        }),
+        [want, want],
+        "the grown search fails as a search of every call",
+      );
+    });
+
+    it("backtracks into the calls of the kept search", ({ seat }) => {
+      const want = ending("passed", 6, [1]);
+
+      check.isEqualTo(
+        seat,
+        grown(
+          (history) => {
+            const one = history.invoke(0, "write", [1], "x");
+            const two = history.invoke(1, "write", [2], "x");
+            one.ok(null);
+            two.ok(null);
+          },
+          (history) => {
+            history.invoke(0, "read", [], "x").ok(1);
+          },
+        ),
+        [want, want],
+        "the grown search finds the order of a search of every call",
+      );
+    });
+
+    it("takes no step without a new call", ({ seat }) => {
+      const want = ending("passed", 2, [1]);
+
+      check.isEqualTo(
+        seat,
+        grown(
+          (history) => {
+            history.invoke(0, "write", [1], "x").ok(null);
+            history.invoke(1, "read", [], "x").ok(1);
+          },
+          () => undefined,
+        ),
+        [want, want],
+        "the grown search keeps its steps",
+      );
+    });
+
+    it("grows by a call whose outcome is unknown", ({ seat }) => {
+      const want = ending("passed", 3, [2]);
+
+      check.isEqualTo(
+        seat,
+        grown(writeOne, (history) => {
+          history.invoke(1, "write", [2], "x").unknown("timed out");
+          history.invoke(2, "read", [], "x").ok(2);
+        }),
+        [want, want],
+        "the lost write takes effect in both searches",
+      );
+    });
+
+    it("reads the deadline of the check that grows it", ({ seat }) => {
+      const history = new History();
+      writeOne(history);
+      const before = recorded(history);
+      const search = new Search(
+        callsOf(before.events, before.ids),
+        REGISTER,
+        configure([]),
+        Number.POSITIVE_INFINITY,
+      );
+      search.run();
+      history.invoke(1, "read", [], "x").ok(1);
+      const after = recorded(history, before.events.length);
+      search.grow(callsOf(after.events, after.ids), REGISTER, 0);
+
+      check.isEqualTo(
+        seat,
+        search.run(),
+        {
+          ...ending("undecided", 1, [1], { linearized: [0], candidates: [] }),
+          limit: "time",
+        },
+        "the grown search stops at the deadline of its check",
+      );
+    });
+
+    it("steps through the spec of the check that grows it", ({ seat }) => {
+      const history = new History();
+      writeOne(history);
+      const before = recorded(history);
+      const search = new Search(
+        callsOf(before.events, before.ids),
+        REGISTER,
+        configure([]),
+        Number.POSITIVE_INFINITY,
+      );
+      search.run();
+      history.invoke(1, "read", [], "x").ok(1);
+      const after = recorded(history, before.events.length);
+      search.grow(
+        callsOf(after.events, after.ids),
+        {
+          ...REGISTER,
+          next: () => {
+            throw new Error("boom");
+          },
+        },
+        Number.POSITIVE_INFINITY,
+      );
+      let err: SpecError | undefined;
+      try {
+        search.run();
+      } catch (thrownError) {
+        err = thrownError as SpecError;
+      }
+
+      check.isEqualTo(
+        seat,
+        [err?.fn, err?.call],
+        ["next", 2],
+        "the next of the second spec throws at the read",
+      );
+    });
   });
 });

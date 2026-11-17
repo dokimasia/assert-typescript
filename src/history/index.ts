@@ -56,13 +56,21 @@ registerSentence(sentence, LINEARIZABLE);
 registerSentence(isolationSentence, SERIALIZABLE, SNAPSHOT_ISOLATION);
 
 export type { Edge, Evidence, Link, Observation } from "./anomaly.js";
+export { Checkpoint } from "./checkpoint.js";
 export { concurrently, type Outcome } from "./concurrently.js";
 export type { Completion, Event, Invocation, Kind } from "./event.js";
 export { Call, History } from "./history.js";
 export { fromIntervals, type Interval } from "./interval.js";
 export { hasSnapshotIsolation, isSerializable } from "./isolation.js";
 export { isLinearizable } from "./linearizable.js";
-export { budget, memoLimit, type Option, timeLimit, workers } from "./option.js";
+export {
+  budget,
+  memoLimit,
+  type Option,
+  resume,
+  timeLimit,
+  workers,
+} from "./option.js";
 export type { Span } from "./partition.js";
 export { type Operation, type Spec, specFrom } from "./spec.js";
 export type { Transaction } from "./transaction.js";

@@ -319,5 +319,22 @@ describe("history", () => {
         "a key of the invocation and none of the completion",
       );
     });
+
+    it("returns the events from an index on", ({ seat }) => {
+      const history = new History();
+      history.invoke(0, "write", [1], "x").ok(null);
+      history.invoke(0, "read", [], "y").ok(1);
+      const { events, ids } = recorded(history, 2);
+
+      check.isEqualTo(
+        seat,
+        [events.map((event) => event.index), ids],
+        [
+          [2, 3],
+          [['{"type":"string","value":"y"}'], []],
+        ],
+        "the events and the identities from the index 2",
+      );
+    });
   });
 });

@@ -127,6 +127,25 @@ function docker(seat: Seat): Docker | undefined {
 }
 ```
 
+`failed(seat)` returns whether the test of a helper's seat has failed. It
+reads the member `failed` of the seat. In a cleanup, the member also counts
+an error that ended the test, so a helper can keep the data of a failed
+test for you to read. A `Standard` has no member `failed`, so the helper
+ends the call with a fault there:
+
+```ts
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { cleanup, failed, type Seat } from "@dokimi/assert";
+
+async function scratch(seat: Seat): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "store-"));
+  cleanup(seat, () => (failed(seat) ? undefined : rm(dir, { recursive: true })));
+  return dir;
+}
+```
+
 `writeRecord(seat, kind, record)` writes a record of another tool of
 dokimasia into the task meta of the test, under the key `kind`. vitest's
 JSON reporter writes the meta of each test. The kind matches
@@ -584,6 +603,7 @@ history.budget(steps: number): Option
 history.memoLimit(bits: number): Option
 history.timeLimit(ms: number): Option
 history.workers(n: number): Option
+history.resume<S>(checkpoint: Checkpoint<S>): Option
 ```
 
 **Machines** — the steps of a case over a subject, and the task scheduler that releases its tasks in an order that the case decides.
@@ -921,6 +941,22 @@ blind writes do not reveal an order between them. Both levels forbid a lost
 update, in which two committed transactions read the same list or value of
 a key first and then both append or write to it.
 
+`history.resume(checkpoint)` continues the searches that a
+`history.Checkpoint` keeps from the last check of the same history that
+passed with it. With the option, a test that checks a growing history after
+each step steps each call once. Each check still reports what a check of
+every call reports. After a check that does not pass, the checkpoint keeps no
+search:
+
+```ts
+const checkpoint = new history.Checkpoint<unknown>();
+for (let value = 0; value < 100; value += 1) {
+  calls.invoke(0, "write", [value], "x").ok(null);
+  history.isLinearizable(seat, calls, REGISTER, "the register is linearizable",
+    history.resume(checkpoint));
+}
+```
+
 ## Machines
 
 A machine lists the actions of a subject and states its sequential
@@ -1018,10 +1054,13 @@ try {
   check.isEqualTo(seat, got, want, "the reply matches");
   soft.hasPrefix(seat, got.id, "req_", "the id carries its prefix");
 } finally {
+  await seat.runCleanups();
   seat.flush();
 }
 ```
 
+`runCleanups` runs the functions that the test registered through
+`cleanup`. Its `failed` counts the failures that the seat received.
 `flush` throws what `soft` collected, and reports any async assertion
 nobody awaited. Only `@dokimi/assert/vitest` imports vitest, and only
 `@dokimi/assert/jest` imports jest. The main entry point imports neither.
@@ -1036,7 +1075,7 @@ definition and holds itself to it:
 - 195 corpus cases state what each assertion must report, run against
   both surfaces and the matchers of `expect`, with the call record of
   each call. They are the same cases every other implementation runs.
-- 452 property vectors, 112 history vectors, 36 machine vectors and 57
+- 452 property vectors, 119 history vectors, 36 machine vectors and 57
   file vectors pin the property engine, the history checks, machines and
   the assertions of files.
 - A completeness gate checks that every assertion is present under the

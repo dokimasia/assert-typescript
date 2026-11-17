@@ -12,7 +12,7 @@
  */
 
 import { detail as literalOf } from "../record/literal.js";
-import type { Event } from "./event.js";
+import type { Completion, Event } from "./event.js";
 import { CallOperation, type Operation } from "./spec.js";
 
 /** Returns the representative of the partition of the call at position, halving the path to it. */
@@ -69,6 +69,57 @@ export interface Partition {
 }
 
 /**
+ * Returns the calls that events invoke, and the completions of earlier
+ * calls. events are the events of a history from the index start on. The
+ * calls are in event order, without the calls that failed, and a call is
+ * known when it completed as ok. The completions complete the calls invoked
+ * before start, in event order.
+ *
+ * @param events - The events of a history from the index start on.
+ * @param ids - The identities of the keys of each event.
+ * @param start - The index of the first event.
+ * @returns The calls, and the completions of the calls invoked before start.
+ */
+export function callsFrom(
+  events: readonly Event[],
+  ids: readonly (readonly string[])[],
+  start: number,
+): { readonly calls: Checked[]; readonly earlier: Completion[] } {
+  const completions = new Map<number, Completion>();
+  const earlier: Completion[] = [];
+  for (const event of events.filter((e): e is Completion => e.kind !== "invoke")) {
+    if (event.call < start) {
+      earlier.push(event);
+    } else {
+      completions.set(event.call, event);
+    }
+  }
+  const calls: Checked[] = [];
+  events.forEach((event, i) => {
+    const completion = completions.get(event.index);
+    if (event.kind === "invoke" && completion?.kind !== "fail") {
+      const known = completion?.kind === "ok";
+      calls.push({
+        span: {
+          call: event.index,
+          completion: completion?.index,
+          process: event.process,
+          operation: new CallOperation(
+            event.operation,
+            event.args,
+            known,
+            known ? completion.output : undefined,
+          ),
+        },
+        keys: event.keys,
+        ids: ids[i] as readonly string[],
+      });
+    }
+  });
+  return { calls, earlier };
+}
+
+/**
  * Returns the calls of a history in event order, without the calls that
  * failed. A call is known when it completed as ok.
  *
@@ -80,31 +131,7 @@ export function callsOf(
   events: readonly Event[],
   ids: readonly (readonly string[])[],
 ): Checked[] {
-  const completions = new Map<number, Event>();
-  for (const event of events) {
-    if (event.kind !== "invoke") {
-      completions.set(event.call, event);
-    }
-  }
-  const calls: Checked[] = [];
-  for (const event of events) {
-    const completion = completions.get(event.index);
-    if (event.kind === "invoke" && completion?.kind !== "fail") {
-      const known = completion?.kind === "ok";
-      const output = known ? (completion as { output: unknown }).output : undefined;
-      calls.push({
-        span: {
-          call: event.index,
-          completion: completion?.index,
-          process: event.process,
-          operation: new CallOperation(event.operation, event.args, known, output),
-        },
-        keys: event.keys,
-        ids: ids[event.index] as readonly string[],
-      });
-    }
-  }
-  return calls;
+  return callsFrom(events, ids, 0).calls;
 }
 
 /**

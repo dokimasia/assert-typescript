@@ -11,6 +11,7 @@ import { describe } from "vitest";
 import { History, recorded } from "../../src/history/history.js";
 import {
   type Checked,
+  callsFrom,
   callsOf,
   concurrency,
   partitionsOf,
@@ -71,6 +72,40 @@ describe("partition", () => {
           ['{"type":"string","value":"x"}', '{"type":"string","value":"y"}'],
         ],
         "two keys",
+      );
+    });
+  });
+
+  describe("callsFrom", () => {
+    it("returns the new calls and the completions of earlier calls", ({ seat }) => {
+      const history = new History();
+      const pending = history.invoke(0, "write", [1], "x");
+      history.invoke(1, "read", [], "y").ok(null);
+      pending.ok(null);
+      const { events, ids } = recorded(history, 1);
+      const { calls: added, earlier } = callsFrom(events, ids, 1);
+
+      check.isEqualTo(
+        seat,
+        [
+          added.map(({ span, keys }) => [span.call, span.completion, keys]),
+          earlier.map((event) => [event.call, event.kind]),
+        ],
+        [[[1, 2, ["y"]]], [[0, "ok"]]],
+        "the read is new, and the write completes",
+      );
+    });
+
+    it("leaves out a new call that failed", ({ seat }) => {
+      const history = new History();
+      history.invoke(0, "write", [1], "x").fail("refused");
+      const { events, ids } = recorded(history);
+
+      check.isEqualTo(
+        seat,
+        callsFrom(events, ids, 0),
+        { calls: [], earlier: [] },
+        "no call",
       );
     });
   });

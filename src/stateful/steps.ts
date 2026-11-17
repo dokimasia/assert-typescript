@@ -6,6 +6,7 @@
  */
 
 import { callSite, Failure } from "../failure.js";
+import { Checkpoint } from "../history/checkpoint.js";
 import { fieldsOf, LINEARIZABLE, whole } from "../history/linearizable.js";
 import { type Case, onEngine } from "../prop/case.js";
 import type { Place, Step } from "../prop/engine/case/record.js";
@@ -40,6 +41,8 @@ class Run<S> {
   readonly #trace: Tracing | undefined;
   /** The states that the last check left, and one undefined state before a check and for a machine without a spec. */
   #states: readonly S[] = [undefined as S];
+  /** The searches of the last check, which the next check continues. */
+  readonly #checkpoint = new Checkpoint<S>();
 
   constructor(c: Case, machine: Machine<S>, config: Config) {
     this.#c = c;
@@ -247,16 +250,17 @@ class Run<S> {
 
   /**
    * Checks the case's history with the machine's spec, with every call in
-   * one partition, and keeps the states that the order it found leaves. A
-   * check that fails ends the case with its record. A machine without a spec
-   * checks nothing.
+   * one partition, and keeps the states that the order it found leaves. Each
+   * check continues the search of the check before it through the checkpoint
+   * of the run. A check that fails ends the case with its record. A machine
+   * without a spec checks nothing.
    */
   #check(): void {
     const { spec } = this.#machine;
     if (spec === undefined) {
       return;
     }
-    const { detail, states } = whole(this.#c.history(), spec);
+    const { detail, states } = whole(this.#c.history(), spec, this.#checkpoint);
     if (detail.outcome !== "passed") {
       this.#c.report(
         new Failure(LINEARIZABLE, CONTRACT, fieldsOf(detail), callSite()),

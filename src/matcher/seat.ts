@@ -69,11 +69,21 @@ export interface Seat {
    * Registers fn to run when the test, the case or the body of the seat
    * ends. The seat runs the last registered first, and awaits a function
    * that returns a promise before the next one runs. The fixture of
-   * `@dokimi/assert/vitest` runs them when the test ends, a Recorder at
-   * runCleanups, and the seat that doesReject or eventually hands a body
-   * when the body ends.
+   * `@dokimi/assert/vitest` runs them when the test ends, a Recorder and a
+   * Collector that a test builds at runCleanups, and the seat that doesReject
+   * or eventually hands a body when the body ends.
    */
   cleanup?: (fn: () => void | Promise<void>) => void;
+
+  /**
+   * True once the test, the case or the body of the seat has failed: once
+   * the seat received a failure, or a fault that ends its call. A noted fault
+   * does not fail it. In a cleanup, it is also true when the test, the case or
+   * the body threw or rejected. The fixture of `@dokimi/assert/vitest`, a
+   * Collector, a Recorder, a case of a property, and the seat that doesReject
+   * or eventually hands a body have the member.
+   */
+  readonly failed?: boolean;
 
   /** Aborts when the test that runs on this seat ends, where the seat states one. */
   readonly signal?: AbortSignal | undefined;

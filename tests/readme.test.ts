@@ -34,7 +34,13 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const README = readFileSync(join(ROOT, "README.md"), "utf8");
 
 /** The kinds of the history vectors. */
-const HISTORY = new Set(["linearizable", "seam", "serializable", "snapshot-isolation"]);
+const HISTORY = new Set([
+  "linearizable",
+  "resume",
+  "seam",
+  "serializable",
+  "snapshot-isolation",
+]);
 
 /** The kinds of the vectors of the assertions of files. */
 const FILES = new Set([
@@ -274,6 +280,39 @@ describe("README", () => {
         section("## Histories"),
         `AssertionFailed: ${recorder.message}\n`,
         "the sentence",
+      );
+    });
+
+    it("passes the checks of a growing history that resume continues", ({ seat }) => {
+      const register: history.Spec<unknown> = {
+        initial: () => null,
+        next: (state, op) => {
+          if (op.name === "write") {
+            return [op.args[0]];
+          }
+          return op.returned(state) ? [state] : [];
+        },
+      };
+      const calls = new history.History();
+      const recorder = new Recorder();
+      const checkpoint = new history.Checkpoint<unknown>();
+      for (let value = 0; value < 100; value += 1) {
+        calls.invoke(0, "write", [value], "x").ok(null);
+        history.isLinearizable(
+          recorder,
+          calls,
+          register,
+          "the register is linearizable",
+          history.resume(checkpoint),
+        );
+      }
+
+      check.isFalse(seat, recorder.failed, "every check passes");
+      check.doesContain(
+        seat,
+        section("## Histories"),
+        "history.resume(checkpoint));",
+        "the README shows the option",
       );
     });
   });

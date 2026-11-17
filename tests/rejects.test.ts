@@ -447,6 +447,36 @@ describe("rejects", () => {
       check.isEqualTo(seat, order, ["cleaned", "settled"], "the cleanup runs first");
     });
 
+    it("hands the check a seat that has failed after a failure of the check", async ({
+      seat,
+    }) => {
+      const seen: (boolean | undefined)[] = [];
+      await check.doesReject(new Recorder(), "the check fails", (inner) => {
+        inner.cleanup?.(() => {
+          seen.push(inner.failed);
+        });
+        seen.push(inner.failed);
+        soft.isTrue(inner, false, "it fails");
+        seen.push(inner.failed);
+      });
+
+      check.isEqualTo(seat, seen, [false, true, true], "the check fails at its record");
+    });
+
+    it("hands the check a seat that has failed after a fault that ends the check", async ({
+      seat,
+    }) => {
+      const seen: (boolean | undefined)[] = [];
+      await check.doesReject(new Recorder(), "the check faults", (inner) => {
+        inner.cleanup?.(() => {
+          seen.push(inner.failed);
+        });
+        fault(inner, new RangeError("the seed is no number"));
+      });
+
+      check.isEqualTo(seat, seen, [true], "the cleanup reads the fault");
+    });
+
     it("returns the record of a failure in a cleanup of the check", async ({
       seat,
     }) => {

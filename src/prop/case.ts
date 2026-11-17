@@ -315,6 +315,21 @@ export class Case implements Seat, Reporter {
   }
 
   /**
+   * True once the case has failed: once it kept a failure record, and once a
+   * fault ended a call of the body. In a cleanup of the case, it is also true
+   * when the body threw or rejected. A skip, a rejection and a noted fault do
+   * not fail the case.
+   */
+  get failed(): boolean {
+    const state = stateOf(this);
+    return (
+      state.records.length > 0 ||
+      state.stopped instanceof Faulted ||
+      state.raised !== undefined
+    );
+  }
+
+  /**
    * Returns the case's history, which records the calls that the body makes
    * to a subject, for a check of history or a machine of stateful. It is
    * empty when the case starts, and every call returns the same history.

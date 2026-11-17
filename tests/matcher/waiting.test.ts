@@ -69,6 +69,27 @@ describe("waiting", () => {
       expect(order).toEqual(["attempt 1", "cleanup 1", "attempt 2", "cleanup 2"]);
     });
 
+    it("hands an attempt a seat that has failed after a failure of the attempt", async () => {
+      const seen: (boolean | undefined)[] = [];
+      let attempts = 0;
+      await waiting.eventually(
+        controlled(),
+        Mode.Fatal,
+        1000,
+        5,
+        (trial: Seat) => {
+          attempts += 1;
+          trial.cleanup?.(() => {
+            seen.push(trial.failed);
+          });
+          soft.isTrue(trial, attempts >= 2, "it settled");
+        },
+        "it converges",
+      );
+
+      expect(seen).toEqual([true, false]);
+    });
+
     it("tries again after a failure in a cleanup of an attempt", async () => {
       let attempts = 0;
       const seat = controlled();

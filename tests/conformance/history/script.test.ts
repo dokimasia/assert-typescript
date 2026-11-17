@@ -8,7 +8,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { intervals, record } from "../../../src/conformance/history/script.js";
+import {
+  intervals,
+  Recording,
+  record,
+} from "../../../src/conformance/history/script.js";
 import { Fault } from "../../../src/matcher/fault.js";
 
 /** The typed literal of the int 1. */
@@ -73,6 +77,51 @@ describe("script", () => {
         "script[0].args[0]",
         "the value is no typed literal",
       ]);
+    });
+  });
+
+  describe("new Recording", () => {
+    it("records no entry", () => {
+      const recording = new Recording([INVOKE], "history");
+
+      expect([recording.history.events().length, recording.entries]).toEqual([
+        0,
+        [INVOKE],
+      ]);
+    });
+
+    it("refuses a script that is no list", () => {
+      expect(faultOf(() => new Recording({}, "history"))).toEqual([
+        "history",
+        "the script is no list",
+      ]);
+    });
+  });
+
+  describe("Recording.through", () => {
+    it("records the entries up to an index", () => {
+      const recording = new Recording([INVOKE, { ok: 1, output: ONE }], "history");
+
+      expect([recording.through(1), recording.history.events().length]).toEqual([
+        undefined,
+        1,
+      ]);
+    });
+
+    it("continues after the entries that it recorded before", () => {
+      const recording = new Recording([INVOKE, { ok: 1, output: ONE }], "history");
+      recording.through(1);
+
+      expect([
+        recording.through(2),
+        recording.history.events().map((e) => e.kind),
+      ]).toEqual([undefined, ["invoke", "ok"]]);
+    });
+
+    it("returns the entry whose call of the seam throws", () => {
+      const recording = new Recording([INVOKE, INVOKE], "history");
+
+      expect([recording.through(2), recording.history.events().length]).toEqual([1, 1]);
     });
   });
 

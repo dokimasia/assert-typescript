@@ -143,7 +143,8 @@ rules.
   `src/conformance/vector.ts`, `src/conformance/files.ts` with its
   modules in `src/conformance/files/`, `src/conformance/prop/vectors.ts`,
   `src/conformance/history/vectors.ts` with
-  `src/conformance/history/script.ts`, and
+  `src/conformance/history/check.ts`, `src/conformance/history/resume.ts`
+  and `src/conformance/history/script.ts`, and
   `src/conformance/stateful/vectors.ts` use vitest's `expect` alone.
   So do the specs of the matchers in `src/expect/`, of the adapters in
   `src/vitest/api.ts` and `src/jest/api.ts`, and of their entry points

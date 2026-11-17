@@ -27,6 +27,10 @@ class Probe extends Body {
   record(message: string): void {
     this.messages.push(message);
   }
+
+  protected received(): boolean {
+    return this.messages.length > 0;
+  }
 }
 
 describe("body", () => {
@@ -76,12 +80,36 @@ describe("body", () => {
     });
   });
 
+  describe("Body.failed", () => {
+    it("returns false before a failure", () => {
+      expect(new Probe(new Recorder(), undefined).failed).toBe(false);
+    });
+
+    it("returns true after a failure that the seat received", () => {
+      const probe = new Probe(new Recorder(), undefined);
+      probe.record("the stated contract");
+
+      expect(probe.failed).toBe(true);
+    });
+  });
+
   describe("Body.end", () => {
     it("aborts the signal with an AbortError", async () => {
       const probe = new Probe(new Recorder(), undefined);
       await probe.end();
 
       expect((probe.signal.reason as Error).name).toBe("AbortError");
+    });
+
+    it("fails the seat of a body that raised before the cleanups run", async () => {
+      const probe = new Probe(new Recorder(), undefined);
+      let failed: boolean | undefined;
+      probe.cleanup(() => {
+        ({ failed } = probe);
+      });
+      await probe.end(true);
+
+      expect([failed, probe.messages]).toEqual([true, []]);
     });
 
     it("runs the cleanups after the signal aborts, the last registered first", async () => {
@@ -241,6 +269,30 @@ describe("body", () => {
       }).catch(() => undefined);
 
       expect(probe.signal.aborted).toBe(true);
+    });
+
+    it("fails the seat before the cleanups when the body throws", async () => {
+      const probe = new Probe(new Recorder(), undefined);
+      let failed: boolean | undefined;
+      await runOn(probe, (seat) => {
+        seat.cleanup?.(() => {
+          ({ failed } = seat);
+        });
+        throw new RangeError("the body broke");
+      }).catch(() => undefined);
+
+      expect(failed).toBe(true);
+    });
+
+    it("leaves the seat without a failure when the body returns", async () => {
+      let failed: boolean | undefined;
+      await runOn(new Probe(new Recorder(), undefined), (seat) => {
+        seat.cleanup?.(() => {
+          ({ failed } = seat);
+        });
+      });
+
+      expect(failed).toBe(false);
     });
 
     it("runs the cleanups before it returns the seat", async () => {

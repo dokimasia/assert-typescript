@@ -116,6 +116,7 @@ const CLASSES: Record<string, { prototype: object }> = {
   ...SEATS,
   call: history.Call,
   case: prop.Case,
+  checkpoint: history.Checkpoint,
   entry: files.Entry,
   failure: index.Failure,
   generator: prop.Generator,
@@ -169,6 +170,10 @@ const DECLARED: Record<string, { file: string; text: string }> = {
   "seat.cleanup": {
     file: "matcher/seat.d.ts",
     text: "cleanup?: (fn: () => void | Promise<void>) => void",
+  },
+  "seat.failed": {
+    file: "matcher/seat.d.ts",
+    text: "readonly failed?: boolean",
   },
   "assertion-call": { file: "matcher/seat.d.ts", text: "export interface Call {" },
   "assertion-call.assertion": {
@@ -392,6 +397,7 @@ describe("index", () => {
         "equateBy",
         "equateEmpty",
         "equateNans",
+        "failed",
         "fault",
         "files",
         "golden",

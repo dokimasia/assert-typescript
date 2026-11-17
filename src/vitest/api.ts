@@ -18,7 +18,10 @@
  * once the body is done, which fails the test with every failure that the
  * body recorded. Before the flush, the fixture runs the functions that the
  * test registered through the seat's `cleanup`, such as the removal of a
- * workspace, also after a test that failed.
+ * workspace, also after a test that failed. vitest marks a test that threw
+ * or rejected failed before it cleans up the fixture, so the fixture fails
+ * the seat of such a test before the functions run, and a function reads
+ * the end of the test through `failed`.
  *
  * The collector's signal is the test's own, which vitest aborts when the
  * test times out and when the run is cancelled. With
@@ -271,7 +274,7 @@ export const test = base.extend<SeatFixture>({
       });
     }
     await use(collector);
-    await cleanUp(collector);
+    await cleanUp(collector, task.result?.state === "fail");
     collector.flush();
   },
 });

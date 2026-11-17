@@ -218,7 +218,8 @@
     "budget",
     "memoLimit",
     "timeLimit",
-    "workers"
+    "workers",
+    "resume"
   ],
   "stateful": [
     "steps",

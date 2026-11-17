@@ -559,6 +559,23 @@ describe("steps", () => {
       );
     });
 
+    it("continues the search of the check before each check", async ({ seat }) => {
+      const stepped: number[] = [];
+      await replayed(
+        {
+          spec: counting((state) => {
+            stepped.push(state);
+            return [state + 1];
+          }),
+          actions: [new Log().action("a")],
+        },
+        [1, 0, 1, 0, 1, 0, 1, 0, 0],
+        swarm(false),
+      );
+
+      check.isEqualTo(seat, stepped, [0, 1, 2, 3], "each call steps once");
+    });
+
     it("runs the invariant after setup, after each step and after settle", async ({
       seat,
     }) => {

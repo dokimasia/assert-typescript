@@ -439,6 +439,34 @@ describe("seat", () => {
     });
   });
 
+  describe("Collector.failed", () => {
+    it("returns false before a failure", () => {
+      expect(new Collector().failed).toBe(false);
+    });
+
+    it("returns true after a message to fail that the test catches", () => {
+      const seat = new Collector();
+      expect(() => seat.fail("the stated contract")).toThrow(AssertionFailed);
+
+      expect(seat.failed).toBe(true);
+    });
+
+    it("returns true after a message to record", () => {
+      const seat = new Collector();
+      seat.record("the stated contract");
+
+      expect(seat.failed).toBe(true);
+    });
+
+    it("returns true after a flush of the failures", () => {
+      const seat = new Collector();
+      seat.record("the stated contract");
+      expect(() => seat.flush()).toThrow(AssertionFailed);
+
+      expect(seat.failed).toBe(true);
+    });
+  });
+
   describe("Collector.collected", () => {
     it("returns the messages in call order", () => {
       const seat = new Collector();
@@ -558,7 +586,57 @@ describe("seat", () => {
     });
   });
 
+  describe("Collector.runCleanups", () => {
+    it("runs the functions of the collector, the last registered first", async () => {
+      const seat = new Collector();
+      const order: number[] = [];
+      seat.cleanup(() => {
+        order.push(1);
+      });
+      seat.cleanup(() => {
+        order.push(2);
+      });
+      await seat.runCleanups();
+
+      expect(order).toEqual([2, 1]);
+    });
+
+    it("runs each function once", async () => {
+      const seat = new Collector();
+      let runs = 0;
+      seat.cleanup(() => {
+        runs += 1;
+      });
+      await seat.runCleanups();
+      await seat.runCleanups();
+
+      expect(runs).toBe(1);
+    });
+
+    it("leaves failed false for a collector without a failure", async () => {
+      const seat = new Collector();
+      let failed: boolean | undefined;
+      seat.cleanup(() => {
+        ({ failed } = seat);
+      });
+      await seat.runCleanups();
+
+      expect(failed).toBe(false);
+    });
+  });
+
   describe("cleanUp", () => {
+    it("fails the collector of a test that failed before the first function runs", async () => {
+      const seat = new Collector();
+      let failed: boolean | undefined;
+      seat.cleanup(() => {
+        ({ failed } = seat);
+      });
+      await cleanUp(seat, true);
+
+      expect([failed, seat.collected]).toEqual([true, []]);
+    });
+
     it("runs the functions of the collector, the last registered first", async () => {
       const seat = new Collector();
       const order: number[] = [];

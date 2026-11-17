@@ -48,6 +48,9 @@ function reportDropped(seat: Seat): void {
 /** The functions that each collector runs when its test ends. */
 const CLEANUPS = new WeakMap<Collector, CleanupList>();
 
+/** The collectors whose test has failed, through a failure or an error that ended the test. */
+const FAILED = new WeakSet<Collector>();
+
 /**
  * Returns a pass of a cleanup list that awaits each function. An error that
  * a function throws or rejects with is a failure of seat: `a cleanup
@@ -342,11 +345,13 @@ export class Collector implements Seat, Cleanups {
   }
 
   /**
-   * Throws, which stops the test here.
+   * Throws, which stops the test here. The collector fails, also when the
+   * test catches the error.
    *
    * @param message What was supposed to be true.
    */
   fail(message: string): never {
+    FAILED.add(this);
     throw new AssertionFailed(message);
   }
 
@@ -356,7 +361,19 @@ export class Collector implements Seat, Cleanups {
    * @param message What was supposed to be true.
    */
   record(message: string): void {
+    FAILED.add(this);
     this.#collected.push(message);
+  }
+
+  /**
+   * True once the test of the collector has failed: once the collector
+   * received a failure through either surface. It stays true after flush. In
+   * a cleanup that the fixture of `@dokimi/assert/vitest` runs, it is also
+   * true when the test threw or rejected. A fault throws in its call, so it
+   * fails the test when the test ends with it.
+   */
+  get failed(): boolean {
+    return FAILED.has(this);
   }
 
   /** Every failure kept so far, in call order. */
@@ -386,7 +403,8 @@ export class Collector implements Seat, Cleanups {
    * fixture of `@dokimi/assert/vitest` runs the functions after the test
    * body, in the reverse order of their registration, and awaits a function
    * that returns a promise. It reports each function that throws or rejects
-   * as a failure of the test.
+   * as a failure of the test. A test that builds its collector runs them
+   * with runCleanups.
    *
    * @param fn - The function, such as the removal of a directory that the
    *   test created.
@@ -395,6 +413,21 @@ export class Collector implements Seat, Cleanups {
     const registered = CLEANUPS.get(this) ?? new CleanupList();
     registered.add(fn);
     CLEANUPS.set(this, registered);
+  }
+
+  /**
+   * Runs the functions that cleanup registered, the last registered first,
+   * and forgets them. It awaits a function that returns a promise before the
+   * next one runs, and a function that a function registers runs in the same
+   * pass. A function that throws or rejects does not stop the ones after it:
+   * the collector records its error as a failure, which the next flush
+   * reports. A jest test, which the jest adapter supplies no seat, calls it
+   * where the test ends, before flush.
+   *
+   * @returns A promise that settles once every function has run.
+   */
+  async runCleanups(): Promise<void> {
+    await CLEANUPS.get(this)?.run(releasing(this));
   }
 
   /**
@@ -426,16 +459,18 @@ export class Collector implements Seat, Cleanups {
 }
 
 /**
- * Runs the functions that collector registered through `cleanup`, the
- * last registered first, and forgets them. It awaits a function that
- * returns a promise before the next one runs, and a function that a
- * function registers runs in the same pass. A function that throws or
- * rejects does not stop the ones after it: the collector records its error
- * as a failure, which the next flush reports.
+ * Runs the functions that collector registered through `cleanup`, as
+ * runCleanups runs them. A test that threw or rejected fails the collector
+ * before the first function runs, so a function reads the end of the test
+ * through failed.
  *
  * @param collector - The seat of the test that ended.
+ * @param raised - True when the test threw or rejected.
  * @returns A promise that settles once every function has run.
  */
-export async function cleanUp(collector: Collector): Promise<void> {
-  await CLEANUPS.get(collector)?.run(releasing(collector));
+export async function cleanUp(collector: Collector, raised = false): Promise<void> {
+  if (raised) {
+    FAILED.add(collector);
+  }
+  await collector.runCleanups();
 }

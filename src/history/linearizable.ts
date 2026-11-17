@@ -12,9 +12,10 @@ import { Fault, ofOperation } from "../matcher/fault.js";
 import { Mode, type Seat } from "../matcher/seat.js";
 import { Running } from "../matcher/verdict.js";
 import { detail as literalOf } from "../record/literal.js";
+import { type Checkpoint, forget, resumed } from "./checkpoint.js";
 import type { Ending, Limit, SpecError, Verdict } from "./ending.js";
 import { History, recorded } from "./history.js";
-import { configure, type Option } from "./option.js";
+import { type Config, configure, type Option } from "./option.js";
 import {
   type Checked,
   callsOf,
@@ -69,6 +70,35 @@ function passed<S>(partitions: number, steps: number): Detail<S> {
   };
 }
 
+/**
+ * Returns the partitions of a check and their searches. A check with a
+ * checkpoint continues the searches that the checkpoint keeps, and every
+ * other check searches each partition from its first call. A check of one
+ * partition has one partition of every call.
+ */
+function searched<S>(
+  history: History,
+  spec: Spec<S>,
+  config: Config,
+  deadline: number,
+  onePartition: boolean,
+): [Partition, Search<S>][] {
+  if (config.checkpoint !== undefined) {
+    return resumed<S>(config.checkpoint, history, spec, config, deadline, onePartition);
+  }
+  const { events, ids } = recorded(history);
+  const calls = callsOf(events, ids);
+  const partitions = onePartition ? [{ keys: [], calls }] : partitionsOf(calls);
+  return partitions.map((p) => [p, new Search(p.calls, spec, config, deadline)]);
+}
+
+/** Leaves checkpoint without a search after a check that did not pass. */
+function kept(checkpoint: Checkpoint<unknown> | undefined, outcome: Verdict): void {
+  if (checkpoint !== undefined && outcome !== "passed") {
+    forget(checkpoint);
+  }
+}
+
 /** The assertion of the record. */
 export const LINEARIZABLE = "linearizable";
 
@@ -103,10 +133,12 @@ export interface Detail<S> {
 /**
  * Returns the detail of the check of history against spec under options:
  * the first violated partition, else the first undecided one, else a pass.
+ * A check with a checkpoint continues the searches that the checkpoint
+ * keeps, and keeps its own searches there when it passes.
  *
  * @param history - The history.
  * @param spec - The spec.
- * @param options - The limits of the check.
+ * @param options - The limits, the workers and the checkpoint of the check.
  * @returns The detail.
  * @throws SpecError when a function of the spec throws.
  */
@@ -120,22 +152,27 @@ export function check<S>(
     config.timeLimit > 0
       ? performance.now() + config.timeLimit
       : Number.POSITIVE_INFINITY;
-  const { events, ids } = recorded(history);
-  const partitions = partitionsOf(callsOf(events, ids));
-  let steps = 0;
-  let undecided: Detail<S> | undefined;
-  for (const p of partitions) {
-    const ending = new Search(p.calls, spec, config, deadline).run();
-    steps += ending.steps;
-    if (ending.outcome !== "passed") {
-      const detail = reported(p, ending, partitions.length, steps);
-      if (ending.outcome === "violated") {
-        return detail;
+  const searches = searched(history, spec, config, deadline, false);
+  let outcome: Verdict = "violated";
+  try {
+    let steps = 0;
+    let undecided: Detail<S> | undefined;
+    for (const [p, search] of searches) {
+      const ending = search.run();
+      steps += ending.steps;
+      if (ending.outcome !== "passed") {
+        const detail = reported(p, ending, searches.length, steps);
+        if (ending.outcome === "violated") {
+          return detail;
+        }
+        undecided ??= detail;
       }
-      undecided ??= detail;
     }
+    outcome = undecided === undefined ? "passed" : "undecided";
+    return undecided ?? passed(searches.length, steps);
+  } finally {
+    kept(config.checkpoint, outcome);
   }
-  return undecided ?? passed(partitions.length, steps);
 }
 
 /**
@@ -143,10 +180,12 @@ export function check<S>(
  * partition, whatever keys the calls state, with the default limits. A
  * machine of stateful checks the history of its steps this way, because its
  * spec states one state of the whole subject. A history without calls passes
- * in no partition.
+ * in no partition. A check with a checkpoint continues the search that the
+ * checkpoint keeps, and keeps its own search there when it passes.
  *
  * @param history - The history.
  * @param spec - The spec.
+ * @param checkpoint - The checkpoint of the check, or undefined.
  * @returns The detail, and the states after the order that the search
  *   found: the initial state for a history without calls, and none for a
  *   check that did not pass.
@@ -155,17 +194,24 @@ export function check<S>(
 export function whole<S>(
   history: History,
   spec: Spec<S>,
+  checkpoint?: Checkpoint<S>,
 ): { readonly detail: Detail<S>; readonly states: readonly S[] } {
-  const { events, ids } = recorded(history);
-  const calls = callsOf(events, ids);
-  const ending = new Search(calls, spec, configure([]), Number.POSITIVE_INFINITY).run();
+  const config = { ...configure([]), checkpoint };
+  const [first] = searched(history, spec, config, Number.POSITIVE_INFINITY, true);
+  const [partition, search] = first as [Partition, Search<S>];
+  let ending: Ending<S> | undefined;
+  try {
+    ending = search.run();
+  } finally {
+    kept(checkpoint, ending?.outcome ?? "violated");
+  }
   if (ending.outcome === "passed") {
     return {
-      detail: passed(calls.length === 0 ? 0 : 1, ending.steps),
+      detail: passed(partition.calls.length === 0 ? 0 : 1, ending.steps),
       states: ending.states,
     };
   }
-  return { detail: reported({ keys: [], calls }, ending, 1, ending.steps), states: [] };
+  return { detail: reported(partition, ending, 1, ending.steps), states: [] };
 }
 
 /**
@@ -235,7 +281,8 @@ export function detailJson(detail: Detail<unknown>): Record<string, unknown> {
  * @param history - The history.
  * @param spec - The sequential specification.
  * @param msg - The contract under test.
- * @param options - The limits of the check: budget, memoLimit, timeLimit and workers.
+ * @param options - The options of the check: budget, memoLimit, timeLimit,
+ *   workers and resume.
  */
 export function isLinearizable<S>(
   seat: Seat,

@@ -29,6 +29,7 @@ export * as bench from "./bench.js";
 export * as check from "./check.js";
 export { cleanup } from "./cleanup.js";
 export { type Clock, Controlled, System } from "./clock.js";
+export { failed } from "./failed.js";
 export { Failure, type Where } from "./failure.js";
 export { fault } from "./fault.js";
 export * as files from "./files/index.js";

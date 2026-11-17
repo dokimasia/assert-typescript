@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * The options of a check of linearizability: its limits, and its workers.
+ * The options of a check of linearizability: its limits, its workers, and
+ * its checkpoint.
  */
+
+import { show } from "../matcher/inspect.js";
+import { Checkpoint } from "./checkpoint.js";
 
 /** Throws a RangeError for a value that is no integer of least or more. */
 function atLeast(call: string, value: number, least: number): void {
@@ -28,6 +32,8 @@ export interface Config {
   readonly memoLimit: number;
   /** The milliseconds that the check may take, and 0 for no limit. */
   readonly timeLimit: number;
+  /** The checkpoint whose searches the check continues, and undefined for a check that searches every call. */
+  readonly checkpoint: Checkpoint<unknown> | undefined;
 }
 
 /** An option of a check of linearizability. A later option overrides an earlier one of the same setting. */
@@ -101,6 +107,27 @@ export function workers(n: number): Option {
 }
 
 /**
+ * Returns the option that continues the searches that checkpoint keeps, and
+ * keeps the searches of a check that passes. The check reads the calls that
+ * the history recorded since the last check that passed with checkpoint. It
+ * continues the search of each partition over its new calls, and searches a
+ * partition from its first call where the kept search cannot continue. A
+ * check that does not pass leaves the checkpoint without a search. The check
+ * reports what a check of every call reports, so a check after each step of
+ * a test steps each call once instead of once for each check.
+ *
+ * @param checkpoint - The checkpoint. Every check that passes it has the same spec.
+ * @returns The option.
+ * @throws TypeError for a value that is no Checkpoint.
+ */
+export function resume<S>(checkpoint: Checkpoint<S>): Option {
+  if (!(checkpoint instanceof Checkpoint)) {
+    throw new TypeError(`history: resume(${show(checkpoint)}) is no Checkpoint`);
+  }
+  return { set: (config) => ({ ...config, checkpoint }) };
+}
+
+/**
  * Returns the settings of a check: the defaults, with each option applied in
  * order.
  *
@@ -108,7 +135,12 @@ export function workers(n: number): Option {
  * @returns The settings.
  */
 export function configure(options: readonly Option[]): Config {
-  let config: Config = { budget: BUDGET, memoLimit: MEMO_LIMIT, timeLimit: 0 };
+  let config: Config = {
+    budget: BUDGET,
+    memoLimit: MEMO_LIMIT,
+    timeLimit: 0,
+    checkpoint: undefined,
+  };
   for (const option of options) {
     config = option.set(config);
   }

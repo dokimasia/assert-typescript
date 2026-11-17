@@ -8,7 +8,8 @@
  * fromIntervals, and compares the events in the history's JSON form, or the
  * entry that the seam refuses, with the vector's. A linearizable vector
  * checks a recorded script with isLinearizable against a named spec on a
- * recorder, and a serializable or a snapshot-isolation vector checks one
+ * recorder, and a resume vector checks the prefixes of a script with one
+ * Checkpoint. A serializable or a snapshot-isolation vector checks a script
  * with the check of its level. Each compares the verdict and the detail of
  * the call record with the vector's.
  */
@@ -18,25 +19,22 @@ import {
   budget,
   type History,
   hasSnapshotIsolation,
-  isLinearizable,
   isSerializable,
-  memoLimit,
   type Option,
-  workers,
 } from "../../history/index.js";
 import { Fault } from "../../matcher/fault.js";
 import type { Seat } from "../../matcher/seat.js";
-import { compareText } from "../../order.js";
-import { Recorder } from "../../seat.js";
 import { sameJson } from "../equality.js";
+import {
+  compareVerdict,
+  linearizableRecord,
+  namedSpec,
+  optionsOf,
+  type Raw,
+  recordOf,
+} from "./check.js";
+import { checkResume } from "./resume.js";
 import { intervals, record } from "./script.js";
-import { SPECS } from "./specs.js";
-
-/** A vector's JSON object. */
-type Raw = Readonly<Record<string, unknown>>;
-
-/** The contract of the check of a linearizable vector. */
-const LINEARIZABLE_CONTRACT = "the history of the vector is linearizable";
 
 /** The contract of the check of an isolation vector. */
 const ISOLATION_CONTRACT = "the transactions of the vector are isolated";
@@ -88,72 +86,6 @@ function historyOf(raw: Raw): History {
   return history;
 }
 
-/** Returns the call record of check on a recorder, as JSON. */
-function recordOf(check: (seat: Seat) => void): Raw {
-  const recorder = new Recorder();
-  check(recorder);
-  return JSON.parse(recorder.records[0] as string) as Raw;
-}
-
-/** Throws a fault for a call record whose verdict or whose detail differs from the vector's. */
-function compareVerdict(call: Raw, raw: Raw): void {
-  const expect = raw["expect"];
-  if (expect !== "pass" && expect !== "fail") {
-    throw new Fault(
-      "expect",
-      `the vector expects ${JSON.stringify(expect)}, neither pass nor fail`,
-    );
-  }
-  if (call["verdict"] !== expect) {
-    throw new Fault(
-      "expect",
-      `the check ends as ${String(call["verdict"])}, want ${expect}`,
-    );
-  }
-  if (expect === "pass") {
-    return;
-  }
-  const detail = call["detail"] as Raw;
-  const stated = raw["detail"] as Raw;
-  for (const name of Object.keys(stated).sort(compareText)) {
-    if (!(name in detail)) {
-      throw new Fault(
-        `detail.${name}`,
-        `the record states no such field, want ${JSON.stringify(stated[name])}`,
-      );
-    }
-    if (!sameJson(detail[name], stated[name])) {
-      throw new Fault(
-        `detail.${name}`,
-        `the field is ${JSON.stringify(detail[name])}, want ${JSON.stringify(stated[name])}`,
-      );
-    }
-  }
-}
-
-/** Returns the options of a check that a vector states, and a fault at a member that states no positive integer. */
-function optionsOf(raw: Raw): Option[] {
-  const options: Option[] = [];
-  const stated: [string, (n: number) => Option][] = [
-    ["budget", budget],
-    ["memo-limit", memoLimit],
-    ["workers", workers],
-  ];
-  for (const [member, option] of stated) {
-    const n = raw[member];
-    if (n !== undefined) {
-      if (!Number.isSafeInteger(n) || (n as number) < 1) {
-        throw new Fault(
-          member,
-          `the ${member} is ${JSON.stringify(n)}, no integer of 1 or more`,
-        );
-      }
-      options.push(option(n as number));
-    }
-  }
-  return options;
-}
-
 /**
  * Checks the history of a linearizable vector against its named spec, and
  * compares the call record with the vector's. A passing check states no
@@ -162,16 +94,11 @@ function optionsOf(raw: Raw): Option[] {
  * one step less it ends undecided at the steps limit after that budget.
  */
 function checkLinearizable(raw: Raw): void {
-  const spec = SPECS.get(String(raw["spec"]));
-  if (spec === undefined) {
-    throw new Fault("spec", `${JSON.stringify(raw["spec"])} is no named spec`);
-  }
+  const spec = namedSpec(raw);
   const history = historyOf(raw);
   const options = optionsOf(raw);
   const checked = (...more: Option[]) =>
-    recordOf((seat) =>
-      isLinearizable(seat, history, spec, LINEARIZABLE_CONTRACT, ...options, ...more),
-    );
+    linearizableRecord(history, spec, [...options, ...more]);
   const call = checked();
   compareVerdict(call, raw);
   if (raw["expect"] === "fail") {
@@ -239,6 +166,7 @@ function checkIsolation(
 export const RUNNERS: ReadonlyMap<string, (raw: Raw) => void> = new Map([
   ["seam", checkSeam],
   ["linearizable", checkLinearizable],
+  ["resume", checkResume],
   ["serializable", checkIsolation(isSerializable)],
   ["snapshot-isolation", checkIsolation(hasSnapshotIsolation)],
 ]);

@@ -14,7 +14,7 @@ import { Body, Ended, runOn } from "./matcher/body.js";
 import { track } from "./matcher/pending.js";
 import { Mode, type Reporter, type Seat } from "./matcher/seat.js";
 import { Running } from "./matcher/verdict.js";
-import { own } from "./record/calls.js";
+import { own, type Slot } from "./record/calls.js";
 
 /**
  * The seat of the check that rejects drives. It keeps each record of the
@@ -25,9 +25,20 @@ import { own } from "./record/calls.js";
  */
 class Check extends Body implements Reporter {
   readonly #records: Failure[] = [];
-  #failed = false;
+  #failed: boolean;
   #fault: Error | undefined;
   #reason: string | undefined;
+
+  /**
+   * Returns the seat of the check of a call of rejects.
+   *
+   * @param parent - The seat of rejects.
+   * @param slot - The slot of the call of rejects, or undefined when it is not recorded.
+   */
+  constructor(parent: Seat, slot: Slot | undefined) {
+    super(parent, slot);
+    this.#failed = false;
+  }
 
   /** Marks the check failed, and ends it. */
   fail(): never {
@@ -74,6 +85,11 @@ class Check extends Body implements Reporter {
   skip(reason: string): never {
     this.#reason ??= reason;
     throw new Ended();
+  }
+
+  /** Reports whether the check received a failure, or a fault that ends its call. */
+  protected received(): boolean {
+    return this.#failed || this.#fault !== undefined;
   }
 
   /** The check's records, whether it failed, the fault that ended it, and the reason of its skip. */

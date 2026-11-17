@@ -486,6 +486,29 @@ describe("api", () => {
         expect(ran.splice(0)).toEqual(["after a failure"]);
       });
 
+      it("registers a cleanup that reads failed in a test that passes", ({ seat }) => {
+        seat.cleanup(() => {
+          ran.push(`failed ${String(seat.failed)}`);
+        });
+      });
+
+      it("leaves the seat of a test that passed without a failure", () => {
+        expect(ran.splice(0)).toEqual(["failed false"]);
+      });
+
+      it.fails("registers a cleanup that reads failed in a test that throws", ({
+        seat,
+      }) => {
+        seat.cleanup(() => {
+          ran.push(`failed ${String(seat.failed)}`);
+        });
+        throw new RangeError("the port is busy");
+      });
+
+      it("fails the seat of a test that threw before its cleanups run", () => {
+        expect(ran.splice(0)).toEqual(["failed true"]);
+      });
+
       it.fails("fails a test whose cleanup throws", ({ seat }) => {
         seat.cleanup(() => {
           throw new Error("the directory is busy");
